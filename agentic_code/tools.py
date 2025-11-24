@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import io
 import contextlib
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -164,11 +165,21 @@ def save_stage3_plan(plan_json: str) -> str:
     Returns:
         Success message with path, or raises ValueError
     """
-    # Parse JSON
+    # Parse JSON (with a light sanitization pass for invalid escapes)
+    invalid_escape = re.compile(r'\\([^"\\/bfnrtu])')
+    sanitized_payload = invalid_escape.sub(r"\1", plan_json)
     try:
-        raw_obj = json.loads(plan_json)
+        raw_obj = json.loads(sanitized_payload)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON: {e}") from e
+        debug_path = STAGE3_OUT_DIR / "failed_stage3_plan.json"
+        debug_path.write_text(plan_json)
+        start = max(e.pos - 40, 0)
+        end = min(e.pos + 40, len(plan_json))
+        snippet = plan_json[start:end]
+        raise ValueError(
+            f"Invalid JSON: {e}. Saved raw payload to {debug_path}. "
+            f"Context: {snippet}"
+        ) from e
 
     # Schema validation
     try:

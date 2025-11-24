@@ -56,11 +56,90 @@ STEP 1: UNDERSTAND (2-3 tool calls)
 
 STEP 2: BUILD JSON SILENTLY
 ----------------------------
-In your head, construct the Stage3Plan JSON with these sections.
+In your head, construct the Stage3Plan JSON with these sections:
+
+```json
+{
+  "plan_id": "PLAN-{selected_task_id}",  // EXACT format!
+  "selected_task_id": "{task_id}",
+  "goal": "Brief description",
+  "task_category": "descriptive|predictive|unsupervised",
+  "artifacts": {
+    "intermediate_table": "{task_id}_data.parquet",
+    "intermediate_format": "parquet",
+    "expected_columns": ["col1", "col2"],
+    "expected_row_count_range": [min, max]
+  },
+  "file_instructions": [{
+    "file_id": "file1",
+    "original_name": "actual_filename.csv",
+    "alias": "short_name",
+    "rename_columns": {"Original Name": "clean_name"},
+    "keep_columns": ["clean_name1", "clean_name2"],
+    "filters": [],
+    "join_keys": [],
+    "notes": null
+  }],
+  "join_steps": [{
+    "step": 1,
+    "description": "Load base table",
+    "left_table": "short_name",
+    "right_table": null,
+    "join_type": "base",
+    "join_keys": [],
+    "expected_cardinality": "base",
+    "validation": {}
+  }],
+  "feature_engineering": [{
+    "feature_name": "new_col",
+    "description": "What it represents",
+    "transform": "mean/sum/etc",
+    "depends_on": ["source_col1"],
+    "implementation": "df['new_col'] = ..."
+  }],
+  "validation": {
+    "time_split": null,
+    "coverage_checks": [],
+    "cardinality_checks": [],
+    "additional_checks": ["Data loaded", "No duplicates"]
+  },
+  "expected_model_types": ["Aggregation"],
+  "evaluation_metrics": ["Summary Statistics"],
+  "notes": ["Any important context"],
+  "key_normalization": []
+}
+```
 
 STEP 3: SAVE (1 tool call - THIS IS MANDATORY)
 -----------------------------------------------
 Call: save_stage3_plan(plan_json=<your complete JSON as a string>)
+
+═══════════════════════════════════════════════════════════════
+EXAMPLES OF CORRECT BEHAVIOR
+═══════════════════════════════════════════════════════════════
+
+GOOD (will succeed):
+- Round 1: load_task_proposal, list_files, inspect_file
+- Round 2: save_stage3_plan(plan_json="...") ✅
+
+BAD (will fail):
+- Round 1-4: Never calls save_stage3_plan ❌
+- Round 4: Prints JSON in reasoning instead of calling tool ❌
+
+═══════════════════════════════════════════════════════════════
+IMPORTANT TIPS
+═══════════════════════════════════════════════════════════════
+
+For WIDE FORMAT data (years as columns like "2018-Quantity", "2019-Quantity"):
+- Rename to "quantity_2018", "quantity_2019", etc.
+- Keep ALL year columns
+- Create aggregate features: mean, growth, trend
+
+For SINGLE FILE descriptive tasks:
+- join_steps: ONE entry with join_type="base"
+- feature_engineering: simple aggregates (mean, sum, growth)
+- validation: method="none" for time_split
+- expected_model_types: ["Aggregation", "Visualization"]
 
 Remember: Your ONLY job is to call save_stage3_plan() with valid JSON.
 DO NOT explain the plan. DO NOT show JSON to the user. JUST SAVE IT."""

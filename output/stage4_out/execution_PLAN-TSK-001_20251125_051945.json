@@ -1,0 +1,15 @@
+{
+  "plan_id": "PLAN-TSK-001",
+  "task_category": "predictive",
+  "status": "success",
+  "outputs": {
+    "intermediate_table": "TSK-001_data.parquet",
+    "final_results": "TSK-001_results.json"
+  },
+  "metrics": {
+    "MAE": 53.95,
+    "RMSE": 66.69
+  },
+  "summary": "Forecasted future rice exports to Bangladesh using a linear regression model. The model was trained on mean quantity and growth rate features. Evaluation metrics indicate moderate accuracy.",
+  "errors": []
+}

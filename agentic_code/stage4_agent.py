@@ -115,7 +115,13 @@ def run_stage4(plan_id: str, max_rounds: int = STAGE4_MAX_ROUNDS, debug: bool = 
     state: MessagesState = {"messages": [system_msg, human_msg]}
 
     if not debug:
-        return stage4_app.invoke(state, config={"configurable": {"thread_id": f"stage4-{plan_id}"}})
+        return stage4_app.invoke(
+            state,
+            config={
+                "configurable": {"thread_id": f"stage4-{plan_id}"},
+                "recursion_limit": max_rounds * 3,
+            },
+        )
 
     print("=" * 80)
     print(f"🚀 STAGE 4: Executing plan {plan_id}")
@@ -127,7 +133,10 @@ def run_stage4(plan_id: str, max_rounds: int = STAGE4_MAX_ROUNDS, debug: bool = 
 
     for curr_state in stage4_app.stream(
         state,
-        config={"configurable": {"thread_id": f"stage4-{plan_id}"}},
+        config={
+            "configurable": {"thread_id": f"stage4-{plan_id}"},
+            "recursion_limit": max_rounds * 3,
+        },
         stream_mode="values",
     ):
         msgs = curr_state["messages"]

@@ -1,0 +1,122 @@
+{
+  "plan_id": "PLAN-TSK-001",
+  "selected_task_id": "TSK-001",
+  "goal": "Forecast future rice exports to Bangladesh",
+  "task_category": "predictive",
+  "created_at": "2025-11-25T04:50:05.856270",
+  "created_by": "stage3_agent",
+  "artifacts": {
+    "intermediate_table": "TSK-001_data.parquet",
+    "intermediate_format": "parquet",
+    "expected_columns": [
+      "HS Code",
+      "Description",
+      "2018 - 19-Quantity",
+      "2019 - 20-Quantity",
+      "2020 - 21-Quantity",
+      "2021 - 22-Quantity",
+      "2022 - 23-Quantity",
+      "2023 - 24-Quantity",
+      "2024 - 25-Quantity"
+    ],
+    "expected_row_count_range": [
+      7,
+      10
+    ]
+  },
+  "key_normalization": [],
+  "file_instructions": [
+    {
+      "file_id": "file1",
+      "original_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "alias": "rice_exports",
+      "filters": [],
+      "rename_columns": {
+        "2018 - 19-Quantity": "quantity_2018_19",
+        "2019 - 20-Quantity": "quantity_2019_20",
+        "2020 - 21-Quantity": "quantity_2020_21",
+        "2021 - 22-Quantity": "quantity_2021_22",
+        "2022 - 23-Quantity": "quantity_2022_23",
+        "2023 - 24-Quantity": "quantity_2023_24",
+        "2024 - 25-Quantity": "quantity_2024_25"
+      },
+      "join_keys": [],
+      "keep_columns": [
+        "HS Code",
+        "Description",
+        "quantity_2018_19",
+        "quantity_2019_20",
+        "quantity_2020_21",
+        "quantity_2021_22",
+        "quantity_2022_23",
+        "quantity_2023_24",
+        "quantity_2024_25"
+      ],
+      "notes": null
+    }
+  ],
+  "join_steps": [
+    {
+      "step": 1,
+      "description": "Load base table",
+      "left_table": "rice_exports",
+      "right_table": null,
+      "join_type": "base",
+      "join_keys": [],
+      "expected_cardinality": "base",
+      "validation": {
+        "check_duplicates_on_keys": [],
+        "expected_unique": false,
+        "check_row_count_stable": false,
+        "check_no_duplicates_introduced": false,
+        "acceptable_coverage": null,
+        "max_cardinality_ratio": null
+      }
+    }
+  ],
+  "feature_engineering": [
+    {
+      "feature_name": "mean_quantity",
+      "description": "Mean quantity over years",
+      "transform": "mean",
+      "depends_on": [
+        "quantity_2018_19",
+        "quantity_2019_20",
+        "quantity_2020_21",
+        "quantity_2021_22",
+        "quantity_2022_23",
+        "quantity_2023_24"
+      ],
+      "implementation": "df['mean_quantity'] = df[['quantity_2018_19', 'quantity_2019_20', 'quantity_2020_21', 'quantity_2021_22', 'quantity_2022_23', 'quantity_2023_24']].mean(axis=1)"
+    },
+    {
+      "feature_name": "growth_rate",
+      "description": "Growth rate from previous year",
+      "transform": "growth",
+      "depends_on": [
+        "quantity_2023_24",
+        "quantity_2022_23"
+      ],
+      "implementation": "df['growth_rate'] = (df['quantity_2023_24'] - df['quantity_2022_23']) / df['quantity_2022_23]"
+    }
+  ],
+  "validation": {
+    "time_split": null,
+    "coverage_checks": [],
+    "cardinality_checks": [],
+    "additional_checks": [
+      "Data loaded",
+      "No duplicates"
+    ]
+  },
+  "expected_model_types": [
+    "Time Series Forecasting"
+  ],
+  "evaluation_metrics": [
+    "MAE",
+    "RMSE"
+  ],
+  "notes": [
+    "Handle missing values using mean imputation"
+  ]
+}

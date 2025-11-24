@@ -1,0 +1,11 @@
+{
+  "plan_id": "PLAN-TSK-001",
+  "task_category": "predictive",
+  "visualizations": [
+    "evaluation_metrics.png",
+    "predicted_values_histogram.png"
+  ],
+  "html_report": null,
+  "summary": "Visualizations include a bar chart of evaluation metrics (MAE and RMSE) and a histogram of predicted rice export values.",
+  "insights": "The model has moderate accuracy as indicated by the MAE and RMSE metrics. The distribution of predicted values provides insight into the variability of the forecasted rice exports."
+}

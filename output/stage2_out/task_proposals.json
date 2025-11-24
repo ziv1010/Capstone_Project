@@ -1,0 +1,168 @@
+{
+  "proposals": [
+    {
+      "id": "TSK-001",
+      "category": "predictive",
+      "title": "Predict Future Rice Exports to Bangladesh",
+      "problem_statement": "Forecasting future rice exports to Bangladesh is crucial for trade planning and policy-making. Understanding export trends can help stakeholders make informed decisions.",
+      "required_files": [
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+      ],
+      "join_plan": {
+        "hypothesized_keys": [
+          [
+            "HS Code",
+            "Description"
+          ]
+        ],
+        "notes": "No join required as this dataset stands alone."
+      },
+      "target": {
+        "name": "2024 - 25-Quantity",
+        "granularity": [
+          "HS Code",
+          "Description"
+        ],
+        "horizon": "1-year ahead"
+      },
+      "feature_plan": {
+        "candidates": [
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2023 - 24-Quantity"
+        ],
+        "transform_ideas": [
+          "lagged features",
+          "growth rates"
+        ],
+        "handling_missingness": "Impute missing values using mean or median of the respective columns."
+      },
+      "validation_plan": "Use time-series cross-validation to evaluate model performance.",
+      "quality_checks": [
+        "Ensure no data leakage by avoiding future data in training.",
+        "Check for consistent units and scales in the target and feature columns."
+      ],
+      "expected_outputs": [
+        "tables",
+        "plots",
+        "model_metrics"
+      ]
+    },
+    {
+      "id": "TSK-002",
+      "category": "descriptive",
+      "title": "Analyze Trends in Rice Cultivation and Production",
+      "problem_statement": "Understanding trends in rice cultivation and production can provide insights into agricultural productivity and resource allocation. This analysis can inform policy and investment decisions.",
+      "required_files": [
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "All-India-profile_-Crop-wise-Area.csv"
+      ],
+      "join_plan": {
+        "hypothesized_keys": [
+          [
+            "Crop",
+            "Season"
+          ]
+        ],
+        "notes": "Join on Crop and Season to combine area, production, and yield data."
+      },
+      "target": {
+        "name": null,
+        "granularity": [
+          "Crop",
+          "Season"
+        ],
+        "horizon": null
+      },
+      "feature_plan": {
+        "candidates": [
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "transform_ideas": [
+          "time series analysis",
+          "seasonal decomposition"
+        ],
+        "handling_missingness": "Handle missing values by imputing with mean or median of the respective columns."
+      },
+      "validation_plan": "Use descriptive statistics and visualizations to validate trends.",
+      "quality_checks": [
+        "Ensure consistent units and scales in the feature columns.",
+        "Validate the join operation to ensure correct alignment of data."
+      ],
+      "expected_outputs": [
+        "tables",
+        "plots",
+        "summary_report"
+      ]
+    },
+    {
+      "id": "TSK-003",
+      "category": "unsupervised",
+      "title": "Cluster Rice Varieties Based on Export Patterns",
+      "problem_statement": "Clustering rice varieties based on their export patterns can help identify groups of similar varieties and inform targeted marketing strategies.",
+      "required_files": [
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+      ],
+      "join_plan": {
+        "hypothesized_keys": [
+          [
+            "HS Code",
+            "Description"
+          ]
+        ],
+        "notes": "No join required as this dataset stands alone."
+      },
+      "target": {
+        "name": null,
+        "granularity": [
+          "HS Code",
+          "Description"
+        ],
+        "horizon": null
+      },
+      "feature_plan": {
+        "candidates": [
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2023 - 24-Quantity",
+          "2024 - 25-Quantity"
+        ],
+        "transform_ideas": [
+          "standardization",
+          "dimensionality reduction"
+        ],
+        "handling_missingness": "Impute missing values using mean or median of the respective columns."
+      },
+      "validation_plan": "Evaluate cluster quality using silhouette scores and visual inspection.",
+      "quality_checks": [
+        "Ensure consistent units and scales in the feature columns.",
+        "Check for outliers and handle them appropriately."
+      ],
+      "expected_outputs": [
+        "tables",
+        "plots",
+        "cluster_assignments"
+      ]
+    }
+  ]
+}

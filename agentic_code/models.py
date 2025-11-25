@@ -7,7 +7,7 @@ execution plans, results, and visualization reports.
 
 from __future__ import annotations
 
-from typing import List, Dict, Any, Optional, Literal, Tuple
+from typing import List, Dict, Any, Optional, Literal, Tuple, TypedDict
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -314,3 +314,17 @@ class PipelineState(BaseModel):
     
     class Config:
         arbitrary_types_allowed = True
+
+
+# ===========================
+# Stage 0: Conversation State
+# ===========================
+
+class ConversationState(TypedDict):
+    """State for conversational interactions."""
+    query: str  # Current user question
+    conversation_history: List[Dict[str, str]]  # Past Q&A
+    available_datasets: List[str]  # Known datasets
+    completed_tasks: List[str]  # Tasks already executed
+    current_plan: Optional[str]  # Current execution plan
+    response: Optional[str]  # Agent's response

@@ -596,3 +596,202 @@ ALL_TOOLS = {
     "stage4": STAGE4_TOOLS,
     "stage5": STAGE5_TOOLS,
 }
+
+
+# ===========================
+# Stage 0: Conversational Tools
+# ===========================
+
+@tool
+def trigger_pipeline_stages(start_stage: int, end_stage: int, task_id: Optional[str] = None) -> str:
+    """Triggers execution of pipeline stages (1-5) based on the conversational query.
+    
+    Args:
+        start_stage: Stage to start from (1-5)
+        end_stage: Stage to end at (1-5)
+        task_id: Optional task ID for Stages 3+
+        
+    Returns:
+        Execution summary string
+    """
+    from .master_agent import run_partial_pipeline
+    
+    try:
+        # Run the pipeline
+        state = run_partial_pipeline(start_stage, end_stage, task_id)
+        
+        # Format summary based on what ran
+        summary = []
+        summary.append(f"✅ Pipeline stages {start_stage}-{end_stage} completed successfully.")
+        
+        if state.get("dataset_summaries"):
+            summary.append(f"- Generated {len(state['dataset_summaries'])} dataset summaries")
+            
+        if state.get("task_proposals"):
+            summary.append(f"- Generated {len(state['task_proposals'])} task proposals")
+            
+        if state.get("stage3_plan"):
+            summary.append(f"- Created execution plan: {state['stage3_plan'].plan_id}")
+            
+        if state.get("execution_result"):
+            status = state['execution_result'].status
+            summary.append(f"- Execution finished with status: {status}")
+            
+        if state.get("visualization_report"):
+            viz_count = len(state['visualization_report'].visualizations)
+            summary.append(f"- Created {viz_count} visualizations")
+            
+        return "\n".join(summary)
+        
+    except Exception as e:
+        return f"❌ Pipeline execution failed: {str(e)}"
+
+
+@tool
+def query_data_capabilities() -> str:
+    """Returns a summary of available datasets and what predictions/analyses are possible.
+    
+    Checks for existing Stage 1 summaries and Stage 2 task proposals.
+    If not available, triggers Stage 1-2 automatically.
+    
+    Returns:
+        Text summary of capabilities
+    """
+    from .master_agent import run_partial_pipeline
+    
+    # Check if we have summaries
+    summaries = _list_summary_files()
+    
+    if not summaries:
+        return "No data summaries found. Please run 'trigger_pipeline_stages(1, 2)' first to analyze the data."
+        
+    # Read summaries
+    summary_texts = []
+    for s in summaries:
+        try:
+            content = _read_summary_file(s)
+            data = json.loads(content)
+            summary_texts.append(f"- {data.get('filename', s)}: {data.get('description', 'No description')}")
+        except:
+            summary_texts.append(f"- {s}")
+            
+    # Check for proposals
+    proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
+    proposals_text = ""
+    
+    if proposals_path.exists():
+        try:
+            data = json.loads(proposals_path.read_text())
+            stage2 = Stage2Output.model_validate(data)
+            proposals_text = "\n\nAvailable Prediction Tasks:\n"
+            for p in stage2.proposals:
+                proposals_text += f"- [{p.id}] {p.task_type}: {p.description}\n"
+        except:
+            proposals_text = "\n(Could not read existing proposals)"
+    else:
+        proposals_text = "\n(No specific task proposals generated yet)"
+        
+    return f"Data Capabilities:\n\nDatasets:\n" + "\n".join(summary_texts) + proposals_text
+
+
+@tool
+def execute_dynamic_analysis(question: str, code: str, description: str) -> str:
+    """General-purpose tool for running custom analysis code.
+    
+    The agent generates code based on the user's question.
+    Has access to all data files and can create ad-hoc predictions.
+    
+    Args:
+        question: The user's original question
+        code: Python code to execute
+        description: Brief description of the analysis
+        
+    Returns:
+        Results as formatted text suitable for conversation
+    """
+    # Reuse the Stage 4 execution environment but with a focus on immediate text output
+    from sklearn.linear_model import LinearRegression
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.metrics import mean_squared_error
+    from sklearn.model_selection import train_test_split
+    import matplotlib.pyplot as plt
+    
+    def load_dataframe_helper(filename: str):
+        return load_dataframe(filename, base_dir=DATA_DIR)
+    
+    globals_dict = {
+        "__name__": "__dynamic_analyzer__",
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "load_dataframe": load_dataframe_helper,
+        "plt": plt,
+        "LinearRegression": LinearRegression,
+        "RandomForestRegressor": RandomForestRegressor,
+        "mean_squared_error": mean_squared_error,
+        "train_test_split": train_test_split,
+    }
+    
+    local_env = {}
+    buf = io.StringIO()
+    
+    try:
+        with contextlib.redirect_stdout(buf):
+            print(f"=== Analysis: {description} ===")
+            exec(code, globals_dict, local_env)
+    except Exception as e:
+        return f"❌ Analysis failed: {e}"
+    
+    return buf.getvalue() or "[Analysis finished with no output]"
+
+
+@tool
+def get_conversation_context() -> str:
+    """Returns current conversation state (query history, completed analyses, cached results).
+    
+    Returns:
+        JSON string of conversation state
+    """
+    state_path = OUTPUT_ROOT / "conversation_state.json"
+    if not state_path.exists():
+        return json.dumps({
+            "history": [],
+            "completed_tasks": [],
+            "last_updated": "never"
+        })
+    return state_path.read_text()
+
+
+@tool
+def save_conversation_state(state_json: str) -> str:
+    """Saves current conversation state for persistence.
+    
+    Args:
+        state_json: JSON string of state
+        
+    Returns:
+        Confirmation message
+    """
+    try:
+        # Validate valid JSON
+        json.loads(state_json)
+        state_path = OUTPUT_ROOT / "conversation_state.json"
+        state_path.write_text(state_json)
+        return "✅ Conversation state saved"
+    except Exception as e:
+        return f"❌ Failed to save state: {e}"
+
+
+# Stage 0 tool list
+STAGE0_TOOLS = [
+    trigger_pipeline_stages,
+    query_data_capabilities,
+    execute_dynamic_analysis,
+    get_conversation_context,
+    save_conversation_state,
+]
+
+# Update ALL_TOOLS
+ALL_TOOLS["stage0"] = STAGE0_TOOLS

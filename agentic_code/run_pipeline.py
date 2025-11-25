@@ -87,6 +87,12 @@ Examples:
     )
     
     parser.add_argument(
+        "--conversational",
+        action="store_true",
+        help="Run in conversational mode (interactive)"
+    )
+    
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=True,
@@ -94,6 +100,19 @@ Examples:
     )
     
     args = parser.parse_args()
+    
+    # Conversational mode
+    if args.conversational:
+        from agentic_code.run_conversational import main as run_conv
+        # We need to hack sys.argv or call the function directly
+        # Since run_conversational.main() parses args too, let's just call it
+        # But we need to clear args first or pass them explicitly
+        # Simpler: just import and run the interactive loop logic if possible, 
+        # or subprocess. But importing is better.
+        # Let's just call the main function from run_conversational
+        # We might need to adjust sys.argv to avoid conflict if we passed other flags
+        sys.argv = [sys.argv[0]] # Clear args for the next parser
+        return run_conv()
     
     # Print config and exit if requested
     if args.config:

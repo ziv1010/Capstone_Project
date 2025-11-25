@@ -397,5 +397,5 @@
       "Description"
     ]
   ],
-  "notes": "The HS Code and Description columns are unique and non-null, making them potential keys. Some quantity and value columns have high null fractions."
+  "notes": "The HS Code and Description columns are marked as potential keys due to their uniqueness and non-null nature."
 }

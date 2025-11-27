@@ -1,9 +1,9 @@
 {
   "plan_id": "PLAN-TSK-001",
   "selected_task_id": "TSK-001",
-  "goal": "Forecast future rice exports to Bangladesh",
+  "goal": "Predict the export value of rice based on historical production data.",
   "task_category": "predictive",
-  "created_at": "2025-11-25T04:50:05.856270",
+  "created_at": "2025-11-27T17:26:00.772706",
   "created_by": "stage3_agent",
   "artifacts": {
     "intermediate_table": "TSK-001_data.parquet",
@@ -11,46 +11,86 @@
     "expected_columns": [
       "HS Code",
       "Description",
-      "2018 - 19-Quantity",
-      "2019 - 20-Quantity",
-      "2020 - 21-Quantity",
-      "2021 - 22-Quantity",
-      "2022 - 23-Quantity",
-      "2023 - 24-Quantity",
-      "2024 - 25-Quantity"
+      "2018 - 19-Value (USD)",
+      "2019 - 20-Value (USD)",
+      "2020 - 21-Value (USD)",
+      "2021 - 22-Value (USD)",
+      "2022 - 23-Value (USD)",
+      "2023 - 24-Value (USD)",
+      "2024 - 25-Value (USD)",
+      "Crop",
+      "Season",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Area-2024-25",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24",
+      "Yield-2024-25"
     ],
     "expected_row_count_range": [
-      7,
-      10
+      10,
+      100
     ]
   },
   "key_normalization": [],
   "file_instructions": [
     {
-      "file_id": "file1",
+      "file_id": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
       "original_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-      "alias": "rice_exports",
+      "alias": "export",
       "filters": [],
-      "rename_columns": {
-        "2018 - 19-Quantity": "quantity_2018_19",
-        "2019 - 20-Quantity": "quantity_2019_20",
-        "2020 - 21-Quantity": "quantity_2020_21",
-        "2021 - 22-Quantity": "quantity_2021_22",
-        "2022 - 23-Quantity": "quantity_2022_23",
-        "2023 - 24-Quantity": "quantity_2023_24",
-        "2024 - 25-Quantity": "quantity_2024_25"
-      },
+      "rename_columns": {},
       "join_keys": [],
       "keep_columns": [
         "HS Code",
         "Description",
-        "quantity_2018_19",
-        "quantity_2019_20",
-        "quantity_2020_21",
-        "quantity_2021_22",
-        "quantity_2022_23",
-        "quantity_2023_24",
-        "quantity_2024_25"
+        "2018 - 19-Value (USD)",
+        "2019 - 20-Value (USD)",
+        "2020 - 21-Value (USD)",
+        "2021 - 22-Value (USD)",
+        "2022 - 23-Value (USD)",
+        "2023 - 24-Value (USD)",
+        "2024 - 25-Value (USD)"
+      ],
+      "notes": null
+    },
+    {
+      "file_id": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "original_name": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "alias": "production",
+      "filters": [
+        "Crop == 'Rice'",
+        "Season == 'Total'"
+      ],
+      "rename_columns": {},
+      "join_keys": [],
+      "keep_columns": [
+        "Crop",
+        "Season",
+        "Area-2020-21",
+        "Area-2021-22",
+        "Area-2022-23",
+        "Area-2023-24",
+        "Area-2024-25",
+        "Production-2020-21",
+        "Production-2021-22",
+        "Production-2022-23",
+        "Production-2023-24",
+        "Production-2024-25",
+        "Yield-2020-21",
+        "Yield-2021-22",
+        "Yield-2022-23",
+        "Yield-2023-24",
+        "Yield-2024-25"
       ],
       "notes": null
     }
@@ -59,11 +99,36 @@
     {
       "step": 1,
       "description": "Load base table",
-      "left_table": "rice_exports",
+      "left_table": "export",
       "right_table": null,
       "join_type": "base",
       "join_keys": [],
+      "left_on": [],
+      "right_on": [],
       "expected_cardinality": "base",
+      "validation": {
+        "check_duplicates_on_keys": [],
+        "expected_unique": false,
+        "check_row_count_stable": false,
+        "check_no_duplicates_introduced": false,
+        "acceptable_coverage": null,
+        "max_cardinality_ratio": null
+      }
+    },
+    {
+      "step": 2,
+      "description": "Join production data",
+      "left_table": "export",
+      "right_table": "production",
+      "join_type": "left",
+      "join_keys": [],
+      "left_on": [
+        "Description"
+      ],
+      "right_on": [
+        "Crop"
+      ],
+      "expected_cardinality": "many-to-one",
       "validation": {
         "check_duplicates_on_keys": [],
         "expected_unique": false,
@@ -76,47 +141,50 @@
   ],
   "feature_engineering": [
     {
-      "feature_name": "mean_quantity",
-      "description": "Mean quantity over years",
-      "transform": "mean",
+      "feature_name": "lagged_value_2023",
+      "description": "Lagged value of 2023-24-Value (USD)",
+      "transform": "lag",
       "depends_on": [
-        "quantity_2018_19",
-        "quantity_2019_20",
-        "quantity_2020_21",
-        "quantity_2021_22",
-        "quantity_2022_23",
-        "quantity_2023_24"
+        "2023 - 24-Value (USD)"
       ],
-      "implementation": "df['mean_quantity'] = df[['quantity_2018_19', 'quantity_2019_20', 'quantity_2020_21', 'quantity_2021_22', 'quantity_2022_23', 'quantity_2023_24']].mean(axis=1)"
+      "implementation": "df['lagged_value_2023'] = df['2023 - 24-Value (USD)'].shift(1)"
     },
     {
-      "feature_name": "growth_rate",
-      "description": "Growth rate from previous year",
+      "feature_name": "growth_rate_2023",
+      "description": "Growth rate of 2023-24-Value (USD)",
       "transform": "growth",
       "depends_on": [
-        "quantity_2023_24",
-        "quantity_2022_23"
+        "2023 - 24-Value (USD)",
+        "2022 - 23-Value (USD)"
       ],
-      "implementation": "df['growth_rate'] = (df['quantity_2023_24'] - df['quantity_2022_23']) / df['quantity_2022_23]"
+      "implementation": "df['growth_rate_2023'] = (df['2023 - 24-Value (USD)'] - df['2022 - 23-Value (USD)']) / df['2022 - 23-Value (USD)']"
     }
   ],
   "validation": {
-    "time_split": null,
+    "time_split": {
+      "method": "year-based",
+      "train_years": "2018-19 to 2023-24",
+      "test_years": "2024-25",
+      "validation_years": null,
+      "leakage_check": "Ensure no data from 2024-25 is used in training."
+    },
     "coverage_checks": [],
     "cardinality_checks": [],
     "additional_checks": [
       "Data loaded",
-      "No duplicates"
+      "No duplicates on join keys"
     ]
   },
   "expected_model_types": [
-    "Time Series Forecasting"
+    "Regression",
+    "Time Series"
   ],
   "evaluation_metrics": [
-    "MAE",
-    "RMSE"
+    "RMSE",
+    "MAE"
   ],
   "notes": [
-    "Handle missing values using mean imputation"
+    "Manual join based on crop type (rice) and year.",
+    "Handle missing values with mean or median imputation."
   ]
 }

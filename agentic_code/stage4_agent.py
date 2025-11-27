@@ -6,9 +6,16 @@ Executes Stage 3 plans by writing and running code to process data, build models
 
 from __future__ import annotations
 
-import json
+import sys
 from pathlib import Path
-from typing import Dict, List
+
+# Allow running as a script (python agentic_code/stage4_agent.py PLAN-TSK-001)
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    __package__ = "agentic_code"
+
+import json
+from typing import Dict, List, Optional
 
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from langchain_openai import ChatOpenAI
@@ -16,9 +23,10 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE4_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS
-from .models import ExecutionResult
+from .config import STAGE4_OUT_DIR, STAGE3_5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS
+from .models import ExecutionResult, TesterOutput
 from .tools import STAGE4_TOOLS
+from .failsafe_agent import run_failsafe
 
 
 # ===========================
@@ -47,7 +55,28 @@ CRITICAL RULES
 4. VERIFY EVERYTHING - check your work at each step
 5. END BY CALLING save_execution_result() - this is your success criterion
 
-Your success = Executing the plan and saving results."""
+═══════════════════════════════════════════════════════════════
+IMPORTANT: STAGE 3.5 TESTER OUTPUT
+═══════════════════════════════════════════════════════════════
+
+Before you start, CHECK if Stage 3.5 Tester output is available in the user message.
+
+IF TESTER OUTPUT IS PROVIDED:
+- You MUST use the selected_method that was benchmarked and chosen
+- The tester output contains:
+  * selected_method: The forecasting method that performed best
+  * implementation_code: Code snippet showing how to implement it
+  * benchmark_results: Performance metrics proving it works
+  * data_split_strategy: How data was split for testing
+
+- INCORPORATE the selected method into your implementation
+- You can adapt the implementation_code to fit the full dataset
+- The method was already proven to work on a subset
+
+IF NO TESTER OUTPUT:
+- Proceed normally using methods from the Stage 3 plan
+
+Your success = Executing the plan (using the benchmarked method if available) and saving results."""
 
 
 # ===========================
@@ -86,11 +115,17 @@ stage4_app = builder.compile(checkpointer=memory)
 # Stage 4 Runner
 # ===========================
 
-def run_stage4(plan_id: str, max_rounds: int = STAGE4_MAX_ROUNDS, debug: bool = True) -> Dict:
+def run_stage4(
+    plan_id: str,
+    tester_output: Optional[TesterOutput] = None,
+    max_rounds: int = STAGE4_MAX_ROUNDS,
+    debug: bool = True,
+) -> Dict:
     """Execute a Stage 3 plan.
     
     Args:
         plan_id: Plan ID from Stage 3 (e.g., 'PLAN-TSK-001')
+        tester_output: Optional TesterOutput from Stage 3.5 with selected method
         max_rounds: Maximum number of agent rounds
         debug: Whether to print debug information
         
@@ -98,6 +133,23 @@ def run_stage4(plan_id: str, max_rounds: int = STAGE4_MAX_ROUNDS, debug: bool = 
         Final state from the graph execution
     """
     system_msg = SystemMessage(content=STAGE4_SYSTEM_PROMPT)
+
+    tester_context = ""
+    if tester_output:
+        selected_method = tester_output.selected_method
+        snippet = selected_method.implementation_code or ""
+        # Keep the snippet concise for the message to avoid blowing context
+        if len(snippet) > 1200:
+            snippet = snippet[:600] + "\n...[truncated]...\n" + snippet[-400:]
+        tester_context = (
+            "\n\nTester output provided:\n"
+            f"- Selected method ({selected_method.method_id}): {selected_method.name}\n"
+            f"- Rationale: {tester_output.selection_rationale}\n"
+            f"- Data split used: {tester_output.data_split_strategy}\n"
+            "- Apply this method to the full dataset; reuse/adapt the implementation code.\n"
+            f"Implementation snippet:\n{snippet}\n"
+        )
+
     human_msg = HumanMessage(
         content=(
             f"Execute Stage 3 plan: '{plan_id}'\n\n"
@@ -108,7 +160,7 @@ def run_stage4(plan_id: str, max_rounds: int = STAGE4_MAX_ROUNDS, debug: bool = 
             f"4. Verify results at each stage\n"
             f"5. save_execution_result() with final outputs\n\n"
             f"Be autonomous. Handle any issues. Follow the plan.\n"
-            f"Your success = Plan executed + Results saved."
+            f"Your success = Plan executed + Results saved.{tester_context}"
         )
     )
 
@@ -200,7 +252,7 @@ def stage4_node(state: dict) -> dict:
     """Stage 4 node for the master pipeline graph.
     
     Args:
-        state: Current pipeline state with stage3_plan set
+        state: Current pipeline state with stage3_plan and optionally tester_output set
         
     Returns:
         Updated state with execution_result populated
@@ -211,9 +263,25 @@ def stage4_node(state: dict) -> dict:
         return state
     
     plan_id = state["stage3_plan"].plan_id
-    print(f"\n🎯 Executing plan: {plan_id}\n")
+    tester_output = state.get("tester_output")
     
-    result = run_stage4(plan_id, debug=True)
+    # Prepare context for Stage 4 agent
+    context_msg = f"\n🎯 Executing plan: {plan_id}\n"
+    
+    if tester_output:
+        selected_method = tester_output.selected_method
+        context_msg += f"\n📊 TESTER OUTPUT AVAILABLE:\n"
+        context_msg += f"- Selected Method: {selected_method.name}\n"
+        context_msg += f"- Rationale: {tester_output.selection_rationale}\n"
+        context_msg += f"- Data Split Used: {tester_output.data_split_strategy}\n"
+        context_msg += f"\n✅ USE THIS METHOD: {selected_method.name}\n"
+        context_msg += f"Implementation guidance:\n{selected_method.implementation_code[:500]}...\n"
+    else:
+        context_msg += "\nℹ️  No tester output available - proceed with methods from Stage 3 plan\n"
+    
+    print(context_msg)
+    
+    result = run_stage4(plan_id, tester_output=tester_output, debug=True)
     
     # Check for execution results
     results = sorted(STAGE4_OUT_DIR.glob(f"execution_{plan_id}*.json"))
@@ -225,12 +293,39 @@ def stage4_node(state: dict) -> dict:
         state["completed_stages"].append(4)
         state["current_stage"] = 5
         print(f"  Status: {result_data.get('status', 'N/A')}")
-        print(f"  Outputs: {len(result_data.get('outputs', {}))}")
+        print(f"  Outputs: {len(result_data.get('outputs', {}))} ")
         if result_data.get('metrics'):
             print(f"  Metrics: {result_data['metrics']}")
+
+        # Trigger failsafe if execution status indicates problems
+        status = result_data.get("status", "").lower()
+        if status and status != "success":
+            try:
+                rec = run_failsafe(
+                    stage="stage4",
+                    error=f"Execution status={status}",
+                    context=result_data.get("summary", "")[:500],
+                    debug=False,
+                )
+                state.setdefault("failsafe_history", []).append(rec)
+                print(f"\n🛟 Failsafe suggestion recorded: {rec.analysis}")
+            except Exception as e:
+                print(f"\n⚠️  Failsafe agent failed: {e}")
     else:
         print("\n⚠️  No execution result saved")
         state["errors"].append("Stage 4: No execution result saved")
+        
+        try:
+            rec = run_failsafe(
+                stage="stage4",
+                error="Execution result missing",
+                context="save_execution_result() not called or failed validation.",
+                debug=False,
+            )
+            state.setdefault("failsafe_history", []).append(rec)
+            print(f"\n🛟 Failsafe suggestion recorded: {rec.analysis}")
+        except Exception as e:
+            print(f"\n⚠️  Failsafe agent failed: {e}")
     
     return state
 
@@ -244,4 +339,19 @@ if __name__ == "__main__":
         sys.exit(1)
     
     plan_id = sys.argv[1].strip()
-    run_stage4(plan_id)
+
+    # Try to load the latest tester output for this plan_id
+    latest_tester: Optional[TesterOutput] = None
+    try:
+        tester_files = sorted(STAGE3_5_OUT_DIR.glob(f"tester_{plan_id}*.json"))
+        if tester_files:
+            latest = tester_files[-1]
+            latest_tester = TesterOutput.model_validate(json.loads(latest.read_text()))
+            print(f"\n📥 Loaded tester output: {latest.name}")
+        else:
+            print(f"\nℹ️  No tester output found for {plan_id} in {STAGE3_5_OUT_DIR}")
+    except Exception as e:
+        print(f"\n⚠️  Could not load tester output automatically: {e}")
+        latest_tester = None
+
+    run_stage4(plan_id, tester_output=latest_tester)

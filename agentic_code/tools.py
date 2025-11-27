@@ -10,6 +10,7 @@ import json
 import io
 import contextlib
 import re
+import warnings
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -19,8 +20,17 @@ import numpy as np
 from langchain_core.tools import tool
 
 from .config import (
-    DATA_DIR, SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR,
-    STAGE4_OUT_DIR, STAGE5_OUT_DIR, STAGE4_WORKSPACE, STAGE5_WORKSPACE
+    PROJECT_ROOT,
+    OUTPUT_ROOT,
+    DATA_DIR,
+    SUMMARIES_DIR,
+    STAGE2_OUT_DIR,
+    STAGE3_OUT_DIR,
+    STAGE3_5_OUT_DIR,
+    STAGE4_OUT_DIR,
+    STAGE5_OUT_DIR,
+    STAGE4_WORKSPACE,
+    STAGE5_WORKSPACE,
 )
 from .models import Stage2Output, Stage3Plan, ExecutionResult
 from .utils import (
@@ -30,6 +40,103 @@ from .utils import (
     inspect_data_file as _inspect_data_file,
     load_dataframe,
 )
+
+# ===========================
+# Generic / Failsafe Tools
+# ===========================
+
+@tool
+def failsafe_python(code: str, description: str = "Failsafe scratchpad") -> str:
+    """Execute arbitrary Python for diagnostics/debugging.
+    
+    Environment includes: pd, np, json, Path, DATA_DIR, OUTPUT_ROOT, PROJECT_ROOT,
+    load_dataframe(filename, nrows=None), and print output is returned.
+    """
+    def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
+        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+
+    globals_dict = {
+        "__name__": "__failsafe_scratch__",
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "OUTPUT_ROOT": OUTPUT_ROOT,
+        "PROJECT_ROOT": PROJECT_ROOT,
+        "load_dataframe": load_dataframe_helper,
+        "description": description,
+    }
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            print(f"=== {description} ===")
+            exec(code, globals_dict, globals_dict)
+    except Exception as e:
+        import traceback
+        return f"[failsafe_python error] {e}\n{traceback.format_exc()}"
+
+    return buf.getvalue() or "[failsafe_python done]"
+
+
+@tool
+def search(
+    query: str,
+    within: str = "project",
+    file_glob: str = "**/*",
+    max_matches: int = 30,
+    case_sensitive: bool = False,
+) -> str:
+    """Search workspace text files for a pattern (regex supported).
+    
+    Args:
+        query: Pattern to search for (regex).
+        within: One of 'project', 'output', 'code', 'data', 'all'. Defaults to 'project'.
+        file_glob: Glob filter for files (e.g., '*.json', '*.log').
+        max_matches: Maximum number of line-level matches to return.
+        case_sensitive: Whether the search is case sensitive.
+        
+    Returns:
+        Matched lines with file paths and line numbers, or a message if none found.
+    """
+    root_map = {
+        "project": PROJECT_ROOT,
+        "output": OUTPUT_ROOT,
+        "code": PROJECT_ROOT / "final_code",
+        "data": DATA_DIR,
+        "all": PROJECT_ROOT,
+    }
+    root = root_map.get(within, PROJECT_ROOT)
+
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        pattern = re.compile(query, flags)
+    except re.error as e:
+        return f"[search error] Invalid regex: {e}"
+
+    hits: List[str] = []
+    for path in root.rglob(file_glob):
+        if not path.is_file():
+            continue
+        try:
+            if path.stat().st_size > 2_000_000:  # avoid huge files
+                continue
+        except OSError:
+            continue
+
+        try:
+            with path.open("r", errors="ignore") as f:
+                for lineno, line in enumerate(f, start=1):
+                    if pattern.search(line):
+                        rel = path.relative_to(root)
+                        hits.append(f"{rel}:{lineno}: {line.strip()}")
+                        if len(hits) >= max_matches:
+                            return "\n".join(hits)
+        except (OSError, UnicodeDecodeError):
+            continue
+
+    return "\n".join(hits) if hits else "[search] No matches found."
 
 # ===========================
 # Stage 2: Task Proposal Tools
@@ -95,10 +202,10 @@ def python_sandbox(code: str) -> str:
 
 
 # Stage 2 tool list
-STAGE2_TOOLS = [list_summary_files, read_summary_file, python_sandbox]
+STAGE2_TOOLS = [list_summary_files, read_summary_file, python_sandbox, search]
 
 
-# ===========================
+# =========================== 
 # Stage 3: Planning Tools
 # ===========================
 
@@ -221,14 +328,31 @@ def save_stage3_plan(plan_json: str) -> str:
             df_left = file_cache[js.left_table]
             df_right = file_cache.get(js.right_table) if js.right_table else None
             
-            missing_left = [k for k in js.join_keys if k not in df_left.columns]
-            if missing_left:
-                raise ValueError(f"Join {idx}: keys {missing_left} missing in {js.left_table}")
-            
-            if df_right is not None:
-                missing_right = [k for k in js.join_keys if k not in df_right.columns]
+            # Case 1: Equijoin with join_keys
+            if js.join_keys:
+                missing_left = [k for k in js.join_keys if k not in df_left.columns]
+                if missing_left:
+                    raise ValueError(f"Join {idx}: keys {missing_left} missing in {js.left_table}")
+                
+                if df_right is not None:
+                    missing_right = [k for k in js.join_keys if k not in df_right.columns]
+                    if missing_right:
+                        raise ValueError(f"Join {idx}: keys {missing_right} missing in {js.right_table}")
+
+            # Case 2: Different keys with left_on/right_on
+            if js.left_on:
+                missing_left = [k for k in js.left_on if k not in df_left.columns]
+                if missing_left:
+                    raise ValueError(f"Join {idx}: left_on keys {missing_left} missing in {js.left_table}")
+
+            if js.right_on and df_right is not None:
+                missing_right = [k for k in js.right_on if k not in df_right.columns]
                 if missing_right:
-                    raise ValueError(f"Join {idx}: keys {missing_right} missing in {js.right_table}")
+                    raise ValueError(f"Join {idx}: right_on keys {missing_right} missing in {js.right_table}")
+            
+            # Ensure at least one join condition
+            if not js.join_keys and not (js.left_on and js.right_on):
+                raise ValueError(f"Join {idx}: Must specify either join_keys OR (left_on and right_on)")
 
     # Save
     out_path = STAGE3_OUT_DIR / f"{plan.plan_id}.json"
@@ -242,14 +366,252 @@ STAGE3_TOOLS = [
     load_task_proposal,
     list_data_files,
     inspect_data_file,
+    search,
     python_sandbox_stage3,
     save_stage3_plan,
 ]
 
 
 # ===========================
-# Stage 4: Execution Tools
+# Stage 3.5: Method Testing & Benchmarking Tools
 # ===========================
+
+@tool
+def load_stage3_plan_for_tester(plan_id: str) -> str:
+    """Load a Stage 3 plan for method testing.
+    
+    Args:
+        plan_id: Plan identifier (e.g., 'PLAN-TSK-001')
+        
+    Returns:
+        JSON string of the plan
+    """
+    from .config import STAGE3_OUT_DIR
+    
+    plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
+    if not plan_path.exists():
+        # Try finding by pattern
+        matches = list(STAGE3_OUT_DIR.glob(f"*{plan_id}*.json"))
+        if not matches:
+            raise FileNotFoundError(f"No plan found matching: {plan_id}")
+        plan_path = matches[0]
+    
+    return plan_path.read_text()
+
+@tool
+def run_benchmark_code(code: str, description: str = "Running benchmark") -> str:
+    """Execute Python code for benchmarking forecasting methods.
+
+    The caller is responsible for every modeling choice.
+    The code you provide should:
+    - Choose and implement the forecasting methods (nothing is pre-selected)
+    - Import any trusted libraries it needs, handling missing packages gracefully
+    - Design the time-based train/validation/test splits
+    - Compute task-appropriate metrics of your choosing
+    - Optionally save artifacts (plots, models, CSVs) under STAGE3_5_OUT_DIR
+
+    Predefined objects in the execution environment:
+    - pd, np
+    - json, Path
+    - DATA_DIR, STAGE3_5_OUT_DIR
+    - load_dataframe(filename, nrows=None) -> pd.DataFrame
+    - time
+
+    Everything else (models, metrics, imports, logic) is fully under the code's control.
+    """
+    from .config import DATA_DIR, STAGE3_5_OUT_DIR
+    import time
+
+    def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
+        """Load a dataframe from DATA_DIR."""
+        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+
+    globals_dict = {
+        "__name__": "__stage3_5_tester__",
+        "__builtins__": __builtins__,  # allow normal imports
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "STAGE3_5_OUT_DIR": STAGE3_5_OUT_DIR,
+        "load_dataframe": load_dataframe_helper,
+        "time": time,
+    }
+
+    buf = io.StringIO()
+
+    try:
+        with contextlib.redirect_stdout(buf):
+            print(f"=== {description} ===")
+            # Use globals_dict for both globals and locals so code can define functions/vars and reuse them
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                warnings.filterwarnings("ignore", category=UserWarning)
+                exec(code, globals_dict, globals_dict)
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return f"[ERROR] {e}\n\nTraceback:\n{error_details}"
+
+    output = buf.getvalue()
+    return output if output else "[Code executed successfully, no output]"
+
+
+@tool
+def python_sandbox_stage3_5(code: str) -> str:
+    """Quick Python sandbox for Stage 3.5 data exploration and prep.
+
+    Use this to:
+    - Inspect columns, dtypes, and sample rows
+    - Prototype lightweight cleaning/prep helpers shared across methods
+    - Verify parsing of date/time columns before full benchmarks
+
+    Available:
+    - pd, np, json, Path
+    - DATA_DIR, STAGE3_5_OUT_DIR
+    - load_dataframe(filename, nrows=None)
+
+    Nothing is pre-hardcoded—your code decides what to do.
+    """
+    from .config import DATA_DIR, STAGE3_5_OUT_DIR
+
+    def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
+        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+
+    globals_dict = {
+        "__name__": "__stage3_5_sandbox__",
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "STAGE3_5_OUT_DIR": STAGE3_5_OUT_DIR,
+        "load_dataframe": load_dataframe_helper,
+    }
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            exec(code, globals_dict, globals_dict)
+    except Exception as e:
+        return f"[ERROR] {e}"
+    return buf.getvalue() or "[No output]"
+
+
+@tool
+def save_tester_output(output_json: Dict[str, Any]) -> str:
+    """Save the final tester output with method selection results.
+    
+    Args:
+        output_json: JSON payload containing:
+            - plan_id: ID of the plan being tested
+            - task_category: predictive/descriptive/unsupervised
+            - methods_proposed: list of ForecastingMethod objects
+            - benchmark_results: list of BenchmarkResult objects
+            - selected_method_id: ID of the winning method
+            - selected_method: The complete ForecastingMethod object for the winner
+            - selection_rationale: Why this method was selected
+            - data_split_strategy: How data was split for testing
+            
+    Returns:
+        Confirmation message with save path
+    """
+    from .config import STAGE3_5_OUT_DIR
+    from .models import TesterOutput
+    from datetime import datetime
+    
+    # Allow lenient inputs: accept dict or JSON string
+    if isinstance(output_json, str):
+        try:
+            output_data = json.loads(output_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}") from e
+    elif isinstance(output_json, dict):
+        output_data = output_json
+    else:
+        raise ValueError("output_json must be a dict or JSON string")
+    
+    # Validate against schema
+    try:
+        tester_output = TesterOutput.model_validate(output_data)
+    except Exception as e:
+        raise ValueError(f"Schema validation failed: {e}")
+    
+    plan_id = tester_output.plan_id
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    STAGE3_5_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = STAGE3_5_OUT_DIR / f"tester_{plan_id}_{timestamp}.json"
+    output_path.write_text(json.dumps(output_data, indent=2))
+    
+    return f"saved::{output_path.name}"
+
+
+@tool
+def record_thought(thought: str, what_im_about_to_do: str) -> str:
+    """Record your reasoning BEFORE taking an action.
+    
+    Use this to explicitly document your thinking before calling other tools.
+    This helps you stay strategic and avoid repeating mistakes.
+    
+    Args:
+        thought: Your current reasoning - what you know, what's uncertain, what you're considering
+        what_im_about_to_do: What action you plan to take next and WHY
+        
+    Returns:
+        Confirmation message
+        
+    Example:
+        record_thought(
+            thought="I've seen that the export data has yearly columns but the production data only has 2020-2025. "
+                    "A cross-file join won't work because there's no common key.",
+            what_im_about_to_do="I'll use python_sandbox to test loading just the export data and reshaping it to long format"
+        )
+    """
+    return f"💭 Thought recorded. Proceeding with: {what_im_about_to_do[:80]}..."
+
+
+@tool
+def record_observation(what_happened: str, what_i_learned: str, next_step: str) -> str:
+    """Record what you observed and learned AFTER an action.
+    
+    Use this to reflect on tool results before deciding what to do next.
+    This helps you learn from errors and adjust your strategy.
+    
+    Args:
+        what_happened: What the last tool/action resulted in (success, error, unexpected result)
+        what_i_learned: Key insight or lesson from this result
+        next_step: What you'll do next based on what you learned
+        
+    Returns:
+        Confirmation message
+        
+    Example:
+        record_observation(
+            what_happened="run_benchmark_code failed with 'Found array with 0 samples'",
+            what_i_learned="The validation set is empty after dropna() - this means my slicing strategy is wrong",
+            next_step="I'll inspect the data shape before/after split to understand the actual structure"
+        )
+    """
+    return f"👁️ Observation recorded. Learning: {what_i_learned[:80]}... → Next: {next_step[:60]}..."
+
+
+# Stage 3.5 tool list
+STAGE3_5_TOOLS = [
+    record_thought,  # ReAct: explicit reasoning before action
+    record_observation,  # ReAct: reflection after action
+    load_stage3_plan_for_tester,
+    search,
+    list_data_files,
+    inspect_data_file,
+    python_sandbox_stage3_5,
+    run_benchmark_code,
+    save_tester_output,
+]
+
+
 
 @tool
 def list_stage3_plans() -> List[str]:
@@ -585,6 +947,17 @@ STAGE5_TOOLS = [
     save_visualization_report,
 ]
 
+# ===========================
+# Failsafe / Debugging Tools
+# ===========================
+
+FAILSAFE_TOOLS = [
+    failsafe_python,
+    search,
+    list_data_files,
+    inspect_data_file,
+]
+
 
 # ===========================
 # Complete Tool Registry
@@ -593,8 +966,10 @@ STAGE5_TOOLS = [
 ALL_TOOLS = {
     "stage2": STAGE2_TOOLS,
     "stage3": STAGE3_TOOLS,
+    "stage3_5": STAGE3_5_TOOLS,
     "stage4": STAGE4_TOOLS,
     "stage5": STAGE5_TOOLS,
+    "failsafe": FAILSAFE_TOOLS,
 }
 
 
@@ -603,13 +978,19 @@ ALL_TOOLS = {
 # ===========================
 
 @tool
-def trigger_pipeline_stages(start_stage: int, end_stage: int, task_id: Optional[str] = None) -> str:
+def trigger_pipeline_stages(
+    start_stage: int,
+    end_stage: int,
+    task_id: Optional[str] = None,
+    user_query: Optional[str] = None,
+) -> str:
     """Triggers execution of pipeline stages (1-5) based on the conversational query.
     
     Args:
         start_stage: Stage to start from (1-5)
         end_stage: Stage to end at (1-5)
         task_id: Optional task ID for Stages 3+
+        user_query: Optional user request to guide proposal generation (Stage 2)
         
     Returns:
         Execution summary string
@@ -618,7 +999,7 @@ def trigger_pipeline_stages(start_stage: int, end_stage: int, task_id: Optional[
     
     try:
         # Run the pipeline
-        state = run_partial_pipeline(start_stage, end_stage, task_id)
+        state = run_partial_pipeline(start_stage, end_stage, task_id, user_query=user_query)
         
         # Format summary based on what ran
         summary = []
@@ -628,7 +1009,9 @@ def trigger_pipeline_stages(start_stage: int, end_stage: int, task_id: Optional[
             summary.append(f"- Generated {len(state['dataset_summaries'])} dataset summaries")
             
         if state.get("task_proposals"):
-            summary.append(f"- Generated {len(state['task_proposals'])} task proposals")
+            summary.append(f"- Generated {len(state['task_proposals'])} task proposals:")
+            for p in state['task_proposals']:
+                summary.append(f"  * [{p.id}] {p.category}: {p.title}")
             
         if state.get("stage3_plan"):
             summary.append(f"- Created execution plan: {state['stage3_plan'].plan_id}")
@@ -683,11 +1066,11 @@ def query_data_capabilities() -> str:
         try:
             data = json.loads(proposals_path.read_text())
             stage2 = Stage2Output.model_validate(data)
-            proposals_text = "\n\nAvailable Prediction Tasks:\n"
+            proposals_text = "\n\nAvailable Analysis Tasks:\n"
             for p in stage2.proposals:
-                proposals_text += f"- [{p.id}] {p.task_type}: {p.description}\n"
-        except:
-            proposals_text = "\n(Could not read existing proposals)"
+                proposals_text += f"- [{p.id}] {p.category}: {p.title}\n"
+        except Exception as e:
+            proposals_text = f"\n(Could not read existing proposals: {e})"
     else:
         proposals_text = "\n(No specific task proposals generated yet)"
         

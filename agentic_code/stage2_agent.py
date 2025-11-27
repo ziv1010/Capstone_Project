@@ -37,18 +37,17 @@ TOOLS_BY_NAME: Dict[str, Any] = {t.name: t for t in STAGE2_TOOLS}
 # ===========================
 # System Prompt
 # ===========================
-
 system_prompt = """
 You are Agent 2 in a multi-stage, agentic data analytics pipeline.
 
 Stage 1 has already produced dataset summaries as JSON files in the 'summaries/' directory.
-Each summary includes:
+Each summary includes (at minimum):
 - dataset_name, path
 - columns (name, physical_dtype, logical_type, null_fraction, unique_fraction, examples, etc.)
 - candidate_primary_keys (sometimes empty)
 - notes
 
-You have access to THREE TOOLS:
+You have access to FOUR TOOLS:
 
 1. list_summary_files()
    - No arguments.
@@ -64,32 +63,140 @@ You have access to THREE TOOLS:
    - The code can:
        * import json, math, statistics, pandas, etc.
        * access PROJECT_ROOT, DATA_DIR, SUMMARIES_DIR
-       * call read_summary_file('<summary-filename>')
        * call list_summary_files()
+       * call read_summary_file('<summary-filename>')
        * open and inspect files directly
        * print intermediate results.
    - Returns whatever was printed to stdout, or an error string.
 
-YOUR JOB IN THIS EXPLORATION PHASE:
+4. search(query: str, within: str = "project", file_glob: str = "**/*", ...)
+   - Workspace text search.
+   - Use it to:
+       * see how raw datasets are used in existing code,
+       * find prior analyses or metrics for specific datasets,
+       * locate existing join logic or feature engineering code.
+   - Does NOT change any files; it only returns text matches.
 
-- Use these tools to deeply understand the available datasets and how they might join.
-- Think about potential predictive, descriptive, and unsupervised tasks you could define later.
-- But in this phase you ONLY call tools and reason; you DO NOT yet output the final task proposals.
+═══════════════════════════════════════════════════════════════
+YOUR ROLE IN STAGE 2
+═══════════════════════════════════════════════════════════════
 
-TOOL-CALLING PROTOCOL (EXPLORATION):
+Your job in Stage 2 is to explore the available datasets and design **high-quality analytic task proposals** that:
 
-- In each step, you conceptually decide on ONE tool to call and produce
-  a Python dict literal describing that call, for example:
+- Are **feasible** given the schema (columns actually exist).
+- Have **plausible joins** between datasets:
+    * Hypothesized keys must be consistent with column names in the summaries.
+    * Do NOT pair columns that do not coexist across the relevant datasets.
+- Are **dataset-agnostic**:
+    * Never assume domain-specific structure that is not implied by summaries or tool results.
+    * Base all reasoning on the summaries, python_sandbox outputs, and (optionally) search().
+
+This phase is **exploration** only:
+- You will call tools, reason about what you see, and refine ideas.
+- A separate synthesis step will later ask you to output the final JSON proposals.
+
+═══════════════════════════════════════════════════════════════
+REACT-STYLE EXPLORATION LOOP
+═══════════════════════════════════════════════════════════════
+
+In each exploration step, follow this pattern internally:
+
+1. THOUGHT:
+   - Briefly think about what you know and what you still need.
+   - Examples:
+     * "I know dataset A has yearly columns; I need to see if dataset B has a matching year field."
+     * "I know column X is numeric and low-null; it might make a good target."
+
+2. ACTION (choose ONE tool to call):
+   - list_summary_files()
+       * Use at the beginning to discover all available summaries.
+   - read_summary_file(filename=...)
+       * Use to inspect specific datasets in detail.
+   - python_sandbox(code=...)
+       * Use for heavier analysis such as:
+           + building a mapping: dataset_name → list of columns
+           + computing candidate join keys between pairs of datasets
+           + checking overlaps of column names or suggested primary keys
+   - search(query=..., within="project" | "data" | "code" | "output" | "all")
+       * Use to discover how these datasets have been joined or analyzed previously.
+
+3. OBSERVATION:
+   - The tool will be executed and its result will be fed back into the conversation.
+   - Use that result in your next THOUGHT.
+
+═══════════════════════════════════════════════════════════════
+TOOL-CALLING PROTOCOL (IMPORTANT)
+═══════════════════════════════════════════════════════════════
+
+In this exploration phase, you do NOT yet output final proposals.
+
+Instead, in each step, you must output exactly ONE Python dict literal describing
+a single tool call, for example:
+
     {"tool_name": "list_summary_files", "tool_args": {}}
 
-- You MAY add natural language before/after and even wrap the dict in ```python ...``` code fences;
-  the orchestration code will try to extract the dict from your message.
+or:
 
-- Valid tool_name values in this phase:
-    "list_summary_files", "read_summary_file", "python_sandbox".
+    {"tool_name": "read_summary_file", "tool_args": {"filename": "some_file.summary.json"}}
 
-Later, AFTER this exploration loop finishes, a separate prompt will ask you
-to output the final set of TaskProposals based on everything you've learned.
+Valid tool_name values in this phase:
+- "list_summary_files"
+- "read_summary_file"
+- "python_sandbox"
+- "search"
+
+You MAY precede this dict with some natural language, or wrap it in ```python ...``` fences;
+the orchestration code will extract the dict. But the dict itself MUST be valid Python syntax.
+
+═══════════════════════════════════════════════════════════════
+JOIN-AWARE EXPLORATION (VERY IMPORTANT)
+═══════════════════════════════════════════════════════════════
+
+As you explore, you must form a mental model of **which datasets can be joined and how**:
+
+- For each dataset summary you inspect, keep track of:
+    * dataset_name
+    * list of column names
+    * candidate_primary_keys (if any)
+
+- When considering joins between datasets:
+    * Use explicit overlaps in column names as your starting point for join keys.
+    * You MAY also consider compatible logical types and patterns (e.g., "year", "state_code"),
+      but you must still anchor them in real columns from the summaries.
+
+- A **join key set** like ["col1", "col2"] is only valid if:
+    * BOTH datasets you intend to join have **all** of these columns.
+    * The columns are not obviously different concepts (e.g., one is numeric year, other is text category),
+      unless the summaries suggest they represent the same concept.
+
+- It is ILLEGAL (for later stages) to propose a join key list where:
+    * Some columns exist only in dataset A and others only in dataset B.
+      (e.g., ["col_only_in_A", "col_only_in_B"] is invalid.)
+    * Columns do not appear at all in a dataset's summary.
+
+If you are unsure whether a join is feasible:
+- Prefer to mark the join as ambiguous in your notes.
+- Avoid inventing join keys that are not supported by the summaries.
+- It is better to propose a single-dataset task than to rely on a fabricated multi-dataset join.
+
+═══════════════════════════════════════════════════════════════
+GOAL FOR THE SYNTHESIS PHASE
+═══════════════════════════════════════════════════════════════
+
+All of this exploration will feed into a later synthesis step where you must propose:
+
+- 3–8 TaskProposals
+- Each with:
+    * A well-motivated analytic question
+    * A clear category (predictive / descriptive / unsupervised)
+    * A feasible set of required_files
+    * A join_plan whose hypothesized_keys obey the join rules above
+    * A realistic target and feature_plan
+    * Validation and quality-check ideas
+
+In this exploration phase, do NOT output proposals directly.
+Focus on building a correct, join-aware understanding of the data.
+
 """
 
 
@@ -260,23 +367,23 @@ You MUST output a SINGLE STRICT JSON object with the following structure:
       "category": "predictive" | "descriptive" | "unsupervised",
       "title": "short human-readable title",
       "problem_statement": "2–5 sentences explaining the analytic question and why it matters.",
-      "required_files": ["Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "..."],
+      "required_files": ["filename1.csv", "filename2.csv"],
       "join_plan": {
         "hypothesized_keys": [
-          ["state", "year"],
-          ["state", "crop", "year"]
+          ["col1"],
+          ["col1", "col2"]
         ],
-        "notes": "brief commentary about join logic"
+        "notes": "brief commentary about join logic and any doubts"
       },
       "target": {
         "name": "column name or null",
-        "granularity": ["columns that define a prediction unit"] or null,
-        "horizon": "forecast horizon like '1-year ahead' or null"
+        "granularity": ["columns that define a prediction/aggregation unit"] or null,
+        "horizon": "forecast horizon like '1-year ahead' or null
       },
       "feature_plan": {
-        "candidates": ["Area-*", "Production-*", "..."],
-        "transform_ideas": ["lagged features", "growth rates", "..."],
-        "handling_missingness": "brief strategy"
+        "candidates": ["pattern-*", "explicit_column_name", "..."],
+        "transform_ideas": ["lagged features", "growth rates", "aggregations", "..."],
+        "handling_missingness": "brief strategy for NA values"
       },
       "validation_plan": "how to evaluate or sanity-check this task",
       "quality_checks": [
@@ -295,16 +402,96 @@ You MUST output a SINGLE STRICT JSON object with the following structure:
   ]
 }
 
-STRICT JSON REQUIREMENTS:
+═══════════════════════════════════════════════════════════════
+STRICT JSON REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
 - Use double quotes for all keys and string values.
 - Use true / false / null for booleans and missing values.
 - No comments, no trailing commas, no Python None/True/False.
 - The top-level object MUST have exactly one key: "proposals".
+- It is OK (but not required) to wrap your JSON in ```json ... ``` fences;
+  if you do, the content inside MUST still be valid JSON.
 
-Do NOT wrap your answer in natural language. It is OK (but not required) to wrap
-your JSON in ```json ... ``` fences; if you do, the content inside MUST still be
-valid JSON.
+Do NOT wrap your answer in extra natural language.
+
+═══════════════════════════════════════════════════════════════
+JOIN CONSISTENCY RULES FOR join_plan.hypothesized_keys
+═══════════════════════════════════════════════════════════════
+
+For EACH proposal:
+
+1. Use ONLY information from:
+   - the dataset summaries you read with read_summary_file(),
+   - any python_sandbox analyses you ran (e.g., column lists, overlaps),
+   - and (optionally) search() results showing existing join logic.
+
+2. For each proposal, consider the set of required_files.
+   - For any pair of files you intend to join, you must have at least one
+     plausible set of join keys or you must mark the join as ambiguous in notes.
+
+3. Each entry in hypothesized_keys is a list of column names, like:
+   - ["col1"] OR ["col1", "col2"].
+
+   It MUST satisfy:
+   - Every column name in that list exists in ALL datasets you intend to join using that key set.
+     (You can infer existence only from summaries / your own tool outputs.)
+   - You MUST NOT construct a single key list that mixes columns that live in different tables
+     (e.g. ["col_only_in_file_A", "col_only_in_file_B"] is invalid).
+
+4. If there is NO common set of columns that exists across the relevant datasets:
+   - Set hypothesized_keys to [].
+   - In join_plan.notes, explicitly say that the join is ambiguous or not safely defined
+     based on the available summaries.
+   - It is better to have no hypothesized_keys than to propose impossible joins.
+
+5. You are allowed to propose:
+   - Single-dataset tasks (required_files has length 1, hypothesized_keys may be []).
+   - Multi-dataset tasks where joins are tentative, as long as:
+       * you do NOT fabricate keys that contradict the summaries, and
+       * you clearly explain the uncertainty in join_plan.notes.
+
+═══════════════════════════════════════════════════════════════
+TARGET, FEATURES, AND VALIDATION
+═══════════════════════════════════════════════════════════════
+
+- category:
+   * "predictive": tasks with a clear target column and prediction objective.
+   * "descriptive": EDA-style tasks with no explicit target.
+   * "unsupervised": clustering / dimensionality reduction / segmentation tasks.
+
+- target:
+   * For predictive tasks, target.name MUST be an existing numeric or categorical column.
+   * granularity should list columns that define a single row / prediction unit.
+   * horizon is a free-text description if there is a time component, otherwise null.
+
+- feature_plan:
+   * candidates can mix explicit column names and wildcard patterns ("prefix-*", "*_suffix").
+   * transform_ideas should reference generic operations (lags, ratios, aggregates).
+   * handling_missingness should be short but concrete.
+
+- validation_plan and quality_checks:
+   * Describe how you would evaluate the task (train/test split, time-based split, etc.).
+   * Include checks that explicitly mention:
+       - verifying join row counts and duplicate keys,
+       - checking nulls on key columns,
+       - avoiding data leakage where applicable.
+
+═══════════════════════════════════════════════════════════════
+NUMBER AND VARIETY OF PROPOSALS
+═══════════════════════════════════════════════════════════════
+
+- Produce between 3 and 8 proposals total.
+- If the user provided a specific request/context earlier, ensure at least one proposal directly
+  addresses it.
+- Prefer proposals that:
+   * are feasible given the schemas,
+   * exercise different types of analysis (predictive, descriptive, unsupervised),
+   * and use joins only when the summaries clearly support them.
+
+Output ONLY the JSON object described above, with no extra explanation.
 """
+
 
     # First attempt
     all_messages = messages + [HumanMessage(content=final_prompt)]
@@ -359,7 +546,7 @@ Output ONLY the JSON (optionally inside ```json ... ```), with no extra explanat
 # Main Stage 2 Runner
 # ===========================
 
-def run_stage2() -> Stage2Output:
+def run_stage2(user_query: Optional[str] = None) -> Stage2Output:
     """Run Stage 2: Task proposal generation.
     
     Returns:
@@ -370,11 +557,19 @@ def run_stage2() -> Stage2Output:
     print("=" * 80)
     
     # Run exploration
+    messages: List[BaseMessage] = [SystemMessage(content=system_prompt)]
+    if user_query:
+        messages.append(
+            HumanMessage(
+                content=f"User request/context: {user_query}\nDesign proposals that answer this."
+            )
+        )
+    messages.append(
+        HumanMessage(content="Begin by calling list_summary_files to see which summaries exist.")
+    )
+
     initial_state: AgentState = {
-        "messages": [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content="Begin by calling list_summary_files to see which summaries exist."),
-        ],
+        "messages": messages,
         "step": 0,
         "tool_name": None,
         "tool_args": {},
@@ -409,7 +604,7 @@ def stage2_node(state: dict) -> dict:
     Returns:
         Updated state with task_proposals populated
     """
-    stage2_output = run_stage2()
+    stage2_output = run_stage2(user_query=state.get("user_query"))
     
     state["task_proposals"] = stage2_output.proposals
     state["completed_stages"].append(2)

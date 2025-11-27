@@ -1,0 +1,11 @@
+{
+  "stage": "stage3",
+  "error": "Plan not saved for task TSK-001",
+  "analysis": "The function save_stage3_plan(plan_json=...) was either not called or failed validation, leading to the plan not being saved.",
+  "next_steps": [
+    "Check the logs and code execution history to determine if save_stage3_plan(plan_json=...) was called.",
+    "Verify that the plan_json passed to save_stage3_plan is a valid JSON string."
+  ],
+  "tool_evidence": "The search revealed multiple references to save_stage3_plan in the codebase, but the plan file does not exist at the expected location, indicating the function was likely not called or failed.",
+  "created_at": "2025-11-27T05:22:30.115873"
+}

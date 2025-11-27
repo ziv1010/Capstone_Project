@@ -3,22 +3,18 @@
     {
       "id": "TSK-001",
       "category": "predictive",
-      "title": "Predict Future Rice Exports to Bangladesh",
-      "problem_statement": "Forecasting future rice exports to Bangladesh is crucial for trade planning and policy-making. Understanding export trends can help stakeholders make informed decisions.",
+      "title": "Predict Rice Export Value Based on Production Data",
+      "problem_statement": "Understanding the relationship between rice production and export values can help in forecasting future export revenues. This task aims to predict the export value of rice based on historical production data.",
       "required_files": [
-        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [
-          [
-            "HS Code",
-            "Description"
-          ]
-        ],
-        "notes": "No join required as this dataset stands alone."
+        "hypothesized_keys": [],
+        "notes": "No direct join keys exist between the datasets. However, both datasets contain information about rice, so a manual join based on crop type (rice) and year could be considered."
       },
       "target": {
-        "name": "2024 - 25-Quantity",
+        "name": "2024 - 25-Value (USD)",
         "granularity": [
           "HS Code",
           "Description"
@@ -27,23 +23,25 @@
       },
       "feature_plan": {
         "candidates": [
-          "2018 - 19-Quantity",
-          "2019 - 20-Quantity",
-          "2020 - 21-Quantity",
-          "2021 - 22-Quantity",
-          "2022 - 23-Quantity",
-          "2023 - 24-Quantity"
+          "*2023*",
+          "*2022*",
+          "*2021*",
+          "*2020*",
+          "*2019*",
+          "*2018*"
         ],
         "transform_ideas": [
           "lagged features",
-          "growth rates"
+          "growth rates",
+          "aggregations"
         ],
-        "handling_missingness": "Impute missing values using mean or median of the respective columns."
+        "handling_missingness": "Impute missing values with mean or median of the respective column."
       },
-      "validation_plan": "Use time-series cross-validation to evaluate model performance.",
+      "validation_plan": "Split the data into training (2018-2023) and test (2024) sets. Evaluate using RMSE and MAE.",
       "quality_checks": [
-        "Ensure no data leakage by avoiding future data in training.",
-        "Check for consistent units and scales in the target and feature columns."
+        "Verify that the join is performed correctly by checking the number of rows and ensuring no duplicates.",
+        "Check for null values in key columns before performing the join.",
+        "Ensure that the target variable is not present in the training set to avoid data leakage."
       ],
       "expected_outputs": [
         "tables",
@@ -54,8 +52,8 @@
     {
       "id": "TSK-002",
       "category": "descriptive",
-      "title": "Analyze Trends in Rice Cultivation and Production",
-      "problem_statement": "Understanding trends in rice cultivation and production can provide insights into agricultural productivity and resource allocation. This analysis can inform policy and investment decisions.",
+      "title": "Analyze Trends in Rice Cultivation Area Over Time",
+      "problem_statement": "Analyzing trends in the area under rice cultivation over time can provide insights into agricultural practices and policy impacts. This task aims to explore the changes in rice cultivation area across different seasons and years.",
       "required_files": [
         "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
         "All-India-profile_-Crop-wise-Area.csv"
@@ -67,7 +65,7 @@
             "Season"
           ]
         ],
-        "notes": "Join on Crop and Season to combine area, production, and yield data."
+        "notes": "Both datasets can be joined using the 'Crop' and 'Season' columns."
       },
       "target": {
         "name": null,
@@ -79,32 +77,18 @@
       },
       "feature_plan": {
         "candidates": [
-          "Area-2020-21",
-          "Area-2021-22",
-          "Area-2022-23",
-          "Area-2023-24",
-          "Area-2024-25",
-          "Production-2020-21",
-          "Production-2021-22",
-          "Production-2022-23",
-          "Production-2023-24",
-          "Production-2024-25",
-          "Yield-2020-21",
-          "Yield-2021-22",
-          "Yield-2022-23",
-          "Yield-2023-24",
-          "Yield-2024-25"
+          "*Area-*"
         ],
         "transform_ideas": [
           "time series analysis",
           "seasonal decomposition"
         ],
-        "handling_missingness": "Handle missing values by imputing with mean or median of the respective columns."
+        "handling_missingness": "Impute missing values with the mean of the respective column."
       },
-      "validation_plan": "Use descriptive statistics and visualizations to validate trends.",
+      "validation_plan": "Perform exploratory data analysis (EDA) to visualize trends and patterns in the data.",
       "quality_checks": [
-        "Ensure consistent units and scales in the feature columns.",
-        "Validate the join operation to ensure correct alignment of data."
+        "Verify that the join is performed correctly by checking the number of rows and ensuring no duplicates.",
+        "Check for null values in key columns before performing the join."
       ],
       "expected_outputs": [
         "tables",
@@ -115,48 +99,38 @@
     {
       "id": "TSK-003",
       "category": "unsupervised",
-      "title": "Cluster Rice Varieties Based on Export Patterns",
-      "problem_statement": "Clustering rice varieties based on their export patterns can help identify groups of similar varieties and inform targeted marketing strategies.",
+      "title": "Cluster Crops Based on Yield and Production Patterns",
+      "problem_statement": "Clustering crops based on their yield and production patterns can help in identifying groups of crops with similar characteristics. This task aims to segment crops into clusters using unsupervised learning techniques.",
       "required_files": [
-        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [
-          [
-            "HS Code",
-            "Description"
-          ]
-        ],
-        "notes": "No join required as this dataset stands alone."
+        "hypothesized_keys": [],
+        "notes": "Single dataset task, no join required."
       },
       "target": {
         "name": null,
         "granularity": [
-          "HS Code",
-          "Description"
+          "Crop",
+          "Season"
         ],
         "horizon": null
       },
       "feature_plan": {
         "candidates": [
-          "2018 - 19-Quantity",
-          "2019 - 20-Quantity",
-          "2020 - 21-Quantity",
-          "2021 - 22-Quantity",
-          "2022 - 23-Quantity",
-          "2023 - 24-Quantity",
-          "2024 - 25-Quantity"
+          "*Yield-*",
+          "*Production-*"
         ],
         "transform_ideas": [
           "standardization",
           "dimensionality reduction"
         ],
-        "handling_missingness": "Impute missing values using mean or median of the respective columns."
+        "handling_missingness": "Impute missing values with the mean of the respective column."
       },
-      "validation_plan": "Evaluate cluster quality using silhouette scores and visual inspection.",
+      "validation_plan": "Evaluate the clustering using silhouette score and visual inspection of cluster centroids.",
       "quality_checks": [
-        "Ensure consistent units and scales in the feature columns.",
-        "Check for outliers and handle them appropriately."
+        "Check for null values in key columns before performing the analysis.",
+        "Ensure that the data is standardized before applying clustering algorithms."
       ],
       "expected_outputs": [
         "tables",

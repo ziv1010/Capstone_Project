@@ -7,8 +7,13 @@ Creates comprehensive visualizations and reports from Stage 4 execution results.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List
+
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    __package__ = "agentic_code"
 
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from langchain_openai import ChatOpenAI
@@ -19,6 +24,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from .config import STAGE5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE5_MAX_ROUNDS
 from .models import VisualizationReport
 from .tools import STAGE5_TOOLS
+from .failsafe_agent import run_failsafe
 
 
 # ===========================
@@ -224,6 +230,18 @@ def stage5_node(state: dict) -> dict:
     else:
         print("\n⚠️  No visualization report saved")
         state["errors"].append("Stage 5: No visualization report saved")
+        
+        try:
+            rec = run_failsafe(
+                stage="stage5",
+                error="Visualization report missing",
+                context="save_visualization_report() not called or failed validation.",
+                debug=False,
+            )
+            state.setdefault("failsafe_history", []).append(rec)
+            print(f"\n🛟 Failsafe suggestion recorded: {rec.analysis}")
+        except Exception as e:
+            print(f"\n⚠️  Failsafe agent failed: {e}")
     
     return state
 

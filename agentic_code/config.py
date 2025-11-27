@@ -22,15 +22,28 @@ OUTPUT_ROOT = FINAL_CODE_ROOT / "output"
 SUMMARIES_DIR = OUTPUT_ROOT / "summaries"
 STAGE2_OUT_DIR = OUTPUT_ROOT / "stage2_out"
 STAGE3_OUT_DIR = OUTPUT_ROOT / "stage3_out"
+STAGE3_5_OUT_DIR = OUTPUT_ROOT / "stage3_5_tester"
 STAGE4_OUT_DIR = OUTPUT_ROOT / "stage4_out"
 STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
+FAILSAFE_OUT_DIR = OUTPUT_ROOT / "failsafe_out"
 
 # Working directories for code execution
 STAGE4_WORKSPACE = STAGE4_OUT_DIR / "code_workspace"
 STAGE5_WORKSPACE = STAGE5_OUT_DIR / "viz_workspace"
 
 # Create all output directories
-for dir_path in [OUTPUT_ROOT, SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR, STAGE4_WORKSPACE, STAGE5_WORKSPACE]:
+for dir_path in [
+    OUTPUT_ROOT,
+    SUMMARIES_DIR,
+    STAGE2_OUT_DIR,
+    STAGE3_OUT_DIR,
+    STAGE3_5_OUT_DIR,
+    STAGE4_OUT_DIR,
+    STAGE5_OUT_DIR,
+    STAGE4_WORKSPACE,
+    STAGE5_WORKSPACE,
+    FAILSAFE_OUT_DIR,
+]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -45,7 +58,7 @@ PRIMARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 8192,
+    "max_tokens": 4096,  # Reduced from 8192 to prevent context overflow
 }
 
 SECONDARY_LLM_CONFIG = {
@@ -53,7 +66,7 @@ SECONDARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 8192,
+    "max_tokens": 4096,  # Reduced from 8192 to prevent context overflow
 }
 
 # ===========================
@@ -68,6 +81,9 @@ STAGE2_MAX_EXPLORATION_STEPS = 10  # Max tool calls during exploration
 
 # Stage 3: Planning
 STAGE3_MAX_ROUNDS = 15  # Max rounds for planning agent
+
+# Stage 3.5: Method Testing & Benchmarking
+STAGE3_5_MAX_ROUNDS = 40  # Max rounds for tester agent (benchmarking may take longer)
 
 # Stage 4: Execution
 STAGE4_MAX_ROUNDS = 25  # Max rounds for execution agent
@@ -102,8 +118,10 @@ def print_config():
     print(f"  - Summaries: {SUMMARIES_DIR}")
     print(f"  - Stage 2: {STAGE2_OUT_DIR}")
     print(f"  - Stage 3: {STAGE3_OUT_DIR}")
+    print(f"  - Stage 3.5: {STAGE3_5_OUT_DIR}")
     print(f"  - Stage 4: {STAGE4_OUT_DIR}")
     print(f"  - Stage 5: {STAGE5_OUT_DIR}")
+    print(f"  - Failsafe: {FAILSAFE_OUT_DIR}")
     print(f"\nLLM Configuration:")
     print(f"  - Primary Model: {PRIMARY_LLM_CONFIG['model']}")
     print(f"  - Secondary Model: {SECONDARY_LLM_CONFIG['model']}")

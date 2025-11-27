@@ -13,18 +13,34 @@ Each stage is a state node that processes data and updates the shared pipeline s
 
 from __future__ import annotations
 
-from typing import TypedDict, List, Optional
+from typing import TypedDict, List, Optional, Tuple
 from datetime import datetime
+import json
 
 from langgraph.graph import StateGraph, END
 
+from .config import (
+    SUMMARIES_DIR,
+    STAGE2_OUT_DIR,
+    STAGE3_OUT_DIR,
+    STAGE3_5_OUT_DIR,
+    STAGE4_OUT_DIR,
+    STAGE5_OUT_DIR,
+)
 from .models import (
-    DatasetSummary, TaskProposal, Stage3Plan,
-    ExecutionResult, VisualizationReport
+    DatasetSummary,
+    TaskProposal,
+    Stage2Output,
+    Stage3Plan,
+    TesterOutput,
+    ExecutionResult,
+    VisualizationReport,
+    FailsafeRecommendation,
 )
 from .stage1_agent import stage1_node
 from .stage2_agent import stage2_node
 from .stage3_agent import stage3_node
+from .stage3_5_agent import stage3_5_node
 from .stage4_agent import stage4_node
 from .stage5_agent import stage5_node
 
@@ -37,15 +53,18 @@ class PipelineState(TypedDict):
     """Unified state for the entire agentic pipeline."""
     # Current progress
     current_stage: int  # Current stage (1-5)
-    completed_stages: List[int]  # List of completed stages
+    completed_stages: List[float]  # List of completed stages (may include 3.5)
     
     # Stage outputs
     dataset_summaries: List[DatasetSummary]  # From Stage 1
     task_proposals: List[TaskProposal]  # From Stage 2
     selected_task_id: Optional[str]  # Which task to execute
     stage3_plan: Optional[Stage3Plan]  # From Stage 3
+    tester_output: Optional[TesterOutput]  # From Stage 3.5
     execution_result: Optional[ExecutionResult]  # From Stage 4
     visualization_report: Optional[VisualizationReport]  # From Stage 5
+    failsafe_history: List[FailsafeRecommendation]  # Failsafe recommendations
+    user_query: Optional[str]  # Original user intent to guide proposals
     
     # Tracking
     errors: List[str]  # Track any errors
@@ -56,8 +75,118 @@ class PipelineState(TypedDict):
 # Build Master Graph
 # ===========================
 
+def load_cached_state(end_stage: float, selected_task_id: Optional[str] = None) -> Tuple[PipelineState, float]:
+    """Preload artifacts from disk so we can skip completed stages."""
+    state: PipelineState = {
+        "current_stage": 1,
+        "completed_stages": [],
+        "dataset_summaries": [],
+        "task_proposals": [],
+        "selected_task_id": selected_task_id,
+        "stage3_plan": None,
+        "tester_output": None,
+        "execution_result": None,
+        "visualization_report": None,
+        "failsafe_history": [],
+        "user_query": None,
+        "errors": [],
+        "started_at": datetime.now().isoformat(),
+    }
+
+    completed: List[float] = []
+
+    # Stage 1 cache
+    summary_files = sorted(SUMMARIES_DIR.glob("*.summary.json"))
+    if summary_files and end_stage >= 1:
+        summaries = []
+        for path in summary_files:
+            try:
+                data = json.loads(path.read_text())
+                summaries.append(DatasetSummary.model_validate(data))
+            except Exception:
+                continue
+        if summaries:
+            state["dataset_summaries"] = summaries
+            completed.append(1)
+
+    # Stage 2 cache
+    proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
+    if proposals_path.exists() and end_stage >= 2:
+        try:
+            data = json.loads(proposals_path.read_text())
+            stage2 = Stage2Output.model_validate(data)
+            state["task_proposals"] = stage2.proposals
+            completed.append(2)
+            if not state["selected_task_id"] and stage2.proposals:
+                state["selected_task_id"] = stage2.proposals[0].id
+        except Exception:
+            pass
+
+    plan_id = f"PLAN-{state['selected_task_id']}" if state.get("selected_task_id") else None
+
+    # Stage 3 cache
+    if end_stage >= 3 and plan_id:
+        plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
+        if not plan_path.exists():
+            matches = sorted(STAGE3_OUT_DIR.glob(f"*{plan_id}*.json"))
+            if matches:
+                plan_path = matches[-1]
+        if plan_path.exists():
+            try:
+                plan_data = json.loads(plan_path.read_text())
+                state["stage3_plan"] = Stage3Plan.model_validate(plan_data)
+                completed.append(3)
+            except Exception:
+                pass
+
+    # Stage 3.5 cache
+    if end_stage >= 3.5 and plan_id:
+        tester_files = sorted(STAGE3_5_OUT_DIR.glob(f"tester_{plan_id}*.json"))
+        if tester_files:
+            try:
+                tester_data = json.loads(tester_files[-1].read_text())
+                state["tester_output"] = TesterOutput.model_validate(tester_data)
+                completed.append(3.5)
+            except Exception:
+                pass
+
+    # Stage 4 cache
+    if end_stage >= 4 and plan_id:
+        exec_files = sorted(STAGE4_OUT_DIR.glob(f"execution_{plan_id}*.json"))
+        if exec_files:
+            try:
+                exec_data = json.loads(exec_files[-1].read_text())
+                state["execution_result"] = ExecutionResult.model_validate(exec_data)
+                completed.append(4)
+            except Exception:
+                pass
+
+    # Stage 5 cache
+    if end_stage >= 5 and plan_id:
+        viz_files = sorted(STAGE5_OUT_DIR.glob(f"visualization_report_{plan_id}*.json"))
+        if viz_files:
+            try:
+                viz_data = json.loads(viz_files[-1].read_text())
+                state["visualization_report"] = VisualizationReport.model_validate(viz_data)
+                completed.append(5)
+            except Exception:
+                pass
+
+    completed_sorted = sorted(set(completed))
+    if completed_sorted:
+        last_done = completed_sorted[-1]
+        # Advance to the next unfinished stage; do not force reruns of completed stages
+        start_stage = last_done + 1
+    else:
+        start_stage = 1
+
+    state["current_stage"] = int(start_stage if start_stage <= end_stage else end_stage)
+    state["completed_stages"] = completed_sorted
+    return state, start_stage
+
+
 def build_master_graph():
-    """Build the master pipeline graph with all 5 stages.
+    """Build the master pipeline graph with all stages including Stage 3.5.
     
     Returns:
         Compiled LangGraph application
@@ -68,6 +197,7 @@ def build_master_graph():
     builder.add_node("stage1", stage1_node)
     builder.add_node("stage2", stage2_node)  
     builder.add_node("stage3", stage3_node)
+    builder.add_node("stage3_5", stage3_5_node)  # Method testing & benchmarking
     builder.add_node("stage4", stage4_node)
     builder.add_node("stage5", stage5_node)
 
@@ -75,7 +205,8 @@ def build_master_graph():
     builder.set_entry_point("stage1")
     builder.add_edge("stage1", "stage2")
     builder.add_edge("stage2", "stage3")  
-    builder.add_edge("stage3", "stage4")
+    builder.add_edge("stage3", "stage3_5")  # Test methods before execution
+    builder.add_edge("stage3_5", "stage4")
     builder.add_edge("stage4", "stage5")
     builder.add_edge("stage5", END)
 
@@ -105,23 +236,7 @@ def run_full_pipeline(selected_task_id: Optional[str] = None) -> PipelineState:
     print(f"Started at: {datetime.now().isoformat()}")
     print("=" * 80)
     
-    # Initialize state
-    initial_state: PipelineState = {
-        "current_stage": 1,
-        "completed_stages": [],
-        "dataset_summaries": [],
-        "task_proposals": [],
-        "selected_task_id": selected_task_id,
-        "stage3_plan": None,
-        "execution_result": None,
-        "visualization_report": None,
-        "errors": [],
-        "started_at": datetime.now().isoformat(),
-    }
-    
-    # Build and run the graph
-    master_app = build_master_graph()
-    final_state = master_app.invoke(initial_state)
+    final_state = run_up_to_stage(5, selected_task_id)
     
     # Print summary
     print("\n" + "=" * 80)
@@ -132,6 +247,10 @@ def run_full_pipeline(selected_task_id: Optional[str] = None) -> PipelineState:
     print(f"Task proposals: {len(final_state.get('task_proposals', []))}")
     if final_state.get('selected_task_id'):
         print(f"Executed task: {final_state['selected_task_id']}")
+    if final_state.get('tester_output'):
+        tester = final_state['tester_output']
+        print(f"Method testing: {len(tester.methods_proposed)} methods benchmarked")
+        print(f"Selected method: {tester.selected_method.name}")
     if final_state.get('execution_result'):
         print(f"Execution status: {final_state['execution_result'].status}")
     if final_state.get('visualization_report'):
@@ -148,7 +267,8 @@ def run_full_pipeline(selected_task_id: Optional[str] = None) -> PipelineState:
 def run_partial_pipeline(
     start_stage: int = 1,
     end_stage: int = 5,
-    selected_task_id: Optional[str] = None
+    selected_task_id: Optional[str] = None,
+    user_query: Optional[str] = None,
 ) -> PipelineState:
     """Run a subset of the pipeline stages.
     
@@ -156,6 +276,7 @@ def run_partial_pipeline(
         start_stage: Stage to start from (1-5)
         end_stage: Stage to end at (1-5)
         selected_task_id: Task ID to execute (required for stages 3+)
+        user_query: Optional user request to guide proposal generation (Stage 2)
         
     Returns:
         Final pipeline state
@@ -167,17 +288,25 @@ def run_partial_pipeline(
         raise ValueError(f"Invalid stage range: {start_stage}-{end_stage}")
     
     print(f"\n🎯 Running pipeline stages {start_stage}-{end_stage}")
-    
-    # For now, we need to run sequentially from stage 1
-    # (could be enhanced to support starting mid-pipeline by loading previous results)
-    if start_stage > 1:
-        print("⚠️  Note: Currently must start from Stage 1. Running full pipeline up to stage_stage.")
-        return run_up_to_stage(end_stage, selected_task_id)
-    
-    return run_up_to_stage(end_stage, selected_task_id)
+
+    # Respect end_stage; cached artifacts will be reused automatically unless
+    # a single-stage run is explicitly requested (start_stage == end_stage),
+    # in which case we rerun that stage even if cached.
+    start_override = start_stage if start_stage == end_stage else None
+    return run_up_to_stage(
+        end_stage,
+        selected_task_id,
+        start_stage_override=start_override,
+        user_query=user_query,
+    )
 
 
-def run_up_to_stage(end_stage: int, selected_task_id: Optional[str] = None) -> PipelineState:
+def run_up_to_stage(
+    end_stage: int,
+    selected_task_id: Optional[str] = None,
+    start_stage_override: Optional[int] = None,
+    user_query: Optional[str] = None,
+) -> PipelineState:
     """Run pipeline up to specified stage.
     
     Args:
@@ -187,50 +316,57 @@ def run_up_to_stage(end_stage: int, selected_task_id: Optional[str] = None) -> P
     Returns:
         Pipeline state after reaching end_stage
     """
-    # Build a custom graph with only the stages we need
+    # Load cached artifacts to skip completed stages
+    initial_state, cached_start_stage = load_cached_state(end_stage, selected_task_id)
+
+    # Persist user query in state so downstream stages (e.g., Stage 2) can tailor proposals
+    if user_query:
+        initial_state["user_query"] = user_query
+
+    # Allow caller to force a specific start stage (used for single-stage reruns).
+    start_stage = start_stage_override if start_stage_override is not None else cached_start_stage
+
+    if start_stage > end_stage:
+        print(f"\nℹ️  Cached artifacts found up to stage {end_stage}. Skipping execution.")
+        return initial_state
+
     builder = StateGraph(PipelineState)
-    
-    # Add nodes up to end_stage
-    if end_stage >= 1:
-        builder.add_node("stage1", stage1_node)
-        builder.set_entry_point("stage1")
-    
-    if end_stage >= 2:
-        builder.add_node("stage2", stage2_node)
-        builder.add_edge("stage1", "stage2")
-    
-    if end_stage >= 3:
-        builder.add_node("stage3", stage3_node)
-        builder.add_edge("stage2", "stage3")
-    
-    if end_stage >= 4:
-        builder.add_node("stage4", stage4_node)
-        builder.add_edge("stage3", "stage4")
-    
-    if end_stage >= 5:
-        builder.add_node("stage5", stage5_node)
-        builder.add_edge("stage4", "stage5")
-    
-    # Connect last stage to END
-    last_stage = f"stage{end_stage}"
-    builder.add_edge(last_stage, END)
-    
-    partial_app = builder.compile()
-    
-    # Initialize and run
-    initial_state: PipelineState = {
-        "current_stage": 1,
-        "completed_stages": [],
-        "dataset_summaries": [],
-        "task_proposals": [],
-        "selected_task_id": selected_task_id,
-        "stage3_plan": None,
-        "execution_result": None,
-        "visualization_report": None,
-        "errors": [],
-        "started_at": datetime.now().isoformat(),
+
+    # Create stage name to node function mapping
+    stage_nodes = {
+        "stage1": stage1_node,
+        "stage2": stage2_node,
+        "stage3": stage3_node,
+        "stage3_5": stage3_5_node,
+        "stage4": stage4_node,
+        "stage5": stage5_node,
     }
-    
+
+    stage_order: List[Tuple[float, str]] = [
+        (1, "stage1"),
+        (2, "stage2"),
+        (3, "stage3"),
+        (3.5, "stage3_5"),
+        (4, "stage4"),
+        (5, "stage5"),
+    ]
+
+    included = [(num, name) for num, name in stage_order if start_stage <= num <= end_stage]
+    if not included:
+        return initial_state
+
+    for _, name in included:
+        builder.add_node(name, stage_nodes[name])
+
+    entry_name = included[0][1]
+    builder.set_entry_point(entry_name)
+
+    for idx in range(len(included) - 1):
+        builder.add_edge(included[idx][1], included[idx + 1][1])
+
+    builder.add_edge(included[-1][1], END)
+
+    partial_app = builder.compile()
     return partial_app.invoke(initial_state)
 
 

@@ -23,6 +23,7 @@ from .config import (
     SUMMARIES_DIR,
     STAGE2_OUT_DIR,
     STAGE3_OUT_DIR,
+    STAGE3B_OUT_DIR,
     STAGE3_5_OUT_DIR,
     STAGE4_OUT_DIR,
     STAGE5_OUT_DIR,
@@ -32,6 +33,7 @@ from .models import (
     TaskProposal,
     Stage2Output,
     Stage3Plan,
+    PreparedDataOutput,
     TesterOutput,
     ExecutionResult,
     VisualizationReport,
@@ -40,6 +42,7 @@ from .models import (
 from .stage1_agent import stage1_node
 from .stage2_agent import stage2_node
 from .stage3_agent import stage3_node
+from .stage3b_agent import stage3b_node
 from .stage3_5_agent import stage3_5_node
 from .stage4_agent import stage4_node
 from .stage5_agent import stage5_node
@@ -53,13 +56,14 @@ class PipelineState(TypedDict):
     """Unified state for the entire agentic pipeline."""
     # Current progress
     current_stage: int  # Current stage (1-5)
-    completed_stages: List[float]  # List of completed stages (may include 3.5)
+    completed_stages: List[float]  # List of completed stages (may include 3.2, 3.5)
     
     # Stage outputs
     dataset_summaries: List[DatasetSummary]  # From Stage 1
     task_proposals: List[TaskProposal]  # From Stage 2
     selected_task_id: Optional[str]  # Which task to execute
     stage3_plan: Optional[Stage3Plan]  # From Stage 3
+    prepared_data: Optional[PreparedDataOutput]  # From Stage 3B
     tester_output: Optional[TesterOutput]  # From Stage 3.5
     execution_result: Optional[ExecutionResult]  # From Stage 4
     visualization_report: Optional[VisualizationReport]  # From Stage 5
@@ -84,6 +88,7 @@ def load_cached_state(end_stage: float, selected_task_id: Optional[str] = None) 
         "task_proposals": [],
         "selected_task_id": selected_task_id,
         "stage3_plan": None,
+        "prepared_data": None,
         "tester_output": None,
         "execution_result": None,
         "visualization_report": None,
@@ -139,6 +144,17 @@ def load_cached_state(end_stage: float, selected_task_id: Optional[str] = None) 
             except Exception:
                 pass
 
+    # Stage 3B cache (data preparation)
+    if end_stage >= 3.2 and plan_id:
+        prep_files = sorted(STAGE3B_OUT_DIR.glob(f"prep_{plan_id}*.json"))
+        if prep_files:
+            try:
+                prep_data = json.loads(prep_files[-1].read_text())
+                state["prepared_data"] = PreparedDataOutput.model_validate(prep_data)
+                completed.append(3.2)
+            except Exception:
+                pass
+
     # Stage 3.5 cache
     if end_stage >= 3.5 and plan_id:
         tester_files = sorted(STAGE3_5_OUT_DIR.glob(f"tester_{plan_id}*.json"))
@@ -186,7 +202,7 @@ def load_cached_state(end_stage: float, selected_task_id: Optional[str] = None) 
 
 
 def build_master_graph():
-    """Build the master pipeline graph with all stages including Stage 3.5.
+    """Build the master pipeline graph with all stages including Stage 3B and 3.5.
     
     Returns:
         Compiled LangGraph application
@@ -197,6 +213,7 @@ def build_master_graph():
     builder.add_node("stage1", stage1_node)
     builder.add_node("stage2", stage2_node)  
     builder.add_node("stage3", stage3_node)
+    builder.add_node("stage3b", stage3b_node)  # Data preparation
     builder.add_node("stage3_5", stage3_5_node)  # Method testing & benchmarking
     builder.add_node("stage4", stage4_node)
     builder.add_node("stage5", stage5_node)
@@ -205,7 +222,8 @@ def build_master_graph():
     builder.set_entry_point("stage1")
     builder.add_edge("stage1", "stage2")
     builder.add_edge("stage2", "stage3")  
-    builder.add_edge("stage3", "stage3_5")  # Test methods before execution
+    builder.add_edge("stage3", "stage3b")  # Prepare data after planning
+    builder.add_edge("stage3b", "stage3_5")  # Test methods on prepared data
     builder.add_edge("stage3_5", "stage4")
     builder.add_edge("stage4", "stage5")
     builder.add_edge("stage5", END)
@@ -247,6 +265,10 @@ def run_full_pipeline(selected_task_id: Optional[str] = None) -> PipelineState:
     print(f"Task proposals: {len(final_state.get('task_proposals', []))}")
     if final_state.get('selected_task_id'):
         print(f"Executed task: {final_state['selected_task_id']}")
+    if final_state.get('prepared_data'):
+        prep = final_state['prepared_data']
+        print(f"Data preparation: {prep.prepared_row_count} rows prepared")
+        print(f"                  {len(prep.columns_created)} features created")
     if final_state.get('tester_output'):
         tester = final_state['tester_output']
         print(f"Method testing: {len(tester.methods_proposed)} methods benchmarked")
@@ -337,6 +359,7 @@ def run_up_to_stage(
         "stage1": stage1_node,
         "stage2": stage2_node,
         "stage3": stage3_node,
+        "stage3b": stage3b_node,
         "stage3_5": stage3_5_node,
         "stage4": stage4_node,
         "stage5": stage5_node,
@@ -346,7 +369,8 @@ def run_up_to_stage(
         (1, "stage1"),
         (2, "stage2"),
         (3, "stage3"),
-        (3.5, "stage3_5"),
+        (3.2, "stage3b"),  # Data preparation
+        (3.5, "stage3_5"),  # Method testing
         (4, "stage4"),
         (5, "stage5"),
     ]

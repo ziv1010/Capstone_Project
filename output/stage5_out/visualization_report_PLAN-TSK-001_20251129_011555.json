@@ -1,0 +1,11 @@
+{
+  "plan_id": "PLAN-TSK-001",
+  "task_category": "predictive",
+  "visualizations": [
+    "STAGE5_OUT_DIR/actual_vs_predicted.png",
+    "STAGE5_OUT_DIR/error_distribution.png"
+  ],
+  "html_report": "",
+  "summary": "Visualizations include a line plot comparing actual vs predicted rice export quantities and a histogram showing the distribution of prediction errors.",
+  "insights": "The model's predictions closely match the actual rice export quantities, with minimal deviation as shown by the tight clustering of errors around zero."
+}

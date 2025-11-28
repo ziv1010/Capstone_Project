@@ -26,6 +26,7 @@ from .config import (
     SUMMARIES_DIR,
     STAGE2_OUT_DIR,
     STAGE3_OUT_DIR,
+    STAGE3B_OUT_DIR,
     STAGE3_5_OUT_DIR,
     STAGE4_OUT_DIR,
     STAGE5_OUT_DIR,
@@ -40,6 +41,9 @@ from .utils import (
     inspect_data_file as _inspect_data_file,
     load_dataframe,
 )
+
+# Shared scratch slot to make the last tool result available to the sandbox
+LAST_TOOL_RESULT: Any = None
 
 # ===========================
 # Generic / Failsafe Tools
@@ -189,6 +193,10 @@ def python_sandbox(code: str) -> str:
         "SUMMARIES_DIR": SUMMARIES_DIR,
         "read_summary_file": _read_summary_file_py,
         "list_summary_files": _list_summary_files_py,
+        # Make prior tool outputs accessible for LLM convenience
+        "result": LAST_TOOL_RESULT,
+        "last_result": LAST_TOOL_RESULT,
+        "last_tool_result": LAST_TOOL_RESULT,
     }
     
     local_env: Dict[str, Any] = {}
@@ -373,6 +381,180 @@ STAGE3_TOOLS = [
 
 
 # ===========================
+# Stage 3B: Data Preparation Tools
+# ===========================
+
+@tool
+def load_stage3_plan_for_prep(plan_id: str) -> str:
+    """Load a Stage 3 plan for data preparation.
+    
+    Args:
+        plan_id: Plan identifier (e.g., 'PLAN-TSK-001')
+        
+    Returns:
+        JSON string of the execution plan
+    """
+    from .config import STAGE3_OUT_DIR
+    
+    plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
+    if not plan_path.exists():
+        matches = list(STAGE3_OUT_DIR.glob(f"*{plan_id}*.json"))
+        if not matches:
+            raise FileNotFoundError(f"No plan found matching: {plan_id}")
+        plan_path = matches[0]
+    
+    return plan_path.read_text()
+
+
+@tool
+def python_sandbox_stage3b(code: str) -> str:
+    """Execute Python code in a sandbox for Stage 3B data exploration.
+    
+    Args:
+        code: Python code to execute. Can access load_dataframe(), DATA_DIR, etc.
+        
+    Returns:
+        Output from the code execution
+    """
+    from .config import DATA_DIR, STAGE3B_OUT_DIR
+    import pandas as pd
+    import numpy as np
+    from io import StringIO
+    import sys
+    
+    # Setup environment
+    local_env = {
+        "pd": pd,
+        "np": np,
+        "DATA_DIR": DATA_DIR,
+        "STAGE3B_OUT_DIR": STAGE3B_OUT_DIR,
+        "load_dataframe": lambda f: pd.read_csv(DATA_DIR / f),
+    }
+    
+    # Capture output
+    old_stdout = sys.stdout
+    sys.stdout = captured = StringIO()
+    
+    try:
+        exec(code, local_env)
+        output = captured.getvalue()
+        return output if output else "[No output]"
+    except Exception as e:
+        return f"[ERROR] {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+    finally:
+        sys.stdout = old_stdout
+
+
+@tool
+def run_data_prep_code(code: str, description: str) -> str:
+    """Execute data preparation code and return results.
+    
+    This is the main tool for data loading, merging, filtering, and transformation.
+    The code should save the prepared DataFrame to STAGE3B_OUT_DIR.
+    
+    Args:
+        code: Python code for data preparation
+        description: Brief description of what this code does
+        
+Returns:
+        Execution status and preview of prepared data
+    """
+    from .config import DATA_DIR, STAGE3B_OUT_DIR
+    import pandas as pd
+    import numpy as np
+    from io import StringIO
+    import sys
+    import traceback
+    
+    print(f"\n=== Running data preparation: {description} ===")
+    
+    # Setup environment with helper functions
+    local_env = {
+        "pd": pd,
+        "np": np,
+        "DATA_DIR": DATA_DIR,
+        "STAGE3B_OUT_DIR": STAGE3B_OUT_DIR,
+        "load_dataframe": lambda f: pd.read_csv(DATA_DIR / f),
+    }
+    
+    # Capture output
+    old_stdout = sys.stdout
+    sys.stdout = captured = StringIO()
+    
+    try:
+        exec(code, local_env)
+        output = captured.getvalue()
+        
+        # Check if prepared_df was created
+        if "prepared_df" in local_env:
+            df = local_env["prepared_df"]
+            preview = f"\n\nPrepared DataFrame Info:\n"
+            preview += f"  Shape: {df.shape}\n"
+            preview += f"  Columns: {list(df.columns)}\n"
+            preview += f"\nFirst 3 rows:\n{df.head(3).to_string()}\n"
+            return output + preview
+        else:
+            return output if output else "[Code executed successfully, no output]"
+            
+    except Exception as e:
+        error_msg = f"[ERROR] {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(error_msg, file=sys.stderr)
+        return error_msg
+    finally:
+        sys.stdout = old_stdout
+
+
+@tool
+def save_prepared_data(
+    plan_id: str,
+    prepared_file_name: str,
+    original_row_count: int,
+    prepared_row_count: int,
+    columns_created: List[str],
+    transformations_applied: List[str],
+    data_quality_report: Dict[str, Any]
+) -> str:
+    """Save prepared data output for Stage 3B.
+    
+    This should be called after successfully preparing the data.
+    The prepared DataFrame should already be saved as parquet/csv.
+    
+    Args:
+        plan_id: Plan ID (e.g., 'PLAN-TSK-001')
+        prepared_file_name: Name of the saved prepared data file
+        original_row_count: Number of rows before preparation
+        prepared_row_count: Number of rows after preparation
+        columns_created: List of feature engineering columns created
+        transformations_applied: List of transformations (filters, joins, etc.)
+        data_quality_report: Data quality metrics
+        
+    Returns:
+        Success message with file path
+    """
+    from .config import STAGE3B_OUT_DIR
+    from .models import PreparedDataOutput
+    import json
+    from datetime import datetime
+    
+    output = PreparedDataOutput(
+        plan_id=plan_id,
+        prepared_file_path=str(STAGE3B_OUT_DIR / prepared_file_name),
+        original_row_count=original_row_count,
+        prepared_row_count=prepared_row_count,
+        columns_created=columns_created,
+        transformations_applied=transformations_applied,
+        data_quality_report=data_quality_report,
+    )
+    
+    # Save metadata
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = STAGE3B_OUT_DIR / f"prep_{plan_id}_{timestamp}.json"
+    output_path.write_text(output.model_dump_json(indent=2))
+    
+    return f"✅ Prepared data output saved to: {output_path}\n\nsaved::prep_{plan_id}"
+
+
+# ===========================
 # Stage 3.5: Method Testing & Benchmarking Tools
 # ===========================
 
@@ -423,8 +605,14 @@ def run_benchmark_code(code: str, description: str = "Running benchmark") -> str
     import time
 
     def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
-        """Load a dataframe from DATA_DIR."""
-        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+        """Load a dataframe, preferring DATA_DIR then Stage 3B output for prepared parquet."""
+        try:
+            return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+        except FileNotFoundError:
+            prepared_path = STAGE3B_OUT_DIR / filename
+            if prepared_path.exists():
+                return load_dataframe(prepared_path)
+            raise
 
     globals_dict = {
         "__name__": "__stage3_5_tester__",
@@ -478,7 +666,13 @@ def python_sandbox_stage3_5(code: str) -> str:
     from .config import DATA_DIR, STAGE3_5_OUT_DIR
 
     def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
-        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+        try:
+            return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+        except FileNotFoundError:
+            prepared_path = STAGE3B_OUT_DIR / filename
+            if prepared_path.exists():
+                return load_dataframe(prepared_path)
+            raise
 
     globals_dict = {
         "__name__": "__stage3_5_sandbox__",
@@ -598,11 +792,26 @@ def record_observation(what_happened: str, what_i_learned: str, next_step: str) 
     return f"👁️ Observation recorded. Learning: {what_i_learned[:80]}... → Next: {next_step[:60]}..."
 
 
+# Stage 3B tool list
+STAGE3B_TOOLS = [
+    record_thought,  # ReAct: explicit reasoning
+    record_observation,  # ReAct: reflection
+    load_stage3_plan_for_prep,
+    list_data_files,
+    inspect_data_file,
+    python_sandbox_stage3b,
+    run_data_prep_code,
+    save_prepared_data,
+    search,
+]
+
 # Stage 3.5 tool list
 STAGE3_5_TOOLS = [
     record_thought,  # ReAct: explicit reasoning before action
     record_observation,  # ReAct: reflection after action
     load_stage3_plan_for_tester,
+    list_summary_files,  # Access Stage 1 summaries
+    read_summary_file,  # Read dataset summaries
     search,
     list_data_files,
     inspect_data_file,

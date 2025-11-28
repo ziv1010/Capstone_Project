@@ -22,6 +22,7 @@ OUTPUT_ROOT = FINAL_CODE_ROOT / "output"
 SUMMARIES_DIR = OUTPUT_ROOT / "summaries"
 STAGE2_OUT_DIR = OUTPUT_ROOT / "stage2_out"
 STAGE3_OUT_DIR = OUTPUT_ROOT / "stage3_out"
+STAGE3B_OUT_DIR = OUTPUT_ROOT / "stage3b_data_prep"  # Data preparation stage
 STAGE3_5_OUT_DIR = OUTPUT_ROOT / "stage3_5_tester"
 STAGE4_OUT_DIR = OUTPUT_ROOT / "stage4_out"
 STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
@@ -37,6 +38,7 @@ for dir_path in [
     SUMMARIES_DIR,
     STAGE2_OUT_DIR,
     STAGE3_OUT_DIR,
+    STAGE3B_OUT_DIR,  # Data preparation
     STAGE3_5_OUT_DIR,
     STAGE4_OUT_DIR,
     STAGE5_OUT_DIR,
@@ -58,7 +60,7 @@ PRIMARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 4096,  # Reduced from 8192 to prevent context overflow
+    "max_tokens": 2048,  # Reduced to allow for longer conversation histories
 }
 
 SECONDARY_LLM_CONFIG = {
@@ -66,7 +68,9 @@ SECONDARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 4096,  # Reduced from 8192 to prevent context overflow
+    "max_tokens": 2048,  # Reduced to allow for longer conversation histories
+    "stop": ["<|im_start|>", "<|im_end|>"],
+
 }
 
 # ===========================
@@ -82,11 +86,14 @@ STAGE2_MAX_EXPLORATION_STEPS = 10  # Max tool calls during exploration
 # Stage 3: Planning
 STAGE3_MAX_ROUNDS = 15  # Max rounds for planning agent
 
+# Stage 3B: Data Preparation
+STAGE3B_MAX_ROUNDS = 100  # Max rounds for data prep agent
+
 # Stage 3.5: Method Testing & Benchmarking
-STAGE3_5_MAX_ROUNDS = 40  # Max rounds for tester agent (benchmarking may take longer)
+STAGE3_5_MAX_ROUNDS = 100  # Max rounds for tester agent (benchmarking may take longer)
 
 # Stage 4: Execution
-STAGE4_MAX_ROUNDS = 25  # Max rounds for execution agent
+STAGE4_MAX_ROUNDS = 100  # Max rounds for execution agent
 
 # Stage 5: Visualization
 STAGE5_MAX_ROUNDS = 20  # Max rounds for visualization agent

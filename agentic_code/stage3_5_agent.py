@@ -1,14 +1,19 @@
 """
-Stage 3.5: Method Testing & Benchmarking Agent
+Stage 3.5: Method Testing & Benchmarking Agent (Tester)
 
-Tests 3 forecasting methods on data subsets to select the best performer before final execution.
+Uses a ReAct framework to:
+1. Identify 3 suitable forecasting methods for the task
+2. Benchmark each method with 3 iterations on a data subset
+3. Detect hallucinated code execution via consistency checks
+4. Select the best-performing method
+5. Pass recommendation to Stage 4 execution
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from langchain_openai import ChatOpenAI
@@ -16,11 +21,14 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE3_5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE3_5_MAX_ROUNDS
-from .models import TesterOutput
+from .config import (
+    STAGE3_5_OUT_DIR,
+    STAGE3B_OUT_DIR,
+    SECONDARY_LLM_CONFIG,
+    STAGE3_5_MAX_ROUNDS,
+)
+from .models import TesterOutput, ForecastingMethod, BenchmarkResult
 from .tools import STAGE3_5_TOOLS
-from .failsafe_agent import run_failsafe
-
 
 # ===========================
 # LLM Setup
@@ -31,291 +39,487 @@ llm_with_tools = llm.bind_tools(STAGE3_5_TOOLS, parallel_tool_calls=False)
 
 
 # ===========================
-# System Prompt
+# System Prompt with ReAct Framework
 # ===========================
 
-STAGE3_5_SYSTEM_PROMPT = """You are the Method Testing & Benchmarking Agent (Stage 3.5) using the ReAct (Reasoning + Acting) framework.
+STAGE3_5_SYSTEM_PROMPT = """You are a forecasting method testing and benchmarking agent.
+
+Your job: Given a Stage 3 plan, you must:
+1. Identify 3 suitable forecasting methods for the task
+2. Benchmark each method with 3 iterations on a data subset
+3. Detect code execution hallucinations via result consistency checks
+4. Select the best-performing method based on averaged metrics
+5. Save the recommendation via save_tester_output()
 
 ═══════════════════════════════════════════════════════════════
-CRITICAL MISSION
+CRITICAL: REACT FRAMEWORK (MANDATORY)
 ═══════════════════════════════════════════════════════════════
 
-Your job: Discover the BEST forecasting approach for the task by designing and running your own benchmarks across three distinct methods.
+You MUST follow this cycle for every step:
 
-SUCCESS CRITERIA: You MUST call save_tester_output() with the winning method. This is NON-NEGOTIABLE.
+**THOUGHT → ACTION → OBSERVATION → REFLECTION**
 
-═══════════════════════════════════════════════════════════════
-ReAct FRAMEWORK (REASONING + ACTING)
-═══════════════════════════════════════════════════════════════
+Before EVERY action:
+- Call record_thought(thought="...", what_im_about_to_do="...")
+  • thought: What you know, what's uncertain, what you're considering
+  • what_im_about_to_do: The specific action you'll take and WHY
 
-For EVERY action you take, follow this cycle:
+After EVERY action result:
+- Call record_observation(what_happened="...", what_i_learned="...", next_step="...")
+  • what_happened: The actual result (success, error, unexpected)
+  • what_i_learned: Key insight or lesson
+  • next_step: What you'll do based on this learning
 
-1. **THOUGHT** (Explicit Reasoning via record_thought)
-   Call record_thought() to document:
-   - What you know so far from previous observations
-   - What's still uncertain or unclear
-   - What alternative approaches you're considering
-   - Potential issues or risks you foresee
-   - WHY your next action will help
-
-2. **ACTION** (Tool Call)
-   - Call ONE tool that addresses your current question
-   - The tool should directly test your hypothesis or gather needed info
-
-3. **OBSERVATION** (Analyze Result via record_observation)
-   Call record_observation() to document:
-   - What the tool returned (success, error, data)
-   - Whether it answered your question or raised new ones
-   - Any surprises or unexpected results
-   - What this teaches you about the data/task
-
-4. **REFLECTION** (Learn & Adjust via record_observation)
-   In the same record_observation() call:
-   - Did this work as expected?
-   - What did you learn about the data structure/problem?
-   - Should you continue this path or pivot to a different approach?
-   - What specific action will you take next?
-
-EXAMPLE REACT CYCLE:
-```
-# Round 1: Understanding the data
-record_thought(
-  thought="I need to understand the structure of both data files before planning any joins or transformations",
-  what_im_about_to_do="Call inspect_data_file() on the export data to see columns, dtypes, and nulls"
-)
-→ inspect_data_file(...)
-record_observation(
-  what_happened="File has 8 rows x 23 columns with yearly export values. No 'Season' column exists.",
-  what_i_learned="The export data is already aggregated by year. Can't join on 'Season' as TSK-001 suggested.",
-  next_step="Inspect the production data to see if a year-based join is feasible"
-)
-
-# Round 2: Check second file
-record_thought(
-  thought="Now I know export data lacks 'Season'. Let me check if production data has year columns that align",
-  what_im_about_to_do="Call inspect_data_file() on production data"
-)
-→ inspect_data_file(...)
-record_observation(
-  what_happened="Production data has Area/Production/Yield for 2020-2025 only, organized by Crop and Season",
-  what_i_learned="These files have different structures - export is wide-format by year, production is long-format with different year coverage",
-  next_step="Use python_sandbox to test if I can filter for Rice and reshape/align the data"
-)
-```
+DO NOT skip these calls. They are how you think strategically and avoid repeating mistakes.
 
 ═══════════════════════════════════════════════════════════════
-ERROR RECOVERY PROTOCOL (Critical for avoiding loops)
+SUCCESS CRITERION
 ═══════════════════════════════════════════════════════════════
 
-When you encounter an error in run_benchmark_code():
+Your ONLY success criterion is calling:
+  save_tester_output(output_json={...})
 
-**STOP AND RECORD OBSERVATION IMMEDIATELY**:
+With a valid TesterOutput containing:
+- plan_id
+- task_category
+- methods_proposed: List of 3 ForecastingMethod objects
+- benchmark_results: List of BenchmarkResult objects (3 methods × 3 iterations = 9 results)
+- selected_method_id: ID of best method
+- selected_method: The ForecastingMethod object for the winner
+- selection_rationale: Why this method was chosen
+- data_split_strategy: How data was split
+
+═══════════════════════════════════════════════════════════════
+PHASE 1: DATA UNDERSTANDING (MANDATORY CHECKLIST)
+═══════════════════════════════════════════════════════════════
+
+Before benchmarking, you MUST understand the data structure:
+
+□ Load the Stage 3 plan (load_stage3_plan_for_tester)
+□ Identify required data files from the plan
+□ Inspect each file (inspect_data_file) to see columns and dtypes
+□ Determine which column contains dates/timestamps
+□ Determine which column is the target variable (from plan)
+□ Understand temporal granularity (daily, monthly, yearly)
+□ Determine full date range (e.g., 2020-2024)
+□ Design train/validation/test split strategy
+□ Verify data can be loaded and split (use python_sandbox_stage3_5)
+
+DO NOT proceed to benchmarking until ALL items are checked.
+
+═══════════════════════════════════════════════════════════════
+PHASE 2: METHOD IDENTIFICATION
+═══════════════════════════════════════════════════════════════
+
+Based on the task and data characteristics, propose 3 distinct forecasting methods.
+
+**Method Selection Criteria:**
+- Task category (predictive time series)
+- Data size and structure
+- Temporal patterns (trend, seasonality, etc.)
+- Computational feasibility
+
+**Example method types** (choose 3 that make sense):
+1. Simple baseline (e.g., moving average, naive forecast)
+2. Statistical method (e.g., ARIMA, Exponential Smoothing)
+3. Machine learning (e.g., Random Forest, Gradient Boosting, Linear Regression)
+
+For each method, create a ForecastingMethod object:
 ```python
-record_observation(
-  what_happened="run_benchmark_code failed with: [exact error]",
-  what_i_learned="Root cause analysis: [why did this fail?]",
-  next_step="[different approach, NOT the same code]"
-)
+{
+  "method_id": "METHOD-1",
+  "name": "Moving Average Baseline",
+  "description": "3-period moving average as a simple baseline",
+  "implementation_code": "# Python code snippet",
+  "libraries_required": ["pandas", "numpy"]
+}
 ```
 
-**Decision Tree**:
-
-1. **Have I seen this EXACT error before?**
-   - YES → **PIVOT** to a completely different approach
-     - Example: If join failed 2x, try using files separately
-     - Example: If slicing produces empty dataframe 2x, reshape the data structure
-   - NO → Analyze root cause and try ONE targeted fix
-
-2. **Is this a fundamental data structure problem?**
-   - Empty dataframes → Your filtering/joining/slicing logic is flawed
-   - Column not found → Check actual column names with inspect_data_file()
-   - Shape mismatch → Data structure assumptions are wrong
-   → **PIVOT**: Go back to python_sandbox and test your assumptions
-
-3. **Have I tried this method 3 times?**
-   - YES → **ABANDON this method**:
-     ```python
-     record_observation(
-       what_happened="METHOD-1 failed 3 times with different errors",
-       what_i_learned="This approach is not viable for this data structure",
-       next_step="Mark METHOD-1 as failed and move to METHOD-2"
-     )
-     ```
-   - NO → Make ONE specific change based on the error message
-
-**NEVER**:
-- ❌ Retry the same code hoping for different results
-- ❌ Make multiple random changes at once (you won't know what worked)
-- ❌ Continue after 3 failures on the same method (move to next method)
-- ❌ Ignore errors and keep going (you need to learn from each one)
+**IMPORTANT:** Be dataset-agnostic. DO NOT hardcode column names like "Year" or "Sales".
+Instead, write code that discovers column names dynamically from the data.
 
 ═══════════════════════════════════════════════════════════════
-DATA UNDERSTANDING (Complete BEFORE benchmarking)
+PHASE 3: BENCHMARKING PROTOCOL (3 ITERATIONS PER METHOD)
 ═══════════════════════════════════════════════════════════════
 
-Before writing ANY benchmark code, complete this checklist:
+For EACH of the 3 methods:
 
-☐ 1. INSPECT BOTH FILES
-   - record_thought() about what you need to learn
-   - inspect_data_file() for EACH required file
-   - record_observation() noting: rows, columns, dtypes, null counts
+**Run 3 iterations:**
+1. Iteration 1: Execute method, record metrics
+2. Iteration 2: Execute same method again, record metrics
+3. Iteration 3: Execute same method third time, record metrics
 
-☐ 2. IDENTIFY TARGET & FEATURES  
-   - What column are we predicting?
-   - What features are available?
-   - Do these columns actually exist in the data?
+**Why 3 iterations?**
+- Verify that code is actually executing (not hallucinated)
+- Check consistency of results
+- Detect stochastic behavior vs. deterministic behavior
 
-☐ 3. UNDERSTAND TEMPORAL STRUCTURE
-   - Are there date/year columns?
-   - What's the time granularity?
-   - How many time periods are available?
+**Consistency Check (Anti-Hallucination Safeguard):**
 
-☐ 4. TEST JOIN FEASIBILITY (if multi-file task)
-   - Do hypothesized join keys exist in BOTH files?
-   - Use python_sandbox to test the join
-   - Check: is the result non-empty?
+After 3 iterations, analyze results:
 
-☐ 5. DEFINE DATA SPLIT STRATEGY
-   - Training period: Which specific rows/years?
-   - Validation period: Which specific rows/years?
-   - Test period: (held out for Stage 4, not used now)
+1. **All zeros detection:**
+   - If all metrics are [0, 0, 0] or [0.0, 0.0, 0.0], FLAG THIS
+   - This likely means code didn't execute or calculated incorrectly
 
-☐ 6. TEST DATA PREP IN SANDBOX
-   - Load, join/filter, split
-   - Verify train and val sets are both non-empty
-   - Print shapes to confirm
+2. **Coefficient of Variation (CV):**
+   - For each metric, calculate: CV = std / mean
+   - If CV > 0.3 (30% variation), FLAG THIS
+   - Means results are inconsistent across runs
 
-ONLY after completing ALL checkboxes should you start benchmarking methods!
+3. **Error flagging:**
+   - If any iteration fails with error, mark method status = "failure"
+   - Include error message in BenchmarkResult
 
-═══════════════════════════════════════════════════════════════
-YOUR WORKFLOW
-═══════════════════════════════════════════════════════════════
+4. **Averaging:**
+   - For successful methods, take mean of 3 iterations for each metric
+   - Use averaged metrics for method comparison
 
-**PHASE 1: UNDERSTAND (Rounds 1-5)**
-1. load_stage3_plan_for_tester(plan_id) 
-2. For EACH required file: inspect_data_file()
-3. python_sandbox_stage3_5() to test data loading, joins, and splits
-4. Complete the DATA UNDERSTANDING checklist above
-
-**PHASE 2: PROPOSE METHODS (Autonomous Thinking)**
-Based on what you learned about the data:
-- Brainstorm 4-5 candidate methods
-- For each: note pros/cons specific to THIS task/data
-- Select 3 diverse methods (different assumptions/complexity)
-- Derive choices from the plan and observed data—no defaults
-
-**PHASE 3: BENCHMARK (Rounds 6-25)**
-For EACH of your 3 methods:
-
-1. record_thought() about the method and your implementation plan
-2. run_benchmark_code() with code that:
-   - Loads and prepares data using your tested approach
-   - Implements the method
-   - Trains on train period
-   - Predicts on validation period
-   - Calculates metrics (RMSE, MAE, or appropriate)
-   - Prints results and timing
-3. record_observation() about what happened:
-   - Success: Note the metrics and timing
-   - Failure: Analyze error and decide: retry with fix OR pivot OR abandon?
-4. If method failed 3x: Mark as "failed" and move to next method
-
-**PHASE 4: SELECT & SAVE (Rounds 26-30)**
-1. record_thought() comparing all methods that ran
-2. Choose winner based on:
-   - Metrics (lower RMSE/MAE)
-   - Execution time
-   - Stability (no errors)
-   - Appropriateness for task
-3. save_tester_output() with complete JSON (see format below)
-
-═══════════════════════════════════════════════════════════════
-OUTPUT FORMAT
-═══════════════════════════════════════════════════════════════
-
-Call save_tester_output(output_json=...) with this structure:
-
-```json
+**Example BenchmarkResult structure:**
+```python
 {
-  "plan_id": "PLAN-TSK-XXX",
-  "task_category": "predictive",
-  "methods_proposed": [
-    {
-      "method_id": "METHOD-1",
-      "name": "Linear Regression",
-      "description": "Why suitable for this specific task/data",
-      "implementation_code": "Complete working Python code",
-      "libraries_required": ["pandas", "sklearn"]
-    },
-    // ... 2 more methods
-  ],
-  "benchmark_results": [
-    {
-      "method_id": "METHOD-1",
-      "method_name": "Linear Regression",
-      "metrics": {"RMSE": 123.45, "MAE": 67.89},
-      "train_period": "2018-2023",
-      "validation_period": "2024",
-      "execution_time_seconds": 0.5,
-      "status": "success",  // or "failed"
-      "error_message": null,  // or error text
-      "predictions_sample": [1.0, 2.0, 3.0]
-    },
-    // ... results for other methods
-  ],
-  "selected_method_id": "METHOD-2",
-  "selected_method": { /* full ForecastingMethod object of winner */ },
-  "selection_rationale": "METHOD-2 had lowest RMSE (45.6) vs METHOD-1 (123.4) and ran 10x faster. METHOD-3 failed due to insufficient data.",
-  "data_split_strategy": "Trained on 2018-2023 export data, validated on 2024. Used simple temporal split."
+  "method_id": "METHOD-1",
+  "method_name": "Moving Average Baseline",
+  "metrics": {"MAE": 123.45, "RMSE": 234.56, "MAPE": 0.12},  # Averaged
+  "train_period": "2020-2023",
+  "validation_period": "2024",
+  "test_period": null,
+  "execution_time_seconds": 2.5,
+  "status": "success",
+  "error_message": null,
+  "predictions_sample": [100.5, 102.3, 98.7, ...]  # First 10 predictions
 }
 ```
 
 ═══════════════════════════════════════════════════════════════
-CRITICAL RULES
+CRITICAL: USE PREPARED DATA IF AVAILABLE
 ═══════════════════════════════════════════════════════════════
 
-1. **Use ReAct framework**: Call record_thought() before every major action, record_observation() after every tool result
-2. **Learn from errors**: Never retry the same code—always adjust based on what you learned
-3. **Pivot when stuck**: After 2-3 failures with same issue, try a completely different approach
-4. **Abandon method after 3 failures**: Mark as "failed" and move to next method
-5. **Warnings are OK**: pandas/numpy warnings (SettingWithCopy, etc.) are non-blocking—continue
-6. **Complete all 3 methods**: Even if some fail, try all 3 before selecting winner
-7. **Save output**: Once you have results from at least 2 methods, call save_tester_output()
-8. **Don't exit early**: Keep going until save_tester_output() succeeds or you hit max rounds
+**Stage 3B may have already prepared the data!**
 
-Remember: Your success = calling save_tester_output() with the winning method!"""
+BEFORE loading raw data files, CHECK if prepared data exists:
+- Look for prepared data file mentioned in Stage 3 plan metadata
+- Typical format: 'prepared_PLAN-TSK-001.parquet'
+- Location: STAGE3B_OUT_DIR or mentioned in plan
+
+**If prepared data exists:**
+✓ Load it directly: `prepared_df = load_dataframe('prepared_PLAN-TSK-001.parquet')`
+✓ Skip manual loading, merging, filtering
+✓ Prepared data already has joins, filters, and features applied
+✓ You only need to split it for benchmarking
+
+**If no prepared data:**
+✗ Fall back to loading raw data files manually
+✗ Apply filters and joins yourself
+
+═══════════════════════════════════════════════════════════════
+HOW TO RUN BENCHMARKS
+═══════════════════════════════════════════════════════════════
+
+Use run_benchmark_code(code="...", description="Testing METHOD-X Iteration Y")
+
+**CRITICAL: Use load_dataframe() helper to load files:**
+- DO NOT use `pd.read_csv('filename.csv')` - this will fail!
+- ALWAYS use `load_dataframe('filename.csv')` - this is provided in the environment
+- The helper automatically finds files in DATA_DIR
+
+**Your code must:**
+1. Load the data using load_dataframe('filename.csv')
+2. Identify date column and target column (DO NOT HARDCODE)
+3. Split data:
+   - Training: Earlier period (e.g., 2020-2023)
+   - Validation: Later period (e.g., 2024)
+   - Test: Optional future period (e.g., 2025 if available)
+4. Implement the forecasting method
+5. Make predictions on validation set
+6. Calculate metrics (MAE, RMSE, MAPE, etc.)
+7. Print results in a parseable format
+8. Optionally save artifacts to STAGE3_5_OUT_DIR
+
+**Metric Calculation:**
+- MAE = Mean Absolute Error
+- RMSE = Root Mean Squared Error  
+- MAPE = Mean Absolute Percentage Error
+- R² = Coefficient of determination
+- Choose metrics appropriate for forecasting tasks
+
+**Example code structure (dataset-agnostic):**
+```python
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# CORRECT: Use load_dataframe() helper
+df = load_dataframe('Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv')
+
+# WRONG: DO NOT use pd.read_csv() directly
+# df = pd.read_csv('filename.csv')  # This will fail!
+
+# Discover date columns dynamically
+date_cols = [col for col in df.columns if 'date' in col.lower() or 'year' in col.lower() or 'time' in col.lower()]
+if not date_cols:
+    # Try finding numeric column that looks like years
+    date_cols = [col for col in df.columns if df[col].dtype in ['int64', 'int32'] and df[col].min() > 1900]
+
+# For wide-format data (columns are years), reshape to long format
+# Example: '2020 - 21-Value (USD)', '2021 - 22-Value (USD)', etc.
+value_cols = [col for col in df.columns if 'Value (USD)' in col or 'value' in col.lower()]
+if value_cols:
+    # Extract years from column names
+    years = []
+    for col in value_cols:
+        # Extract year like "2020 - 21" from "2020 - 21-Value (USD)"
+        year_match = col.split('-')[0].strip()
+        years.append((year_match, col))
+    
+    # Use the year columns for forecasting
+    # Train on older years, validate on newest year
+    
+# Calculate metrics
+mae = np.mean(np.abs(predictions - actuals))
+rmse = np.sqrt(np.mean((predictions - actuals)**2))
+mape = np.mean(np.abs((predictions - actuals) / actuals)) * 100
+
+print(f"MAE: {mae}")
+print(f"RMSE: {rmse}")
+print(f"MAPE: {mape}")
+```
+
+═══════════════════════════════════════════════════════════════
+PHASE 4: METHOD SELECTION
+═══════════════════════════════════════════════════════════════
+
+After all benchmarks complete:
+
+1. **Filter:** Remove failed methods (status = "failure")
+
+2. **Rank:** Among successful methods, rank by primary metric
+   - For forecasting: Usually MAE or RMSE (lower is better)
+   - Choose the metric that makes most sense for the task
+
+3. **Select:** Pick the best-performing method
+
+4. **Document:** Write selection_rationale explaining:
+   - Why this method performed best
+   - How it compared to alternatives
+   - Any caveats or considerations
+
+═══════════════════════════════════════════════════════════════
+ERROR RECOVERY PROTOCOL
+═══════════════════════════════════════════════════════════════
+
+If you encounter errors:
+
+1. **First error:** Analyze what went wrong
+   - Use record_observation to document the error
+   - Try a different approach or fix the issue
+
+2. **Repeated errors (same method):** 
+   - Skip to next method
+   - Mark current method as "failure"
+   - Do NOT waste more than 3 attempts per method
+
+3. **Data loading errors:**
+   - Use python_sandbox_stage3_5 to inspect data structure
+   - Adjust column discovery logic
+   - Try alternative loading strategies
+
+4. **Metric calculation errors:**
+   - Check for division by zero
+   - Verify predictions and actuals have same shape
+   - Handle missing values appropriately
+
+5. **Search for help:**
+   - Use search() to find examples of forecasting code
+   - Look for similar tasks in output directory
+   - Learn from prior successful implementations
+
+═══════════════════════════════════════════════════════════════
+STATE TRACKING (PREVENT REPETITION)
+═══════════════════════════════════════════════════════════════
+
+Keep mental track of:
+- Which methods have been proposed ✓
+- Which methods have been benchmarked ✓
+- How many iterations completed per method
+- Which approaches have failed (don't retry the same failure)
+- Current phase: DATA_UNDERSTANDING → METHOD_PROPOSAL → BENCHMARKING → SELECTION
+
+═══════════════════════════════════════════════════════════════
+TOOLS AVAILABLE
+═══════════════════════════════════════════════════════════════
+
+**ReAct Tools:**
+- record_thought(thought, what_im_about_to_do)
+- record_observation(what_happened, what_i_learned, next_step)
+
+**Data Exploration:**
+- load_stage3_plan_for_tester(plan_id) → Returns Stage 3 plan JSON
+- list_data_files() → List available data files
+- inspect_data_file(filename, n_rows) → Show schema and sample rows
+- python_sandbox_stage3_5(code) → Quick Python execution for exploration
+
+**Benchmarking:**
+- run_benchmark_code(code, description) → Execute benchmarking code
+- search(query, within) → Search for examples and prior work
+
+**Final Output:**
+- save_tester_output(output_json) → Save final recommendation
+
+═══════════════════════════════════════════════════════════════
+EXAMPLE WORKFLOW
+═══════════════════════════════════════════════════════════════
+
+1. record_thought("I need to understand the task and data structure", 
+                  "Loading Stage 3 plan")
+2. load_stage3_plan_for_tester("PLAN-TSK-001")
+3. record_observation("Plan loaded, it's a predictive task with files X, Y", 
+                      "Need to inspect data structure", 
+                      "Inspecting first data file")
+4. inspect_data_file("file1.csv")
+5. record_observation("Found date column 'Year' and target 'Production'",
+                      "Data is yearly from 2015-2024",
+                      "Will split at 2023 for train/val")
+6. record_thought("Data structure clear, now proposing 3 methods",
+                  "Proposing baseline, ARIMA, and RF methods")
+7. record_observation("3 methods identified: MA, ARIMA, RandomForest",
+                      "Methods are appropriate for yearly forecasting",
+                      "Starting benchmarks with METHOD-1 iteration 1")
+8. run_benchmark_code(code="...", description="METHOD-1 Iteration 1")
+9. record_observation("METHOD-1 Iter 1: MAE=50.2",
+                      "Code executed successfully",
+                      "Running iteration 2")
+... Continue for all methods and iterations ...
+10. save_tester_output(output_json={...})
+
+═══════════════════════════════════════════════════════════════
+FINAL REMINDER
+═══════════════════════════════════════════════════════════════
+
+- Follow ReAct framework religiously (record_thought before, record_observation after)
+- Run 3 iterations for each of 3 methods (9 benchmarks total)
+- Check result consistency to detect hallucinations
+- Be dataset-agnostic (discover structure, don't assume)
+- Save comprehensive TesterOutput when complete
+- Aim to finish within {max_rounds} rounds
+"""
 
 
 # ===========================
-# LangGraph
+# LangGraph Setup
 # ===========================
+
+def truncate_messages(messages: List[BaseMessage], max_history: int = 20) -> List[BaseMessage]:
+    """Truncate message history to prevent token overflow.
+    
+    Keeps:
+    - System message (first message)
+    - Initial user message (second message)  
+    - Last max_history messages (recent conversation)
+    
+    Args:
+        messages: Full message list
+        max_history: Number of recent messages to keep
+        
+    Returns:
+        Truncated message list
+    """
+    if len(messages) <= max_history + 2:
+        return messages
+    
+    # Keep system message, user message, and last N messages
+    return [messages[0], messages[1]] + messages[-(max_history):]
+
 
 def agent_node(state: MessagesState) -> Dict[str, List[BaseMessage]]:
-    """Single LLM step."""
-    # Prune history to last 15 messages to control context length
-    msgs = state.get("messages", [])
-    if len(msgs) > 15:
-        state["messages"] = msgs[-15:]
-    response = llm_with_tools.invoke(state["messages"])
+    """Single LLM step with tool calling."""
+    # Truncate message history to prevent token overflow
+    truncated_messages = truncate_messages(state["messages"], max_history=20)
+    response = llm_with_tools.invoke(truncated_messages)
     return {"messages": [response]}
 
 
 tool_node = ToolNode(STAGE3_5_TOOLS)
 
 
+def _tool_call_history(messages: List[BaseMessage]) -> List[str]:
+    """Extract tool call names from conversation history."""
+    names: List[str] = []
+    for m in messages:
+        tool_calls = getattr(m, "tool_calls", None)
+        if not tool_calls:
+            continue
+        for tc in tool_calls:
+            # LangChain/OpenAI tool_calls can be dict-like or objects with nested function.name
+            name = None
+            if isinstance(tc, dict):
+                name = tc.get("name")
+                if not name and isinstance(tc.get("function"), dict):
+                    name = tc["function"].get("name")
+            else:
+                name = getattr(tc, "name", None)
+                if not name:
+                    func = getattr(tc, "function", None)
+                    if func is not None:
+                        name = getattr(func, "name", None)
+            if name:
+                names.append(name)
+    return names
+
+
 def should_continue(state: MessagesState) -> str:
-    """Route based on tool calls."""
-    last = state["messages"][-1]
-    if hasattr(last, 'tool_calls') and last.tool_calls:
+    """Route based on tool calls, retrying agent when incomplete."""
+    messages = state["messages"]
+    last = messages[-1]
+
+    # Track progress
+    tool_history = _tool_call_history(messages)
+    save_called = any(name == "save_tester_output" for name in tool_history)
+    benchmarks_run = sum(1 for name in tool_history if name == "run_benchmark_code")
+
+    # If we just got a tool call, go execute it
+    if hasattr(last, "tool_calls") and last.tool_calls:
         return "tools"
-    return END
+
+    # If already saved, we can end
+    if save_called:
+        return END
+
+    # If benchmarks are incomplete or save not called, nudge and continue agent
+    recent_tool = None
+    for m in reversed(messages):
+        tc_list = getattr(m, "tool_calls", None)
+        if tc_list:
+            tc = tc_list[0]
+            if isinstance(tc, dict):
+                recent_tool = tc.get("name") or (tc.get("function") or {}).get("name")
+            else:
+                recent_tool = getattr(tc, "name", None)
+                if not recent_tool and hasattr(tc, "function"):
+                    recent_tool = getattr(tc.function, "name", None)
+            break
+
+    done_msg = (
+        "All 3 methods × 3 iterations are complete; call save_tester_output now."
+        if benchmarks_run >= 9
+        else "Continue benchmarking until 9 run_benchmark_code calls, then save."
+    )
+    reminder = (
+        f"No tool call detected. You must continue benchmarking and call save_tester_output when done.\n"
+        f"run_benchmark_code calls so far: {benchmarks_run}/9. "
+        f"save_tester_output called: {save_called}.\n"
+        f"{done_msg} "
+        f"Most recent tool: {recent_tool or 'none yet'}."
+    )
+    messages.append(HumanMessage(content=reminder))
+    return "agent"
 
 
 builder = StateGraph(MessagesState)
 builder.add_node("agent", agent_node)
 builder.add_node("tools", tool_node)
 builder.set_entry_point("agent")
-builder.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+builder.add_conditional_edges("agent", should_continue, {"tools": "tools", "agent": "agent", END: END})
 builder.add_edge("tools", "agent")
 
 memory = MemorySaver()
@@ -326,13 +530,8 @@ stage3_5_app = builder.compile(checkpointer=memory)
 # Stage 3.5 Runner
 # ===========================
 
-def run_stage3_5(
-    plan_id: str,
-    max_rounds: int = STAGE3_5_MAX_ROUNDS,
-    debug: bool = True,
-    recursion_limit: int | None = None,
-) -> Dict:
-    """Run Stage 3.5 method testing for a specific plan.
+def run_stage3_5(plan_id: str, max_rounds: int = STAGE3_5_MAX_ROUNDS, debug: bool = True) -> Dict:
+    """Run Stage 3.5 method testing and benchmarking.
     
     Args:
         plan_id: Plan ID from Stage 3 (e.g., 'PLAN-TSK-001')
@@ -342,50 +541,85 @@ def run_stage3_5(
     Returns:
         Final state from the graph execution
     """
-    def _trunc(text: str, limit: int = 800) -> str:
-        if not isinstance(text, str):
-            return str(text)
-        if len(text) <= limit:
-            return text
-        half = limit // 2
-        return text[:half] + "\n...[truncated]...\n" + text[-half:]
-
+    from .config import STAGE3_OUT_DIR, STAGE2_OUT_DIR
+    import json
+    
+    # Load exclusion context from Stage 3 plan
+    excluded_context = ""
+    plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
+    if plan_path.exists():
+        try:
+            plan_data = json.loads(plan_path.read_text())
+            excluded_cols = plan_data.get("excluded_columns", [])
+            
+            # Also check task proposal for excluded columns
+            task_id = plan_data.get("task_id", "")
+            if task_id:
+                task_path = STAGE2_OUT_DIR / "task_proposals.json"
+                if task_path.exists():
+                    task_data = json.loads(task_path.read_text())
+                    for proposal in task_data.get("proposals", []):
+                        if proposal.get("id") == task_id:
+                            task_excluded = proposal.get("excluded_columns", [])
+                            excluded_cols.extend(task_excluded)
+                            break
+            
+            if excluded_cols:
+                excluded_context = "\n\n**COLUMNS EXCLUDED DUE TO DATA QUALITY:**\n"
+                excluded_context += "The following columns were rejected in earlier stages:\n"
+                for ex in excluded_cols:
+                    excluded_context += f"- {ex.get('column_name', 'unknown')} from {ex.get('file', 'unknown')}: {ex.get('reason', 'no reason given')}\n"
+                excluded_context += "\nBe aware these columns are unavailable. Use alternatives if needed.\n"
+        except Exception as e:
+            print(f"Warning: Could not load excluded columns: {e}")
+    
     system_msg = SystemMessage(content=STAGE3_5_SYSTEM_PROMPT)
+    # Surface prepared parquet hints to the agent so it loads them first.
+    prepared_parquet = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
+    if prepared_parquet.exists():
+        parquet_hint = (
+            f"\n\nPrepared data detected at: {prepared_parquet}\n"
+            f"Load with load_dataframe('{prepared_parquet.name}') and reuse it instead of raw CSVs."
+        )
+    else:
+        parquet_hint = (
+            "\n\nNo prepared parquet found in Stage 3B output directory. "
+            "Proceed with raw data loading."
+        )
     human_msg = HumanMessage(
         content=(
-            f"Test forecasting methods for plan '{plan_id}'.\\n\\n"
-            f"Workflow:\\n"
-            f"1. load_stage3_plan_for_tester('{plan_id}')\\n"
-            f"2. inspect_data_file() for the required data\\n"
-            f"3. Propose 3 forecasting methods suitable for this task\\n"
-            f"4. Design temporal data split strategy\\n"
-            f"5. Benchmark all 3 methods using run_benchmark_code()\\n"
-            f"6. Select the best method based on your benchmark evidence\\n"
-            f"7. save_tester_output() with complete results\\n\\n"
-            f"Remember:\\n"
-            f"- Be autonomous in selecting methods, metrics, splits, and libraries\\n"
-            f"- Adapt everything to the specific forecasting task and data\\n"
-            f"- Your SUCCESS = calling save_tester_output()\\n"
-            f"- Complete in <={max_rounds} rounds"
+            f"Test and benchmark forecasting methods for plan '{plan_id}'.{excluded_context}\n\n"
+            f"Follow the ReAct framework strictly:\n"
+            f"1. DATA UNDERSTANDING: Load plan, inspect data, identify structure\n"
+            f"2. METHOD PROPOSAL: Identify 3 suitable forecasting methods\n"
+            f"3. BENCHMARKING: Run each method 3 times, check consistency\n"
+            f"4. SELECTION: Choose best method based on averaged metrics\n"
+            f"5. SAVE: Call save_tester_output() with complete results\n\n"
+            f"Remember:\n"
+            f"- Use record_thought() BEFORE each action\n"
+            f"- Use record_observation() AFTER each action\n"
+            f"- Run 3 iterations per method to verify code execution\n"
+            f"- Check coefficient of variation to detect hallucinations\n"
+            f"- Be dataset-agnostic (discover column names)\n"
+            f"- Use search() if you need examples or guidance\n\n"
+            f"Your success metric: save_tester_output() called with valid TesterOutput."
+            f"{parquet_hint}"
         )
     )
 
     state: MessagesState = {"messages": [system_msg, human_msg]}
 
-    # Allow callers to override recursion_limit; default scales with max_rounds
-    recursion_cap = recursion_limit or max_rounds * 3
+    # Configure with higher recursion limit for benchmarking tasks  
+    config = {
+        "configurable": {"thread_id": f"stage3_5-{plan_id}"},
+        "recursion_limit": max_rounds + 125  # Increased buffer for 9 benchmarks + selection
+    }
 
     if not debug:
-        return stage3_5_app.invoke(
-            state,
-            config={
-                "configurable": {"thread_id": f"stage3_5-{plan_id}"},
-                "recursion_limit": recursion_cap,
-            },
-        )
+        return stage3_5_app.invoke(state, config=config)
 
     print("=" * 80)
-    print(f"🚀 STAGE 3.5: Method Testing for {plan_id}")
+    print(f"🧪 STAGE 3.5: Method Testing & Benchmarking for {plan_id}")
     print("=" * 80)
 
     final_state = None
@@ -394,10 +628,7 @@ def run_stage3_5(
 
     for curr_state in stage3_5_app.stream(
         state,
-        config={
-            "configurable": {"thread_id": f"stage3_5-{plan_id}"},
-            "recursion_limit": recursion_cap,
-        },
+        config=config,
         stream_mode="values",
     ):
         msgs = curr_state["messages"]
@@ -406,60 +637,55 @@ def run_stage3_5(
         for m in new_msgs:
             msg_type = m.__class__.__name__
             if "System" in msg_type:
-                print("\\n" + "─" * 80)
+                print("\n" + "─" * 80)
                 print("💻 [SYSTEM]")
                 print("─" * 80)
                 print(m.content[:500] + "..." if len(m.content) > 500 else m.content)
             elif "Human" in msg_type:
-                print("\\n" + "─" * 80)
+                print("\n" + "─" * 80)
                 print("👤 [USER]")
                 print("─" * 80)
                 print(m.content)
             elif "AI" in msg_type:
                 round_num += 1
-                print("\\n" + "═" * 80)
+                print("\n" + "═" * 80)
                 print(f"🤖 [AGENT - Round {round_num}]")
                 print("═" * 80)
                 if m.content:
-                    print("\\n💭 Reasoning:")
-                    content = _trunc(m.content, limit=1000)
-                    print(content)
+                    print("\n💭 Reasoning:")
+                    content = m.content
+                    if len(content) > 1000:
+                        print(content[:500] + "\n...[truncated]...\n" + content[-500:])
+                    else:
+                        print(content)
                 
                 if hasattr(m, 'tool_calls') and m.tool_calls:
-                    print("\\n🔧 Tool Calls:")
+                    print("\n🔧 Tool Calls:")
                     for tc in m.tool_calls:
                         name = tc.get("name", "UNKNOWN")
                         args = tc.get("args", {})
-                        print(f"\\n  📌 {name}")
+                        print(f"\n  📌 {name}")
                         for k, v in args.items():
-                            if isinstance(v, str) and len(v) > 300:
-                                print(f"     {k}: {v[:150]}...[truncated]...{v[-150:]}")
+                            if isinstance(v, str) and len(v) > 200:
+                                print(f"     {k}: {v[:100]}...[truncated]...{v[-100:]}")
                             else:
                                 print(f"     {k}: {v}")
             elif "Tool" in msg_type:
-                print("\\n" + "─" * 80)
-                print(f"🛠️ [TOOL RESULT] {getattr(m, 'name', 'unknown')}")
-                print("─" * 80)
-                content = m.content or ""
-                print(_trunc(content, limit=800))
+                print("\n📥 Tool Result:")
+                content = m.content
+                if len(content) > 500:
+                    print(content[:250] + "\n...[truncated]...\n" + content[-250:])
+                else:
+                    print(content)
 
         prev_len = len(msgs)
         final_state = curr_state
         
         if round_num >= max_rounds:
-            print(f"\\n⚠️  Reached max rounds ({max_rounds}). Stopping.")
+            print(f"\n⚠️  Reached max rounds ({max_rounds}). Stopping.")
             break
 
-    if final_state:
-        tool_names = [
-            getattr(m, "name", None)
-            for m in final_state["messages"]
-            if m.__class__.__name__.endswith("ToolMessage")
-        ]
-        if "save_tester_output" not in tool_names:
-            print("\\n⚠️  save_tester_output was never called in this run.")
-
-    print("\\n" + "=" * 80)
+    print("\n" + "=" * 80)
     print(f"✅ Complete - {round_num} rounds")
     print("=" * 80)
     return final_state
@@ -478,60 +704,40 @@ def stage3_5_node(state: dict) -> dict:
     Returns:
         Updated state with tester_output populated
     """
-    if not state.get("stage3_plan"):
-        print("ERROR: No Stage 3 plan available for method testing")
+    from .config import STAGE3_5_OUT_DIR
+    
+    stage3_plan = state.get("stage3_plan")
+    if not stage3_plan:
+        print("ERROR: No Stage 3 plan available for Stage 3.5")
         state["errors"].append("Stage 3.5: No Stage 3 plan available")
         return state
     
-    plan_id = state["stage3_plan"].plan_id
-    print(f"\\n🎯 Starting Stage 3.5 Method Testing for: {plan_id}\\n")
+    plan_id = stage3_plan.plan_id
+    
+    # Check for prepared data from Stage 3B
+    prepared_data = state.get("prepared_data")
+    if prepared_data:
+        print(f"\n✅ Stage 3B prepared data available: {prepared_data.prepared_file_path}")
+        print(f"   Rows: {prepared_data.prepared_row_count}, Features: {len(prepared_data.columns_created)}")
+    else:
+        print(f"\n⚠️  No prepared data from Stage 3B - agent will load raw data")
+    
+    print(f"\n🧪 Starting Stage 3.5 for: {plan_id}\n")
     
     result = run_stage3_5(plan_id, debug=True)
     
     # Check for saved tester output
     tester_files = sorted(STAGE3_5_OUT_DIR.glob(f"tester_{plan_id}*.json"))
     if tester_files:
-        latest = tester_files[-1]
-        print(f"\\n✅ SUCCESS! Tester output saved to: {latest}")
-        tester_data = json.loads(latest.read_text())
+        latest_file = tester_files[-1]
+        print(f"\n✅ SUCCESS! Tester output saved to: {latest_file}")
+        tester_data = json.loads(latest_file.read_text())
         state["tester_output"] = TesterOutput.model_validate(tester_data)
         state["completed_stages"].append(3.5)
         state["current_stage"] = 4
-        
-        # Print summary
-        print(f"\\n📊 Benchmarking Summary:")
-        print(f"  Methods tested: {len(tester_data.get('methods_proposed', []))}")
-        print(f"  Selected method: {tester_data.get('selected_method', {}).get('name', 'N/A')}")
-        print(f"  Selection rationale: {tester_data.get('selection_rationale', 'N/A')}")
     else:
-        print("\\n⚠️  WARNING: Tester output not saved. Check logs above.")
-        last_ai = None
-        if result and isinstance(result, dict) and "messages" in result:
-            for msg in reversed(result["messages"]):
-                if "AI" in msg.__class__.__name__:
-                    last_ai = msg
-                    break
-        if last_ai:
-            print("\\n🧠 Last agent message before termination:")
-            content = last_ai.content or ""
-            if len(content) > 2000:
-                print(content[:1000] + "\\n...[truncated]...\\n" + content[-1000:])
-            else:
-                print(content)
-
+        print("\n⚠️  WARNING: Tester output not saved. Check logs above.")
         state["errors"].append("Stage 3.5: Tester output not saved")
-        
-        try:
-            rec = run_failsafe(
-                stage="stage3_5",
-                error="Tester output missing",
-                context="save_tester_output() not called or failed validation.",
-                debug=False,
-            )
-            state.setdefault("failsafe_history", []).append(rec)
-            print(f"\\n🛟 Failsafe suggestion recorded: {rec.analysis}")
-        except Exception as e:
-            print(f"\\n⚠️  Failsafe agent failed: {e}")
     
     return state
 

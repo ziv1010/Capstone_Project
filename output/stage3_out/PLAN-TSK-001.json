@@ -1,9 +1,9 @@
 {
   "plan_id": "PLAN-TSK-001",
   "selected_task_id": "TSK-001",
-  "goal": "Predict the export value of rice based on historical production data.",
+  "goal": "Forecast future rice export quantities to Bangladesh using historical data.",
   "task_category": "predictive",
-  "created_at": "2025-11-27T17:26:00.772706",
+  "created_at": "2025-11-28T19:58:50.192925",
   "created_by": "stage3_agent",
   "artifacts": {
     "intermediate_table": "TSK-001_data.parquet",
@@ -11,34 +11,16 @@
     "expected_columns": [
       "HS Code",
       "Description",
-      "2018 - 19-Value (USD)",
-      "2019 - 20-Value (USD)",
-      "2020 - 21-Value (USD)",
-      "2021 - 22-Value (USD)",
-      "2022 - 23-Value (USD)",
-      "2023 - 24-Value (USD)",
-      "2024 - 25-Value (USD)",
-      "Crop",
-      "Season",
-      "Area-2020-21",
-      "Area-2021-22",
-      "Area-2022-23",
-      "Area-2023-24",
-      "Area-2024-25",
-      "Production-2020-21",
-      "Production-2021-22",
-      "Production-2022-23",
-      "Production-2023-24",
-      "Production-2024-25",
-      "Yield-2020-21",
-      "Yield-2021-22",
-      "Yield-2022-23",
-      "Yield-2023-24",
-      "Yield-2024-25"
+      "2018 - 19-Quantity",
+      "2019 - 20-Quantity",
+      "2020 - 21-Quantity",
+      "2021 - 22-Quantity",
+      "2022 - 23-Quantity",
+      "2024 - 25-Quantity"
     ],
     "expected_row_count_range": [
-      10,
-      100
+      8,
+      8
     ]
   },
   "key_normalization": [],
@@ -46,60 +28,28 @@
     {
       "file_id": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
       "original_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-      "alias": "export",
+      "alias": "rice_exports",
       "filters": [],
       "rename_columns": {},
       "join_keys": [],
       "keep_columns": [
         "HS Code",
         "Description",
-        "2018 - 19-Value (USD)",
-        "2019 - 20-Value (USD)",
-        "2020 - 21-Value (USD)",
-        "2021 - 22-Value (USD)",
-        "2022 - 23-Value (USD)",
-        "2023 - 24-Value (USD)",
-        "2024 - 25-Value (USD)"
+        "2018 - 19-Quantity",
+        "2019 - 20-Quantity",
+        "2020 - 21-Quantity",
+        "2021 - 22-Quantity",
+        "2022 - 23-Quantity",
+        "2024 - 25-Quantity"
       ],
-      "notes": null
-    },
-    {
-      "file_id": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-      "original_name": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-      "alias": "production",
-      "filters": [
-        "Crop == 'Rice'",
-        "Season == 'Total'"
-      ],
-      "rename_columns": {},
-      "join_keys": [],
-      "keep_columns": [
-        "Crop",
-        "Season",
-        "Area-2020-21",
-        "Area-2021-22",
-        "Area-2022-23",
-        "Area-2023-24",
-        "Area-2024-25",
-        "Production-2020-21",
-        "Production-2021-22",
-        "Production-2022-23",
-        "Production-2023-24",
-        "Production-2024-25",
-        "Yield-2020-21",
-        "Yield-2021-22",
-        "Yield-2022-23",
-        "Yield-2023-24",
-        "Yield-2024-25"
-      ],
-      "notes": null
+      "notes": "Data validation: All columns verified ≥65% complete. Currency: Using INR as per preference."
     }
   ],
   "join_steps": [
     {
       "step": 1,
       "description": "Load base table",
-      "left_table": "export",
+      "left_table": "rice_exports",
       "right_table": null,
       "join_type": "base",
       "join_keys": [],
@@ -114,59 +64,35 @@
         "acceptable_coverage": null,
         "max_cardinality_ratio": null
       }
-    },
-    {
-      "step": 2,
-      "description": "Join production data",
-      "left_table": "export",
-      "right_table": "production",
-      "join_type": "left",
-      "join_keys": [],
-      "left_on": [
-        "Description"
-      ],
-      "right_on": [
-        "Crop"
-      ],
-      "expected_cardinality": "many-to-one",
-      "validation": {
-        "check_duplicates_on_keys": [],
-        "expected_unique": false,
-        "check_row_count_stable": false,
-        "check_no_duplicates_introduced": false,
-        "acceptable_coverage": null,
-        "max_cardinality_ratio": null
-      }
     }
   ],
   "feature_engineering": [
     {
-      "feature_name": "lagged_value_2023",
-      "description": "Lagged value of 2023-24-Value (USD)",
+      "feature_name": "quantity_lag_1",
+      "description": "Lagged quantity from previous year",
       "transform": "lag",
       "depends_on": [
-        "2023 - 24-Value (USD)"
+        "2023 - 24-Quantity"
       ],
-      "implementation": "df['lagged_value_2023'] = df['2023 - 24-Value (USD)'].shift(1)"
+      "implementation": "df['quantity_lag_1'] = df['2023 - 24-Quantity'].shift(1)"
     },
     {
-      "feature_name": "growth_rate_2023",
-      "description": "Growth rate of 2023-24-Value (USD)",
+      "feature_name": "quantity_growth_rate",
+      "description": "Growth rate of quantity",
       "transform": "growth",
       "depends_on": [
-        "2023 - 24-Value (USD)",
-        "2022 - 23-Value (USD)"
+        "2023 - 24-Quantity"
       ],
-      "implementation": "df['growth_rate_2023'] = (df['2023 - 24-Value (USD)'] - df['2022 - 23-Value (USD)']) / df['2022 - 23-Value (USD)']"
+      "implementation": "df['quantity_growth_rate'] = df['2023 - 24-Quantity'].pct_change()"
     }
   ],
   "validation": {
     "time_split": {
       "method": "year-based",
-      "train_years": "2018-19 to 2023-24",
-      "test_years": "2024-25",
+      "train_years": "2018-19 to 2022-23",
+      "test_years": "2023-24",
       "validation_years": null,
-      "leakage_check": "Ensure no data from 2024-25 is used in training."
+      "leakage_check": "Ensure no data leakage by splitting on years"
     },
     "coverage_checks": [],
     "cardinality_checks": [],
@@ -176,7 +102,6 @@
     ]
   },
   "expected_model_types": [
-    "Regression",
     "Time Series"
   ],
   "evaluation_metrics": [
@@ -184,7 +109,7 @@
     "MAE"
   ],
   "notes": [
-    "Manual join based on crop type (rice) and year.",
-    "Handle missing values with mean or median imputation."
+    "Data validation: All columns verified ≥65% complete.",
+    "Currency: Using INR as per preference."
   ]
 }

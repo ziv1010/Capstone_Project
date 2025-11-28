@@ -3,18 +3,17 @@
     {
       "id": "TSK-001",
       "category": "predictive",
-      "title": "Predict Rice Export Value Based on Production Data",
-      "problem_statement": "Understanding the relationship between rice production and export values can help in forecasting future export revenues. This task aims to predict the export value of rice based on historical production data.",
+      "title": "Forecast Rice Exports to Bangladesh",
+      "problem_statement": "Predict future rice export quantities and values to Bangladesh using historical data. All columns verified \u226565% data completeness.",
       "required_files": [
-        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
       ],
       "join_plan": {
         "hypothesized_keys": [],
-        "notes": "No direct join keys exist between the datasets. However, both datasets contain information about rice, so a manual join based on crop type (rice) and year could be considered."
+        "notes": "Single dataset, no join required."
       },
       "target": {
-        "name": "2024 - 25-Value (USD)",
+        "name": "2024 - 25-Quantity",
         "granularity": [
           "HS Code",
           "Description"
@@ -23,25 +22,23 @@
       },
       "feature_plan": {
         "candidates": [
-          "*2023*",
-          "*2022*",
-          "*2021*",
-          "*2020*",
-          "*2019*",
-          "*2018*"
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2023 - 24-Quantity"
         ],
         "transform_ideas": [
           "lagged features",
-          "growth rates",
-          "aggregations"
+          "growth rates"
         ],
-        "handling_missingness": "Impute missing values with mean or median of the respective column."
+        "handling_missingness": "Impute missing values using mean or median of the respective column."
       },
-      "validation_plan": "Split the data into training (2018-2023) and test (2024) sets. Evaluate using RMSE and MAE.",
+      "validation_plan": "Split the data into training and test sets based on time. Evaluate using RMSE and MAE.",
       "quality_checks": [
-        "Verify that the join is performed correctly by checking the number of rows and ensuring no duplicates.",
-        "Check for null values in key columns before performing the join.",
-        "Ensure that the target variable is not present in the training set to avoid data leakage."
+        "Verify that the target column has sufficient data points.",
+        "Check for any duplicates or inconsistencies in the data."
       ],
       "expected_outputs": [
         "tables",
@@ -51,91 +48,92 @@
     },
     {
       "id": "TSK-002",
-      "category": "descriptive",
-      "title": "Analyze Trends in Rice Cultivation Area Over Time",
-      "problem_statement": "Analyzing trends in the area under rice cultivation over time can provide insights into agricultural practices and policy impacts. This task aims to explore the changes in rice cultivation area across different seasons and years.",
+      "category": "predictive",
+      "title": "Forecast Rice Export Values to Bangladesh",
+      "problem_statement": "Predict future rice export values to Bangladesh using historical data. All columns verified \u226565% data completeness.",
       "required_files": [
-        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-        "All-India-profile_-Crop-wise-Area.csv"
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [
-          [
-            "Crop",
-            "Season"
-          ]
+        "hypothesized_keys": [],
+        "notes": "Single dataset, no join required."
+      },
+      "target": {
+        "name": "2024 - 25-Value (INR)",
+        "granularity": [
+          "HS Code",
+          "Description"
         ],
-        "notes": "Both datasets can be joined using the 'Crop' and 'Season' columns."
+        "horizon": "1-year ahead"
+      },
+      "feature_plan": {
+        "candidates": [
+          "2018 - 19-Value (INR)",
+          "2019 - 20-Value (INR)",
+          "2020 - 21-Value (INR)",
+          "2021 - 22-Value (INR)",
+          "2022 - 23-Value (INR)",
+          "2023 - 24-Value (INR)"
+        ],
+        "transform_ideas": [
+          "lagged features",
+          "growth rates"
+        ],
+        "handling_missingness": "Impute missing values using mean or median of the respective column."
+      },
+      "validation_plan": "Split the data into training and test sets based on time. Evaluate using RMSE and MAE.",
+      "quality_checks": [
+        "Verify that the target column has sufficient data points.",
+        "Check for any duplicates or inconsistencies in the data."
+      ],
+      "expected_outputs": [
+        "tables",
+        "plots",
+        "model_metrics"
+      ]
+    },
+    {
+      "id": "TSK-003",
+      "category": "descriptive",
+      "title": "Analyze Trends in Rice Exports to Bangladesh",
+      "problem_statement": "Analyze trends in rice exports to Bangladesh over the years. All columns verified \u226565% data completeness.",
+      "required_files": [
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+      ],
+      "join_plan": {
+        "hypothesized_keys": [],
+        "notes": "Single dataset, no join required."
       },
       "target": {
         "name": null,
-        "granularity": [
-          "Crop",
-          "Season"
-        ],
+        "granularity": null,
         "horizon": null
       },
       "feature_plan": {
         "candidates": [
-          "*Area-*"
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2023 - 24-Quantity",
+          "2024 - 25-Quantity"
         ],
         "transform_ideas": [
           "time series analysis",
           "seasonal decomposition"
         ],
-        "handling_missingness": "Impute missing values with the mean of the respective column."
+        "handling_missingness": "Impute missing values using mean or median of the respective column."
       },
-      "validation_plan": "Perform exploratory data analysis (EDA) to visualize trends and patterns in the data.",
+      "validation_plan": "Perform exploratory data analysis to identify trends and patterns.",
       "quality_checks": [
-        "Verify that the join is performed correctly by checking the number of rows and ensuring no duplicates.",
-        "Check for null values in key columns before performing the join."
+        "Ensure that the data is clean and consistent.",
+        "Check for any outliers or anomalies in the data."
       ],
       "expected_outputs": [
         "tables",
         "plots",
         "summary_report"
-      ]
-    },
-    {
-      "id": "TSK-003",
-      "category": "unsupervised",
-      "title": "Cluster Crops Based on Yield and Production Patterns",
-      "problem_statement": "Clustering crops based on their yield and production patterns can help in identifying groups of crops with similar characteristics. This task aims to segment crops into clusters using unsupervised learning techniques.",
-      "required_files": [
-        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
-      ],
-      "join_plan": {
-        "hypothesized_keys": [],
-        "notes": "Single dataset task, no join required."
-      },
-      "target": {
-        "name": null,
-        "granularity": [
-          "Crop",
-          "Season"
-        ],
-        "horizon": null
-      },
-      "feature_plan": {
-        "candidates": [
-          "*Yield-*",
-          "*Production-*"
-        ],
-        "transform_ideas": [
-          "standardization",
-          "dimensionality reduction"
-        ],
-        "handling_missingness": "Impute missing values with the mean of the respective column."
-      },
-      "validation_plan": "Evaluate the clustering using silhouette score and visual inspection of cluster centroids.",
-      "quality_checks": [
-        "Check for null values in key columns before performing the analysis.",
-        "Ensure that the data is standardized before applying clustering algorithms."
-      ],
-      "expected_outputs": [
-        "tables",
-        "plots",
-        "cluster_assignments"
       ]
     }
   ]

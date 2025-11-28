@@ -19,6 +19,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 
 from .config import SUMMARIES_DIR, STAGE2_OUT_DIR, PRIMARY_LLM_CONFIG, STAGE2_MAX_EXPLORATION_STEPS
+from . import tools  # for shared sandbox state
 from .models import Stage2Output, TaskProposal
 from .tools import STAGE2_TOOLS
 from .utils import parse_tool_call, parse_proposals_json
@@ -75,10 +76,87 @@ You have access to FOUR TOOLS:
        * see how raw datasets are used in existing code,
        * find prior analyses or metrics for specific datasets,
        * locate existing join logic or feature engineering code.
-   - Does NOT change any files; it only returns text matches.
 
 ═══════════════════════════════════════════════════════════════
-YOUR ROLE IN STAGE 2
+CRITICAL VALIDATION RULES (MANDATORY FAILSAFES)
+═══════════════════════════════════════════════════════════════
+
+**RULE 1: DATA AVAILABILITY (≥65% NON-NAN)**
+Before proposing ANY task, you MUST verify that all columns used have at least 65% non-NaN data.
+
+How to check:
+1. Review Stage 1 summaries for null_fraction per column
+2. For a column to be usable: (1 - null_fraction) >= 0.65
+3. If null_fraction > 0.35, DO NOT use that column
+4. If unsure, use python_sandbox() to calculate: `df['column'].notna().sum() / len(df)`
+
+Example validation:
+```python
+# Check data availability
+import pandas as pd
+df = load_dataframe('file.csv')
+
+for col in ['export_value', 'production', 'year']:
+    non_nan_pct = df[col].notna().sum() / len(df)
+    print(f"{col}: {non_nan_pct*100:.1f}% non-NaN")
+    if non_nan_pct < 0.65:
+        print(f"  ❌ REJECT - Insufficient data!")
+    else:
+        print(f"  ✓ OK - Can use this column")
+```
+
+**RULE 2: TASK TYPE PREFERENCE**
+Strongly prefer PREDICTIVE tasks over descriptive/clustering tasks.
+
+Priority order:
+1. **PREDICTIVE** (forecasting, regression, classification) ← HIGHEST PRIORITY
+2. Clustering (if predictive not viable)
+3. Descriptive (last resort)
+
+When multiple task types are possible, ALWAYS propose predictive tasks first.
+
+**RULE 3: CURRENCY PREFERENCE (INR > USD)**
+When dataset has both INR and USD columns:
+- **Default:** Use INR (Indian Rupees) columns
+- **Exception:** Use USD only if user explicitly mentions international analysis or USD
+
+Example:
+- Columns: "Value (INR)", "Value (USD)"
+- ✓ Prefer: "Value (INR)"
+- ✗ Avoid: "Value (USD)" (unless user requests it)
+
+═══════════════════════════════════════════════════════════════
+VALIDATION WORKFLOW (MANDATORY)
+═══════════════════════════════════════════════════════════════
+
+For EACH proposed task:
+
+STEP 1: Identify all required columns
+  - List target column(s)
+  - List feature column(s)
+  - List join key column(s) if multiple files
+
+STEP 2: Validate data availability
+  - Check Stage 1 summaries for null_fraction
+  - Calculate: data_availability = 1 - null_fraction
+  - Require: data_availability >= 0.65 for ALL columns
+  - If any column fails, REJECT the task or find alternative
+
+STEP 3: Verify task type priority
+  - Is this predictive? (if yes, proceed)
+  - If not, can it be made predictive? (try to convert)
+  - If still not predictive, justify why clustering/descriptive is needed
+
+STEP 4: Check currency preference
+  - Are there INR and USD columns?
+  - If yes, use INR unless user specifies otherwise
+
+STEP 5: Document validation
+  - In task description, mention data availability check
+  - State: "All required columns have ≥65% non-NaN data"
+
+═══════════════════════════════════════════════════════════════
+TASK PROPOSAL GUIDELINES
 ═══════════════════════════════════════════════════════════════
 
 Your job in Stage 2 is to explore the available datasets and design **high-quality analytic task proposals** that:
@@ -144,6 +222,9 @@ Valid tool_name values in this phase:
 - "read_summary_file"
 - "python_sandbox"
 - "search"
+
+Inside python_sandbox, you can also access the previous tool output as `result`, `last_result`, or `last_tool_result`.
+Do NOT paste entire summary JSON blobs into python_sandbox code; instead call read_summary_file(...) or use result/last_result.
 
 You MAY precede this dict with some natural language, or wrap it in ```python ...``` fences;
 the orchestration code will extract the dict. But the dict itself MUST be valid Python syntax.
@@ -245,7 +326,7 @@ def agent_llm_node(state: AgentState) -> AgentState:
                 '{"tool_name": "<one of: \'list_summary_files\', '
                 '\'read_summary_file\', \'python_sandbox\'>", '
                 '"tool_args": { ... }}\n'
-                "Do not include explanation or markdown."
+                "Do not include explanation or markdown. Do NOT paste raw summary JSON; use read_summary_file(...) or result/last_result instead."
             )
         )
         state["messages"].append(ai_msg)
@@ -284,6 +365,8 @@ def agent_tool_node(state: AgentState) -> AgentState:
         print(f"Calling tool: {name} with args: {args}")
         try:
             result = tool.invoke(args)
+            # Make last tool output accessible to the sandbox for convenience
+            tools.LAST_TOOL_RESULT = result
         except Exception as e:
             result = f"[tool execution error] {e}"
 
@@ -358,6 +441,13 @@ def build_proposals_from_history(messages: List[BaseMessage]) -> tuple[Dict, Sta
 Now, based on all the dataset summaries and tool outputs in this conversation,
 synthesize your final plan of analytic tasks.
 
+REMINDER: MANDATORY VALIDATION RULES
+- ✓ ALL columns must have ≥65% non-NaN data (1 - null_fraction ≥ 0.65)
+- ✓ PREFER predictive tasks (forecasting, regression, classification)
+- ✓ When INR and USD both exist, USE INR (unless user specifies otherwise)
+- ✓ Document data validation in problem_statement: "All columns verified ≥65% complete"
+- ✓ DOCUMENT EXCLUDED COLUMNS: Any column you considered but rejected must be listed in excluded_columns
+
 You MUST output a SINGLE STRICT JSON object with the following structure:
 
 {
@@ -366,7 +456,7 @@ You MUST output a SINGLE STRICT JSON object with the following structure:
       "id": "TSK-001",
       "category": "predictive" | "descriptive" | "unsupervised",
       "title": "short human-readable title",
-      "problem_statement": "2–5 sentences explaining the analytic question and why it matters.",
+      "problem_statement": "2–5 sentences explaining the analytic question and why it matters. MUST mention: 'All columns verified ≥65% data completeness'",
       "required_files": ["filename1.csv", "filename2.csv"],
       "join_plan": {
         "hypothesized_keys": [
@@ -378,7 +468,7 @@ You MUST output a SINGLE STRICT JSON object with the following structure:
       "target": {
         "name": "column name or null",
         "granularity": ["columns that define a prediction/aggregation unit"] or null,
-        "horizon": "forecast horizon like '1-year ahead' or null
+        "horizon": "forecast horizon like '1-year ahead' or null"
       },
       "feature_plan": {
         "candidates": ["pattern-*", "explicit_column_name", "..."],
@@ -389,6 +479,18 @@ You MUST output a SINGLE STRICT JSON object with the following structure:
       "quality_checks": [
         "simple checks to avoid leakage or broken joins",
         "..."
+      ],
+      "excluded_columns": [
+        {
+          "column_name": "Price_USD",
+          "file": "export_data.csv",
+          "reason": "Only 45% non-NaN data, below 65% threshold. Using Price_INR instead."
+        },
+        {
+          "column_name": "Legacy_ID",
+          "file": "production.csv",
+          "reason": "90% missing data, unusable for analysis"
+        }
       ],
       "expected_outputs": [
         "tables",

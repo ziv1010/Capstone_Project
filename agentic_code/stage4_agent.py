@@ -45,8 +45,47 @@ STAGE4_SYSTEM_PROMPT = """You are Agent 4: The Executor.
 
 Your mission: Execute the Stage 3 plan flawlessly and autonomously.
 
+3. Read file_instructions to know which data to load
+4. **CHECK FOR PREPARED DATA FIRST:**
+   - Look for 'prepared_PLAN-ID.parquet' in STAGE3B_OUT_DIR
+   - If it exists, load it directly - it already has joins, filters, features
+   - If not, load raw data files and apply transformations manually
+5. Implement the forecasting solution per the plan
+6. Calculate evaluation metrics (RMSE, MAE, etc.)
+7. Save predictions and model artifacts
+8. Call save_execution_result() when complete
+
 ═══════════════════════════════════════════════════════════════
-CRITICAL RULES
+CRITICAL: USE PREPARED DATA IF AVAILABLE
+═══════════════════════════════════════════════════════════════
+
+**Stage 3B may have prepared your data!**
+
+BEFORE loading raw files, check if prepared data exists:
+```python
+import os
+from pathlib import Path
+
+# Check for prepared data
+prep_file = STAGE3B_OUT_DIR / 'prepared_PLAN-TSK-001.parquet'
+if prep_file.exists():
+    # Use prepared data - already has joins, filters, features!
+    df = load_dataframe('prepared_PLAN-TSK-001.parquet')
+    print(f"✓ Loaded prepared data: {df.shape}")
+else:
+    # Fall back to loading raw data
+    df1 = load_dataframe('raw_file1.csv')
+    df2 = load_dataframe('raw_file2.csv')
+    # Apply joins, filters manually...
+```
+
+**Benefits of using prepared data:**
+✓ Faster execution (no data wrangling)
+✓ Consistent with benchmarking (Stage 3.5 used same data)
+✓ Joins and features already applied per plan
+
+═══════════════════════════════════════════════════════════════
+EXECUTION WORKFLOW
 ═══════════════════════════════════════════════════════════════
 
 1. You are FULLY AUTONOMOUS - write and execute code to handle ANY requirement
@@ -249,23 +288,36 @@ def run_stage4(
 # ===========================
 
 def stage4_node(state: dict) -> dict:
-    """Stage 4 node for the master pipeline graph.
+    """Stage 4 node for master graph.
     
     Args:
-        state: Current pipeline state with stage3_plan and optionally tester_output set
+        state: Pipeline state with stage3_plan and optionally tester_output
         
     Returns:
-        Updated state with execution_result populated
+        Updated state with execution_result
     """
-    if not state.get("stage3_plan"):
-        print("ERROR: No Stage 3 plan available for execution")
+    from .config import STAGE4_OUT_DIR
+    from pathlib import Path
+    
+    stage3_plan = state.get("stage3_plan")
+    if not stage3_plan:
+        print("ERROR: No Stage 3 plan available for Stage 4")
         state["errors"].append("Stage 4: No Stage 3 plan available")
         return state
     
-    plan_id = state["stage3_plan"].plan_id
+    plan_id = stage3_plan.plan_id
     tester_output = state.get("tester_output")
     
-    # Prepare context for Stage 4 agent
+    # Check for prepared data from Stage 3B
+    prepared_data = state.get("prepared_data")
+    if prepared_data:
+        print(f"\n✅ Stage 3B prepared data available: {prepared_data.prepared_file_path}")
+        print(f"   Rows: {prepared_data.prepared_row_count}, Features: {len(prepared_data.columns_created)}")
+        print(f"   Use load_dataframe('{Path(prepared_data.prepared_file_path).name}') to load it")
+    else:
+        print(f"\n⚠️  No prepared data from Stage 3B - agent will load raw data")
+    
+    print(f"\n⚙️  Starting Stage 4 for: {plan_id}\n")
     context_msg = f"\n🎯 Executing plan: {plan_id}\n"
     
     if tester_output:

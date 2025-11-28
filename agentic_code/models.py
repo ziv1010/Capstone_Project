@@ -82,6 +82,21 @@ class FeaturePlan(BaseModel):
         default_factory=list,
         description="Free-text feature engineering ideas."
     )
+    quality_checks: List[str] = Field(
+        default_factory=list,
+        description="Checks for avoiding leakage, broken joins, etc."
+    )
+    excluded_columns: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description=(
+            "Columns that were considered but excluded due to data quality issues. "
+            "Each entry has 'column_name', 'file', and 'reason' (e.g., 'Only 45% non-NaN data, below 65% threshold')"
+        )
+    )
+    expected_outputs: List[str] = Field(
+        default_factory=list,
+        description="Expected output types like tables, plots, metrics, etc."
+    )
     handling_missingness: Optional[str] = None
 
 
@@ -248,6 +263,31 @@ class Stage3Plan(BaseModel):
 
 
 # ===========================
+# Stage 3B: Data Preparation
+# ===========================
+
+class PreparedDataOutput(BaseModel):
+    """Output from Stage 3B data preparation agent."""
+    plan_id: str = Field(description="Links back to Stage 3 plan")
+    prepared_file_path: str = Field(description="Path to saved prepared data file (parquet)")
+    original_row_count: int = Field(description="Number of rows before preparation")
+    prepared_row_count: int = Field(description="Number of rows after preparation")
+    columns_created: List[str] = Field(
+        default_factory=list,
+        description="Names of feature engineering columns created"
+    )
+    transformations_applied: List[str] = Field(
+        default_factory=list,
+        description="List of transformations applied (filters, joins, feature engineering)"
+    )
+    data_quality_report: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Data quality metrics (null counts, duplicates, etc.)"
+    )
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+# ===========================
 # Stage 3.5: Method Testing & Benchmarking
 # ===========================
 
@@ -348,6 +388,21 @@ class VisualizationReport(BaseModel):
     html_report: Optional[str] = Field(
         default=None,
         description="Path to HTML report (if created)"
+    )
+    expected_columns: List[str] = Field(
+        default_factory=list,
+        description="Expected columns in the final merged dataset"
+    )
+    excluded_columns: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description=(
+            "Columns excluded during planning due to data quality. "
+            "Each entry has 'column_name', 'file', and 'reason' (e.g., 'Only 50% complete, below 65% threshold')"
+        )
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Any additional context, warnings, or clarifications"
     )
     summary: str
     insights: List[str] = Field(

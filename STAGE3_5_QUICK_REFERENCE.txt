@@ -1,0 +1,113 @@
+"""
+Stage 3.5 Quick Reference - Using the Tester Agent
+===================================================
+
+WHAT IT DOES
+------------
+- Benchmarks 3 forecasting methods with 3 iterations each
+- Detects hallucinated code via consistency checks
+- Selects best method based on averaged metrics
+- Passes recommendation to Stage 4 for execution
+
+USAGE
+-----
+
+1. Run Full Pipeline (includes Stage 3.5):
+   
+   micromamba activate llm
+   cd /scratch/ziv_baretto/llmserve/final_code/agentic_code
+   python master_agent.py TSK-001
+
+2. Run Stage 3.5 Standalone:
+   
+   python stage3_5_agent.py PLAN-TSK-001
+
+3. Check Results:
+   
+   Output saved to: output/stage3_5_tester/tester_PLAN-TSK-001_*.json
+
+KEY FEATURES
+------------
+✓ ReAct framework with explicit reasoning
+✓ 3 methods × 3 iterations = 9 benchmarks  
+✓ Coefficient of Variation (CV) checking
+✓ Dataset-agnostic (no hardcoded columns)
+✓ Automatic method selection
+✓ Full pipeline integration
+
+OUTPUT STRUCTURE
+----------------
+{
+  "plan_id": "PLAN-TSK-001",
+  "task_category": "predictive",
+  "methods_proposed": [
+    {
+      "method_id": "METHOD-1",
+      "name": "Moving Average",
+      "description": "...",
+      "implementation_code": "..."
+    },
+    ...
+  ],
+  "benchmark_results": [
+    {
+      "method_id": "METHOD-1",
+      "metrics": {"MAE": 50.2, "RMSE": 75.3},
+      "status": "success"
+    },
+    ...
+  ],
+  "selected_method_id": "METHOD-2",
+  "selected_method": {...},
+  "selection_rationale": "Best MAE and RMSE",
+  "data_split_strategy": "2020-2023 train, 2024 validation"
+}
+
+VALIDATION
+----------
+Run validation tests:
+   
+   python test_stage3_5_integration.py
+
+Expected: 5/5 tests passed ✓
+
+TROUBLESHOOTING
+---------------
+
+Q: Agent gets stuck?
+A: Check max_rounds in config.py (default: 40)
+
+Q: Methods fail to benchmark?
+A: Check logs for data loading errors
+   Use python_sandbox_stage3_5 to debug data structure
+
+Q: Results inconsistent?
+A: Agent will detect this (CV > 0.3) and flag it
+   Check implementation_code for randomness
+
+Q: Want to change number of methods/iterations?
+A: Modify system prompt in stage3_5_agent.py
+   Update validation logic accordingly
+
+FILES
+-----
+- stage3_5_agent.py - Main agent (650 lines)
+- models.py - TesterOutput, ForecastingMethod, BenchmarkResult
+- tools.py - STAGE3_5_TOOLS (9 tools)
+- config.py - STAGE3_5_OUT_DIR, STAGE3_5_MAX_ROUNDS
+- master_agent.py - Pipeline integration
+
+MONITORING
+----------
+Watch for these in logs:
+- "💭 Thought recorded" - ReAct reasoning
+- "👁️ Observation recorded" - ReAct reflection  
+- "=== Testing METHOD-X Iteration Y ===" - Benchmark runs
+- "saved::tester_..." - Final output saved
+
+NEXT STEPS
+----------
+1. Run on your forecasting task
+2. Review Stage 3.5 output
+3. Verify Stage 4 uses selected method
+4. Check benchmarking logs for insights

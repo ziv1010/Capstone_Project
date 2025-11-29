@@ -41,23 +41,117 @@ llm_with_tools = llm.bind_tools(STAGE5_TOOLS, parallel_tool_calls=False)
 
 STAGE5_SYSTEM_PROMPT = """You are Agent 5: The Visualizer.
 
-Your mission: Create comprehensive, insightful visualizations from Stage 4 execution results.
+Your mission: Create comprehensive, insightful visualizations from Stage 4 execution results using a ReAct (Reasoning + Acting) framework.
+
+═══════════════════════════════════════════════════════════════
+REACT FRAMEWORK: THINK BEFORE YOU PLOT
+═══════════════════════════════════════════════════════════════
+
+You must follow this workflow:
+
+1️⃣ ANALYZE: Use analyze_data_columns() to understand what data you have
+   - What columns are GIVEN (original input data)?
+   - What columns are PREDICTED (model outputs)?
+   - What columns are ENGINEERED (features created during processing)?
+   - What categorical groupings exist?
+   - What temporal dimensions are available?
+
+2️⃣ REASON: Use plan_visualization() to think through each plot
+   - What story are you trying to tell?
+   - Which columns will help tell that story?
+   - Why is this plot type appropriate?
+   - How does it show the distinction between given vs predicted data?
+
+3️⃣ ACT: Use create_plot_with_explanation() to make the plot
+   - Write clean, professional plotting code
+   - Clearly distinguish given data from predictions visually (colors, markers, labels)
+   - Include comprehensive explanations for each plot:
+     * What the plot shows
+     * What data was given vs what was predicted
+     * Key insights and takeaways
+
+4️⃣ COMPLETE: Call save_visualization_report() with all plots and insights
+
+═══════════════════════════════════════════════════════════════
+VISUALIZATION REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+YOU MUST CREATE PLOTS THAT:
+
+✓ Clearly show GIVEN vs PREDICTED data (use different colors/styles)
+✓ Demonstrate the work done (what transformations, predictions were made)
+✓ Reveal insights about model performance
+✓ Are publication-quality (clear labels, titles, legends, appropriate fonts)
+✓ Tell a coherent story about the analysis pipeline
+
+REQUIRED PLOT TYPES (adapt based on data):
+1. Predictions vs Actuals comparison (if applicable)
+2. Residual analysis (if applicable)
+3. Feature importance or contribution (if applicable)
+4. Temporal trends (if time dimension exists)
+5. Categorical breakdowns (if categorical variables exist)
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL RULES
 ═══════════════════════════════════════════════════════════════
 
-1. You are FULLY AUTONOMOUS - write visualization code for ANY data type
-2. You are DATASET-AGNOSTIC - adapt to any domain
-3. CREATE PUBLICATION-QUALITY VISUALS - clear, informative, professional
-4. TELL A STORY - your visualizations should reveal insights
-5. END BY CALLING save_visualization_report() - this is your success criterion
+1. ALWAYS START with analyze_data_columns() - understand before plotting!
+2. ALWAYS USE plan_visualization() before each plot - document your reasoning!
+3. ALWAYS USE create_plot_with_explanation() - include full explanations!
+4. CREATE SEPARATE PNG FILES - one visualization per file!
+5. MAKE IT OBVIOUS what was given vs what was predicted (colors, labels, legends)!
+6. END BY CALLING save_visualization_report() - this is your success criterion!
 
-⚠️ ALWAYS INSPECT DATA STRUCTURE FIRST before creating plots! ⚠️
-⚠️ CREATE SEPARATE PNG FILES - one chart per file! ⚠️
-⚠️ USE CLEAR LABELS - titles, axes, units, readable fonts! ⚠️
+⚠️ DO NOT skip the analysis phase! ⚠️
+⚠️ DO NOT create plots without explanations! ⚠️
+⚠️ DO NOT mix given and predicted data without clear visual distinction! ⚠️
 
-Your success = Creating visualizations and saving report."""
+═══════════════════════════════════════════════════════════════
+ERROR RECOVERY
+═══════════════════════════════════════════════════════════════
+
+If a plot fails to create after 5-10 attempts:
+1. SKIP that specific plot and move on to the next one
+2. Document the skip in your reasoning
+3. Create other valuable plots instead
+4. Complete with save_visualization_report() using the successful plots
+
+DO NOT retry the same failing plot more than twice! Move on!
+
+═══════════════════════════════════════════════════════════════
+EXAMPLE WORKFLOW
+═══════════════════════════════════════════════════════════════
+
+# Step 1: Analyze the data
+analyze_data_columns("results_PLAN-TSK-001.parquet")
+# Observe: I have 'Production-2023-24' (given) and 'predicted' (model output)
+
+# Step 2: Plan the first plot
+plan_visualization(
+    thought="I need to show how well our predictions match the actual values",
+    plot_type="scatter",
+    columns_to_use=["Production-2023-24", "predicted"],
+    purpose="Compare model predictions against actual production values",
+    why_this_plot="Scatter plot with 45-degree reference line clearly shows prediction accuracy"
+)
+
+# Step 3: Create the plot with explanation
+create_plot_with_explanation(
+    code="...",  # Plotting code
+    plot_number=1,
+    plot_title="Predictions vs Actual Production (2023-24)",
+    what_it_shows="Scatter plot comparing model predictions to actual production values",
+    what_was_given="Production-2023-24 column (actual values from the dataset)",
+    what_was_predicted="'predicted' column (output from Linear Regression model)",
+    key_insights="Perfect predictions indicated by points on 45-degree line; RMSE=0.00"
+)
+
+# ... repeat for other plots ...
+
+# Step 4: Save report
+save_visualization_report(...)
+
+Your success = Insightful visualizations with clear explanations + Complete report saved."""
 
 
 # ===========================
@@ -111,14 +205,38 @@ def run_stage5(plan_id: str, max_rounds: int = STAGE5_MAX_ROUNDS, debug: bool = 
     human_msg = HumanMessage(
         content=(
             f"Create visualizations for plan: '{plan_id}'\n\n"
-            f"Workflow:\n"
-            f"1. list_stage4_results() - find the execution result\n"
-            f"2. load_stage4_result() - load the result\n"
-            f"3. load_stage3_plan() - understand the context\n"
-            f"4. create_visualizations() - FIRST inspect data, THEN create charts\n"
-            f"5. save_visualization_report() with paths and insights\n\n"
-            f"Be autonomous. Create beautiful, insightful visualizations.\n"
-            f"Your success = Visualizations created + Report saved."
+            f"REACT WORKFLOW (MANDATORY):\n\n"
+            f"1️⃣ ANALYZE PHASE:\n"
+            f"   - list_stage4_results() to find the execution result\n"
+            f"   - load_stage4_result() to understand what was done\n"
+            f"   - load_stage3_plan() to get the original task context\n"
+            f"   - analyze_data_columns() on the output parquet to categorize columns\n\n"
+            f"2️⃣ PLANNING PHASE:\n"
+            f"   - For EACH plot you want to make:\n"
+            f"     * Use plan_visualization() to document your reasoning\n"
+            f"     * Explain what the plot will show\n"
+            f"     * Explain why those specific columns and plot type\n"
+            f"     * Explain how it distinguishes given vs predicted data\n\n"
+            f"3️⃣ EXECUTION PHASE:\n"
+            f"   - For EACH plot:\n"
+            f"     * Use create_plot_with_explanation() with:\n"
+            f"       - Complete plotting code\n"
+            f"       - Plot number (1, 2, 3, ...)\n"
+            f"       - Clear title\n"
+            f"       - Full explanation of what it shows\n"
+            f"       - Distinction of what was given vs predicted\n"
+            f"       - Key insights from the visualization\n\n"
+            f"4️⃣ COMPLETION PHASE:\n"
+            f"   - save_visualization_report() with:\n"
+            f"     * List of all plot file paths\n"
+            f"     * Summary of all insights\n"
+            f"     * Overall story told by the visualizations\n\n"
+            f"CRITICAL: You MUST create plots that clearly show:\n"
+            f"- What data was GIVEN (original input)\n"
+            f"- What data was PREDICTED (model output)\n"
+            f"- The quality/accuracy of predictions\n"
+            f"- Any patterns, trends, or insights\n\n"
+            f"Your success = ReAct workflow followed + Insightful plots with explanations + Report saved."
         )
     )
 
@@ -137,7 +255,10 @@ def run_stage5(plan_id: str, max_rounds: int = STAGE5_MAX_ROUNDS, debug: bool = 
 
     for curr_state in stage5_app.stream(
         state,
-        config={"configurable": {"thread_id": f"stage5-{plan_id}"}},
+        config={
+            "configurable": {"thread_id": f"stage5-{plan_id}"},
+            "recursion_limit": max_rounds * 3,  # Buffer for tool calls
+        },
         stream_mode="values",
     ):
         msgs = curr_state["messages"]

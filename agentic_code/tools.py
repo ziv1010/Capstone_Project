@@ -1406,9 +1406,279 @@ def create_visualizations(code: str, description: str = "Creating visualizations
 
 
 @tool
+def analyze_data_columns(parquet_path: str) -> str:
+    """Analyze the columns in a Stage 4 output parquet file to understand what data is available.
+
+    This tool helps the visualization agent understand:
+    - What columns represent given/original data
+    - What columns represent predictions/model outputs
+    - What columns could be useful for visualization
+    - Data types, ranges, and basic statistics
+
+    Args:
+        parquet_path: Path to the parquet file (can be relative to STAGE4_OUT_DIR)
+
+    Returns:
+        Detailed analysis of columns and data structure
+    """
+    filepath = Path(parquet_path)
+    if not filepath.exists():
+        # Try relative to STAGE4_OUT_DIR
+        filepath = STAGE4_OUT_DIR / filepath.name
+
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {parquet_path}")
+
+    df = load_dataframe(filepath, base_dir=STAGE4_OUT_DIR)
+
+    analysis = []
+    analysis.append(f"=" * 80)
+    analysis.append(f"DATA ANALYSIS: {filepath.name}")
+    analysis.append(f"=" * 80)
+    analysis.append(f"\nShape: {df.shape[0]} rows × {df.shape[1]} columns\n")
+
+    # Categorize columns
+    given_cols = []
+    predicted_cols = []
+    engineered_cols = []
+    temporal_cols = []
+    categorical_cols = []
+
+    for col in df.columns:
+        col_lower = col.lower()
+
+        # Identify predicted/model outputs
+        if any(x in col_lower for x in ['predicted', 'forecast', 'residual', 'error', 'confidence']):
+            predicted_cols.append(col)
+        # Identify engineered features
+        elif any(x in col_lower for x in ['lagged', 'growth', 'rolling', 'diff', 'rate', 'ratio']):
+            engineered_cols.append(col)
+        # Identify temporal columns
+        elif any(x in col_lower for x in ['date', 'time', 'year', 'month', 'day', 'period']):
+            temporal_cols.append(col)
+        # Identify categorical
+        elif df[col].dtype == 'object' or df[col].nunique() < 20:
+            categorical_cols.append(col)
+        # Otherwise, it's likely given/original data
+        else:
+            given_cols.append(col)
+
+    # Report categorization
+    analysis.append("COLUMN CATEGORIZATION:")
+    analysis.append(f"\n📥 GIVEN/ORIGINAL DATA ({len(given_cols)} columns):")
+    for col in given_cols[:10]:  # Show first 10
+        analysis.append(f"  - {col}: {df[col].dtype}, range [{df[col].min():.2f}, {df[col].max():.2f}]" if df[col].dtype != 'object' else f"  - {col}: {df[col].dtype}, {df[col].nunique()} unique values")
+    if len(given_cols) > 10:
+        analysis.append(f"  ... and {len(given_cols) - 10} more")
+
+    analysis.append(f"\n🔮 PREDICTED/MODEL OUTPUTS ({len(predicted_cols)} columns):")
+    for col in predicted_cols:
+        analysis.append(f"  - {col}: {df[col].dtype}, range [{df[col].min():.2f}, {df[col].max():.2f}]" if df[col].dtype != 'object' else f"  - {col}: {df[col].dtype}")
+
+    analysis.append(f"\n🔧 ENGINEERED FEATURES ({len(engineered_cols)} columns):")
+    for col in engineered_cols:
+        analysis.append(f"  - {col}: {df[col].dtype}, range [{df[col].min():.2f}, {df[col].max():.2f}]" if df[col].dtype != 'object' else f"  - {col}: {df[col].dtype}")
+
+    analysis.append(f"\n📅 TEMPORAL COLUMNS ({len(temporal_cols)} columns):")
+    for col in temporal_cols:
+        analysis.append(f"  - {col}: {df[col].dtype}")
+
+    analysis.append(f"\n🏷️  CATEGORICAL COLUMNS ({len(categorical_cols)} columns):")
+    for col in categorical_cols:
+        analysis.append(f"  - {col}: {df[col].nunique()} unique values → {list(df[col].unique()[:5])}")
+
+    # Add summary statistics for key columns
+    analysis.append(f"\n" + "=" * 80)
+    analysis.append("KEY INSIGHTS:")
+    analysis.append("=" * 80)
+
+    # Find actual vs predicted columns
+    actual_cols = [c for c in df.columns if any(x in c.lower() for x in ['production', 'yield', 'area', 'sales', 'value']) and c not in predicted_cols and c not in engineered_cols]
+
+    if predicted_cols and actual_cols:
+        analysis.append(f"\n✓ This dataset contains PREDICTIONS that can be compared to ACTUAL values")
+        analysis.append(f"  - Actual value columns: {actual_cols[:3]}")
+        analysis.append(f"  - Predicted columns: {predicted_cols}")
+
+    if categorical_cols:
+        analysis.append(f"\n✓ Categorical breakdowns possible by: {categorical_cols[:3]}")
+
+    analysis.append(f"\n" + "=" * 80)
+
+    return "\n".join(analysis)
+
+
+@tool
+def plan_visualization(
+    thought: str,
+    plot_type: str,
+    columns_to_use: List[str],
+    purpose: str,
+    why_this_plot: str
+) -> str:
+    """Plan a single visualization before creating it.
+
+    Use this tool to explicitly think through what plot you want to make and why.
+    This is part of the ReAct framework - reasoning before acting.
+
+    Args:
+        thought: Your reasoning about what you've learned from the data so far
+        plot_type: Type of plot (e.g., 'line', 'bar', 'scatter', 'heatmap', 'residual')
+        columns_to_use: List of column names that will be used in this plot
+        purpose: What this plot aims to show (e.g., 'Compare predictions vs actual', 'Show temporal trends')
+        why_this_plot: Justification for why this specific plot type and columns will achieve the purpose
+
+    Returns:
+        Confirmation with the plan summary
+    """
+    plan = f"""
+📋 VISUALIZATION PLAN
+{'=' * 80}
+💭 Reasoning: {thought}
+
+📊 Plot Details:
+  - Type: {plot_type}
+  - Columns: {', '.join(columns_to_use)}
+
+🎯 Purpose: {purpose}
+
+💡 Rationale: {why_this_plot}
+{'=' * 80}
+
+✓ Plan recorded. Proceed to create this visualization using create_visualizations().
+"""
+    return plan
+
+
+@tool
+def create_plot_with_explanation(
+    code: str,
+    plot_number: int,
+    plot_title: str,
+    what_it_shows: str,
+    what_was_given: str,
+    what_was_predicted: str,
+    key_insights: str
+) -> str:
+    """Execute visualization code and record detailed explanation.
+
+    This tool combines code execution with explicit documentation of what the plot shows.
+
+    Args:
+        code: Python code to create and save the plot
+        plot_number: Sequential number for this plot (1, 2, 3, ...)
+        plot_title: Title of the plot
+        what_it_shows: What this visualization displays
+        what_was_given: Which columns/data were provided as input (given data)
+        what_was_predicted: Which columns/data were predicted by the model
+        key_insights: What insights can be drawn from this plot
+
+    Returns:
+        Execution result with saved plot path
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    # Try to import plotly (optional)
+    try:
+        import plotly.express as px
+        import plotly.graph_objects as go
+        has_plotly = True
+    except ImportError:
+        px = None
+        go = None
+        has_plotly = False
+
+    def load_dataframe_viz(filepath):
+        """Load a dataframe from any supported format."""
+        filepath = Path(filepath)
+        if not filepath.exists():
+            filepath = STAGE4_OUT_DIR / filepath.name
+
+        if not filepath.exists():
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+        return load_dataframe(filepath, base_dir=STAGE4_OUT_DIR)
+
+    globals_dict = {
+        "__name__": "__stage5_plot_maker__",
+        "pd": pd,
+        "np": np,
+        "plt": plt,
+        "sns": sns,
+        "json": json,
+        "Path": Path,
+        "STAGE4_OUT_DIR": STAGE4_OUT_DIR,
+        "STAGE5_OUT_DIR": STAGE5_OUT_DIR,
+        "STAGE5_WORKSPACE": STAGE5_WORKSPACE,
+        "load_dataframe": load_dataframe_viz,
+        "plot_number": plot_number,
+    }
+
+    if has_plotly:
+        globals_dict.update({"px": px, "go": go})
+
+    buf = io.StringIO()
+
+    try:
+        with contextlib.redirect_stdout(buf):
+            print(f"=" * 80)
+            print(f"PLOT {plot_number}: {plot_title}")
+            print(f"=" * 80)
+            print(f"\n📊 What it shows: {what_it_shows}")
+            print(f"\n📥 Given data: {what_was_given}")
+            print(f"\n🔮 Predicted data: {what_was_predicted}")
+            print(f"\n💡 Key insights: {key_insights}")
+            print(f"\n{'=' * 80}")
+            print(f"Executing plot code...")
+            print(f"{'=' * 80}\n")
+
+            # Execute the plotting code
+            exec(code, globals_dict, globals_dict)
+
+            # Close any open plots
+            plt.close('all')
+
+            print(f"\n✓ Plot {plot_number} created successfully")
+    except Exception as e:
+        plt.close('all')
+        import traceback
+        error_details = traceback.format_exc()
+        return f"[ERROR] Plot {plot_number} failed: {e}\n\n{error_details}"
+
+    output = buf.getvalue()
+
+    # Also save the explanation as a text file
+    explanation_path = STAGE5_OUT_DIR / f"plot_{plot_number}_explanation.txt"
+    explanation = f"""
+PLOT {plot_number}: {plot_title}
+{'=' * 80}
+
+What it shows:
+{what_it_shows}
+
+Given data (from original dataset):
+{what_was_given}
+
+Predicted data (from model output):
+{what_was_predicted}
+
+Key insights:
+{key_insights}
+
+{'=' * 80}
+"""
+    explanation_path.write_text(explanation)
+
+    return output + f"\n\n✓ Explanation saved to: {explanation_path}"
+
+
+@tool
 def save_visualization_report(report_json: str) -> str:
     """Save the final visualization report.
-    
+
     Args:
         report_json: JSON string containing:
             - plan_id: ID of the executed plan
@@ -1417,23 +1687,23 @@ def save_visualization_report(report_json: str) -> str:
             - html_report: path to HTML report (if created)
             - summary: text summary of visualizations
             - insights: key insights from the visualizations
-    
+
     Returns:
         Confirmation message with save path
     """
     from datetime import datetime
-    
+
     try:
         report = json.loads(report_json)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON: {e}")
-    
+
     plan_id = report.get("plan_id", "UNKNOWN")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     output_path = STAGE5_OUT_DIR / f"visualization_report_{plan_id}_{timestamp}.json"
     output_path.write_text(json.dumps(report, indent=2))
-    
+
     return f"✅ Visualization report saved to: {output_path}"
 
 
@@ -1442,7 +1712,10 @@ STAGE5_TOOLS = [
     list_stage4_results,
     load_stage4_result,
     load_stage3_plan_viz,
-    create_visualizations,
+    analyze_data_columns,  # NEW: ReAct - Analyze what we have
+    plan_visualization,  # NEW: ReAct - Plan before plotting
+    create_visualizations,  # Keep for backward compatibility
+    create_plot_with_explanation,  # NEW: ReAct - Plot with full explanation
     save_visualization_report,
 ]
 

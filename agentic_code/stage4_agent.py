@@ -149,21 +149,27 @@ When saving your final results, you MUST:
 
 1. **Save a comprehensive parquet file** that includes:
    - ALL original data columns (date, features, identifiers, etc.)
-   - Predicted values in a column like 'predicted' or 'forecast'
+   - Predicted values in a descriptive column like 'predicted_<target_name>'
+     * Example: If predicting 'Production-2024-25', name it 'predicted_Production-2024-25'
+     * NOT just 'predicted' - be specific about what is being predicted!
    - Actual values (for comparison plots)
    - Any additional computed columns (residuals, confidence intervals, etc.)
    
    Example:
    ```python
-   # Combine original data with predictions
+   # Identify the target column name (e.g., 'Production-2024-25')
+   target_col = 'Production-2024-25'  # or whatever you're predicting
+   
+   # Combine original data with predictions using descriptive names
    results_df = df.copy()
-   results_df['predicted'] = predictions
-   results_df['residual'] = results_df['actual'] - results_df['predicted']
+   results_df[f'predicted_{target_col}'] = predictions  # Descriptive name!
+   results_df[f'residual_{target_col}'] = results_df[target_col] - results_df[f'predicted_{target_col}']
    
    # Save to parquet for visualization
    output_path = STAGE4_OUT_DIR / f'results_{plan_id}.parquet'
    results_df.to_parquet(output_path, index=False)
    ```
+
 
 2. **Maintain a detailed execution log** as a list of steps:
    ```python

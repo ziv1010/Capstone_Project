@@ -96,7 +96,7 @@ STAGE3_5_MAX_ROUNDS = 100  # Max rounds for tester agent (benchmarking may take 
 STAGE4_MAX_ROUNDS = 100  # Max rounds for execution agent
 
 # Stage 5: Visualization
-STAGE5_MAX_ROUNDS = 20  # Max rounds for visualization agent
+STAGE5_MAX_ROUNDS = 50  # Max rounds for visualization agent (increased to handle ReAct cycles + retries)
 
 # ===========================
 # Helper Functions

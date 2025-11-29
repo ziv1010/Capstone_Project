@@ -1,0 +1,106 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   STAGE 5: REACT VISUALIZATION WORKFLOW                   ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: ANALYZE - Understand What You Have                              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────┐
+    │ Load Stage 4    │
+    │ Results         │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐       ┌──────────────────────────────────┐
+    │ analyze_data_   │──────▶│ Column Categorization:           │
+    │ columns()       │       │  • Given/Original Data           │
+    └─────────────────┘       │  • Predicted/Model Outputs       │
+                              │  • Engineered Features           │
+                              │  • Temporal Columns              │
+                              │  • Categorical Variables         │
+                              └──────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: REASON - Plan Each Visualization                                │
+└───────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────┐       ┌──────────────────────────────────┐
+    │ plan_          │──────▶│ For Each Plot:                   │
+    │ visualization() │       │  • What story does it tell?      │
+    └─────────────────┘       │  • Which columns to use?         │
+                              │  • Why this plot type?           │
+                              │  • How to show given vs predicted?│
+                              └──────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: ACT - Create Plots with Explanations                            │
+└───────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────┐       ┌──────────────────────────────────┐
+    │ create_plot_   │──────▶│ For Each Plot:                   │
+    │ with_          │       │  • Write plotting code           │
+    │ explanation()   │       │  • Distinguish given vs predicted│
+    └─────────────────┘       │  • Save as PNG                   │
+                              │  • Document explanations         │
+                              └──────────────────────────────────┘
+                                           │
+                                           ▼
+                              ┌──────────────────────────────────┐
+                              │ Outputs:                         │
+                              │  • plot_N.png (visualization)    │
+                              │  • plot_N_explanation.txt (docs) │
+                              └──────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: COMPLETE - Save Comprehensive Report                            │
+└───────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────┐       ┌──────────────────────────────────┐
+    │ save_          │──────▶│ Final Report:                    │
+    │ visualization_ │       │  • List of all plots             │
+    │ report()       │       │  • Summary of insights           │
+    └─────────────────┘       │  • Overall narrative             │
+                              │  • Task completion status        │
+                              └──────────────────────────────────┘
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                         KEY IMPROVEMENTS                                  ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+✓ TRANSPARENCY: Agent explains its reasoning before acting
+✓ CLARITY: Clear distinction between given and predicted data
+✓ INSIGHT: Strategic plot selection based on data analysis
+✓ DOCUMENTATION: Every plot comes with detailed explanations
+✓ REPRODUCIBILITY: Complete code and context for each visualization
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                     EXAMPLE: PREDICTIONS PLOT                             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+1. ANALYZE: "Dataset has 'Production-2023-24' (given) and 'predicted' (output)"
+
+2. PLAN: "Need scatter plot to compare predictions vs actuals. This shows
+         accuracy because points on 45° line = perfect prediction."
+
+3. ACT: Create scatter plot with:
+        • Blue points = (actual, predicted) pairs
+        • Red dashed line = 45° reference (perfect prediction)
+        • Clear labels distinguishing given vs predicted
+
+4. EXPLAIN: "Plot shows model predictions vs actual production values.
+            Given: Production-2023-24 from original dataset.
+            Predicted: Output from Linear Regression model.
+            Insight: Perfect accuracy (all points on reference line)."
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                            TESTING                                        ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Run: python test_stage5_react.py PLAN-TSK-002
+
+This will demonstrate the full ReAct workflow:
+  • Column analysis
+  • Plot planning
+  • Visualization creation
+  • Comprehensive reporting

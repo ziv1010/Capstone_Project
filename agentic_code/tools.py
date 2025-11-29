@@ -782,6 +782,206 @@ def python_sandbox_stage3_5(code: str) -> str:
 
 
 @tool
+def save_checkpoint_stage3_5(checkpoint_json: Dict[str, Any]) -> str:
+    """Save checkpoint with VERBOSE confirmation and auto-verification.
+
+    This checkpoint should contain:
+    - plan_id: The plan being tested
+    - data_split_strategy: Summary of how data is split
+    - date_column: Name of date column (if identified)
+    - target_column: Name of target column (if identified)
+    - train_period: Training period (e.g., "2020-2023")
+    - validation_period: Validation period (e.g., "2024")
+    - test_period: Test period if applicable
+    - methods_to_test: List of 3 ForecastingMethod objects (as dicts)
+    - methods_completed: List of method_ids fully benchmarked (3 iterations)
+    - benchmark_results: List of all BenchmarkResult objects so far (as dicts)
+    - iteration_counts: Dict mapping method_id to number of successful iterations
+
+    Args:
+        checkpoint_json: Dictionary containing checkpoint data
+
+    Returns:
+        Detailed confirmation message with verification
+    """
+    from .config import STAGE3_5_OUT_DIR
+    from .models import Stage3_5Checkpoint
+    from datetime import datetime
+
+    # Validate against schema
+    try:
+        checkpoint = Stage3_5Checkpoint.model_validate(checkpoint_json)
+    except Exception as e:
+        return f"❌ [ERROR] Checkpoint validation failed: {e}\n\nPlease fix the JSON and try again."
+
+    # Update timestamp
+    checkpoint_dict = checkpoint.model_dump()
+    checkpoint_dict["updated_at"] = datetime.now().isoformat()
+
+    plan_id = checkpoint.plan_id
+    STAGE3_5_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
+
+    # Save checkpoint
+    try:
+        checkpoint_path.write_text(json.dumps(checkpoint_dict, indent=2))
+    except Exception as e:
+        return f"❌ [ERROR] Failed to write checkpoint file: {e}"
+
+    # VERIFY: Re-load the file to confirm it was actually written
+    try:
+        saved_data = json.loads(checkpoint_path.read_text())
+        verified_results = len(saved_data.get("benchmark_results", []))
+        verified_iterations = saved_data.get("iteration_counts", {})
+    except Exception as e:
+        return f"❌ [ERROR] Checkpoint was saved but verification failed: {e}\n\nFile may be corrupt!"
+
+    # Detailed summary
+    methods_left = [m["method_id"] for m in checkpoint.methods_to_test
+                   if m["method_id"] not in checkpoint.methods_completed]
+
+    summary = f"""✓ CHECKPOINT SAVED AND VERIFIED: {checkpoint_path.name}
+
+Progress Summary:
+- Methods completed: {len(checkpoint.methods_completed)}/3
+  ✓ Completed: {checkpoint.methods_completed if checkpoint.methods_completed else 'None'}
+  ⏳ Remaining: {methods_left if methods_left else 'None - all done!'}
+
+- Total benchmark results stored: {verified_results}
+- Iteration counts per method: {verified_iterations}
+- Data split: {checkpoint.data_split_strategy}
+
+File location: {checkpoint_path.absolute()}
+
+✓ Verification: Re-loaded file confirms {verified_results} results saved successfully.
+
+You can verify this checkpoint anytime by calling verify_checkpoint_stage3_5().
+"""
+
+    return summary
+
+
+@tool
+def load_checkpoint_stage3_5(plan_id: str) -> str:
+    """Load existing checkpoint for Stage 3.5 to resume progress.
+
+    This retrieves:
+    - What methods need to be tested
+    - What methods are already completed
+    - The data split strategy to maintain consistency
+    - All benchmark results collected so far
+    - Progress on iterations per method
+
+    Args:
+        plan_id: Plan ID (e.g., 'PLAN-TSK-001')
+
+    Returns:
+        JSON string of the checkpoint, or error if not found
+    """
+    from .config import STAGE3_5_OUT_DIR
+
+    checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
+
+    if not checkpoint_path.exists():
+        return f"[INFO] No checkpoint found for {plan_id}. Starting fresh."
+
+    try:
+        checkpoint_data = json.loads(checkpoint_path.read_text())
+
+        # Format a helpful summary
+        methods_to_test = checkpoint_data.get("methods_to_test", [])
+        methods_completed = checkpoint_data.get("methods_completed", [])
+        iteration_counts = checkpoint_data.get("iteration_counts", {})
+
+        methods_left = [m["method_id"] for m in methods_to_test
+                       if m["method_id"] not in methods_completed]
+
+        summary = (
+            f"=== CHECKPOINT LOADED for {plan_id} ===\n\n"
+            f"Data Split Strategy: {checkpoint_data.get('data_split_strategy', 'Not set')}\n"
+            f"Date Column: {checkpoint_data.get('date_column', 'Not identified')}\n"
+            f"Target Column: {checkpoint_data.get('target_column', 'Not identified')}\n"
+            f"Train Period: {checkpoint_data.get('train_period', 'Not set')}\n"
+            f"Validation Period: {checkpoint_data.get('validation_period', 'Not set')}\n\n"
+            f"Methods to Test ({len(methods_to_test)} total):\n"
+        )
+
+        for method in methods_to_test:
+            method_id = method["method_id"]
+            status = "✓ COMPLETED" if method_id in methods_completed else f"⏳ In Progress ({iteration_counts.get(method_id, 0)}/3 iterations)"
+            summary += f"  - {method_id} ({method['name']}): {status}\n"
+
+        summary += f"\nMethods Remaining: {methods_left if methods_left else 'None - ready to select best method!'}\n"
+        summary += f"Total Benchmark Results: {len(checkpoint_data.get('benchmark_results', []))}\n\n"
+        summary += f"Full checkpoint data:\n{json.dumps(checkpoint_data, indent=2)}"
+
+        return summary
+    except Exception as e:
+        return f"[ERROR] Failed to load checkpoint: {e}"
+
+
+@tool
+def verify_checkpoint_stage3_5(plan_id: str, expected_iterations: Dict[str, int]) -> str:
+    """Verify checkpoint was saved correctly by comparing expected vs actual iteration counts.
+
+    Use this tool after save_checkpoint_stage3_5() to confirm the checkpoint was properly updated.
+
+    Args:
+        plan_id: Plan ID to verify (e.g., 'PLAN-TSK-001')
+        expected_iterations: Dict mapping method_id to expected iteration count
+            Example: {"METHOD-1": 3, "METHOD-2": 1, "METHOD-3": 0}
+
+    Returns:
+        Verification result with details - either ✓ PASSED or ❌ FAILED
+    """
+    from .config import STAGE3_5_OUT_DIR
+
+    checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
+
+    if not checkpoint_path.exists():
+        return f"❌ VERIFICATION FAILED: No checkpoint file found at {checkpoint_path}"
+
+    try:
+        checkpoint_data = json.loads(checkpoint_path.read_text())
+        actual_iterations = checkpoint_data.get("iteration_counts", {})
+        actual_results = len(checkpoint_data.get("benchmark_results", []))
+
+        # Compare expected vs actual
+        mismatches = []
+        for method_id, expected_count in expected_iterations.items():
+            actual_count = actual_iterations.get(method_id, 0)
+            if actual_count != expected_count:
+                mismatches.append(
+                    f"  {method_id}: Expected {expected_count}, Got {actual_count}"
+                )
+
+        if mismatches:
+            return f"""❌ VERIFICATION FAILED: Iteration counts don't match!
+
+Mismatches:
+{chr(10).join(mismatches)}
+
+Actual checkpoint state:
+- Iterations: {actual_iterations}
+- Results count: {actual_results}
+
+ACTION REQUIRED: Re-save checkpoint with correct data!
+"""
+
+        return f"""✓ VERIFICATION PASSED!
+
+All iteration counts match expected values:
+{chr(10).join(f'  {mid}: {cnt} iterations ✓' for mid, cnt in expected_iterations.items())}
+
+Total results in checkpoint: {actual_results}
+Checkpoint is valid and up-to-date.
+"""
+
+    except Exception as e:
+        return f"❌ VERIFICATION ERROR: {e}"
+
+
+@tool
 def save_tester_output(output_json: Dict[str, Any]) -> str:
     """Save the final tester output with method selection results.
     
@@ -896,6 +1096,9 @@ STAGE3B_TOOLS = [
 STAGE3_5_TOOLS = [
     record_thought,  # ReAct: explicit reasoning before action
     record_observation,  # ReAct: reflection after action
+    load_checkpoint_stage3_5,  # Load checkpoint to resume progress
+    save_checkpoint_stage3_5,  # Save checkpoint to maintain memory
+    verify_checkpoint_stage3_5,  # Verify checkpoint was saved correctly
     load_stage3_plan_for_tester,
     list_summary_files,  # Access Stage 1 summaries
     read_summary_file,  # Read dataset summaries

@@ -291,6 +291,55 @@ class PreparedDataOutput(BaseModel):
 # Stage 3.5: Method Testing & Benchmarking
 # ===========================
 
+class Stage3_5Checkpoint(BaseModel):
+    """Checkpoint for Stage 3.5 to maintain memory across conversation truncation."""
+    plan_id: str = Field(description="Plan ID being tested")
+
+    # Data split information (to maintain consistency across all methods)
+    data_split_strategy: str = Field(
+        description="How data was split for benchmarking, e.g., '2020-2023 train, 2024 validation'"
+    )
+    date_column: Optional[str] = Field(
+        default=None,
+        description="Name of the date/time column identified in the data"
+    )
+    target_column: Optional[str] = Field(
+        default=None,
+        description="Name of the target variable column"
+    )
+    train_period: str = Field(description="Training period, e.g., '2020-2023'")
+    validation_period: str = Field(description="Validation period, e.g., '2024'")
+    test_period: Optional[str] = Field(default=None, description="Test period if applicable")
+
+    # Methods to test
+    methods_to_test: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of methods that need to be tested (serialized ForecastingMethod)"
+    )
+
+    # Progress tracking
+    methods_completed: List[str] = Field(
+        default_factory=list,
+        description="List of method_ids that have been fully benchmarked (3 iterations each)"
+    )
+
+    # Results so far
+    benchmark_results: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Accumulated benchmark results (serialized BenchmarkResult objects)"
+    )
+
+    # Iteration tracking per method
+    iteration_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of successful iterations completed per method_id"
+    )
+
+    # Metadata
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class ForecastingMethod(BaseModel):
     """Specification for a forecasting method to benchmark."""
     method_id: str = Field(description="Unique identifier, e.g., 'METHOD-1'")

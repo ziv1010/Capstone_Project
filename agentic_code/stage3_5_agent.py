@@ -56,6 +56,103 @@ Your job: Given a Stage 3 plan, you must:
 5. Save the recommendation via save_tester_output()
 
 ═══════════════════════════════════════════════════════════════
+CRITICAL: CHECKPOINT SYSTEM (MEMORY MANAGEMENT)
+═══════════════════════════════════════════════════════════════
+
+**YOU MUST USE CHECKPOINTS TO MAINTAIN MEMORY!**
+
+Due to conversation history truncation, you WILL lose memory of:
+- What methods you planned to test
+- What data split you decided on
+- Which methods are already completed
+- What results you've collected
+
+**CHECKPOINT WORKFLOW (MANDATORY):**
+
+1. **AT THE START:** Call load_checkpoint_stage3_5(plan_id)
+   - If checkpoint exists: Resume from where you left off
+   - If no checkpoint: You're starting fresh
+
+2. **AFTER DATA UNDERSTANDING:** Once you've identified the data split, save a checkpoint:
+   - Call save_checkpoint_stage3_5() with:
+     * plan_id
+     * data_split_strategy (description of your split)
+     * date_column, target_column (if identified)
+     * train_period, validation_period, test_period
+     * methods_to_test (list of 3 ForecastingMethod dicts)
+     * methods_completed: [] (empty at start)
+     * benchmark_results: [] (empty at start)
+     * iteration_counts: {} (empty at start)
+
+3. **BEFORE AND AFTER EACH BENCHMARK ATTEMPT:** Update the checkpoint:
+
+   **BEFORE attempting a benchmark iteration:**
+   - Save checkpoint showing you're ABOUT to run this iteration
+   - This ensures progress is preserved even if the benchmark fails
+
+   **AFTER each benchmark attempt (success OR failure):**
+   - If successful: Increment iteration_counts, append BenchmarkResult
+   - If failed: Document the error in your observations, still increment attempt count
+   - If a method reaches 3 iterations, add method_id to methods_completed
+   - Save updated checkpoint
+   - **CRITICAL**: IMMEDIATELY verify the checkpoint was saved correctly!
+     Call verify_checkpoint_stage3_5(plan_id, expected_iterations)
+   - If verification fails, re-save with corrected data before continuing
+   - Never proceed to next iteration/method without successful verification
+
+   **KEY INSIGHT**: Save checkpoints FREQUENTLY, not just on success. This prevents losing progress when errors occur.
+
+4. **WHEN YOU RESUME:** Check the checkpoint to know:
+   - What methods still need testing
+   - What data split to use (MUST be consistent!)
+   - What results you already have
+
+**Example checkpoint after proposing methods:**
+```python
+save_checkpoint_stage3_5({
+    "plan_id": "PLAN-TSK-001",
+    "data_split_strategy": "Train: 2018-2023, Validation: 2024",
+    "date_column": "Year",
+    "target_column": "Rice_Export_USD",
+    "train_period": "2018-2023",
+    "validation_period": "2024",
+    "test_period": None,
+    "methods_to_test": [
+        {"method_id": "METHOD-1", "name": "Moving Average", ...},
+        {"method_id": "METHOD-2", "name": "Linear Regression", ...},
+        {"method_id": "METHOD-3", "name": "Random Forest", ...}
+    ],
+    "methods_completed": [],
+    "benchmark_results": [],
+    "iteration_counts": {}
+})
+```
+
+**Example checkpoint after METHOD-1 iteration 1:**
+```python
+save_checkpoint_stage3_5({
+    # ... same as above ...
+    "methods_completed": [],  # METHOD-1 not done yet (needs 3 iterations)
+    "benchmark_results": [
+        {"method_id": "METHOD-1", "method_name": "Moving Average", "metrics": {...}, ...}
+    ],
+    "iteration_counts": {"METHOD-1": 1}
+})
+```
+
+**Example checkpoint after METHOD-1 complete (3 iterations):**
+```python
+save_checkpoint_stage3_5({
+    # ... same as above ...
+    "methods_completed": ["METHOD-1"],  # ✓ METHOD-1 is done!
+    "benchmark_results": [
+        # 3 results for METHOD-1
+    ],
+    "iteration_counts": {"METHOD-1": 3}
+})
+```
+
+═══════════════════════════════════════════════════════════════
 CRITICAL: REACT FRAMEWORK (MANDATORY)
 ═══════════════════════════════════════════════════════════════
 
@@ -338,27 +435,37 @@ If you encounter errors:
 
 1. **First error:** Analyze what went wrong
    - Use record_observation to document the error
+   - **SAVE CHECKPOINT** with error documented in observations
    - Try a different approach or fix the issue
 
-2. **Repeated errors (same method):** 
+2. **Repeated errors (same method):**
    - Skip to next method
-   - Mark current method as "failure"
+   - Mark current method as "failure" status in benchmark_results
+   - **SAVE CHECKPOINT** with failed method documented
    - Do NOT waste more than 3 attempts per method
 
 3. **Data loading errors:**
    - Use python_sandbox_stage3_5 to inspect data structure
    - Adjust column discovery logic
+   - **SAVE CHECKPOINT** before trying alternative loading strategies
    - Try alternative loading strategies
 
 4. **Metric calculation errors:**
    - Check for division by zero
    - Verify predictions and actuals have same shape
    - Missing values should already be handled by Stage 3B; only guard against new NaN introduced by your split/code
+   - **SAVE CHECKPOINT** after diagnosing the issue
 
 5. **Search for help:**
    - Use search() to find examples of forecasting code
    - Look for similar tasks in output directory
    - Learn from prior successful implementations
+
+**CRITICAL FOR ERROR RECOVERY: SAVE CHECKPOINTS OFTEN!**
+- Even if a benchmark fails, save the checkpoint documenting the attempt
+- This prevents losing progress when debugging errors
+- When you fix an error, save checkpoint before retrying
+- Never let more than 2-3 actions pass without a checkpoint save
 
 ═══════════════════════════════════════════════════════════════
 STATE TRACKING (PREVENT REPETITION)
@@ -379,6 +486,11 @@ TOOLS AVAILABLE
 - record_thought(thought, what_im_about_to_do)
 - record_observation(what_happened, what_i_learned, next_step)
 
+**Checkpoint Tools (CRITICAL - USE THESE!):**
+- load_checkpoint_stage3_5(plan_id) → Load existing checkpoint to resume progress
+- save_checkpoint_stage3_5(checkpoint_json) → Save checkpoint to maintain memory
+- verify_checkpoint_stage3_5(plan_id, expected_iterations) → Verify checkpoint was saved correctly
+
 **Data Exploration:**
 - load_stage3_plan_for_tester(plan_id) → Returns Stage 3 plan JSON
 - list_data_files() → List available data files
@@ -396,34 +508,87 @@ TOOLS AVAILABLE
 EXAMPLE WORKFLOW
 ═══════════════════════════════════════════════════════════════
 
-1. record_thought("I need to understand the task and data structure", 
-                  "Loading Stage 3 plan")
-2. load_stage3_plan_for_tester("PLAN-TSK-001")
-3. record_observation("Plan loaded, it's a predictive task with files X, Y", 
-                      "Need to inspect data structure", 
-                      "Inspecting prepared parquet first")
-4. record_thought("Stage 3B produced prepared_PLAN-TSK-001.parquet; use it directly",
-                  "Loading prepared data and checking columns/nulls")
-5. python_sandbox_stage3_5("df = load_dataframe('prepared_PLAN-TSK-001.parquet'); print(df.head()); print(df.isna().sum())")
-6. record_observation("Prepared data loaded; null counts are zero and dtypes look good",
-                      "Data is yearly from 2015-2024",
-                      "Will split at 2023 for train/val")
-7. record_thought("Data structure clear, now proposing 3 methods",
-                  "Proposing baseline, ARIMA, and RF methods")
-8. record_observation("3 methods identified: MA, ARIMA, RandomForest",
-                      "Methods are appropriate for yearly forecasting",
-                      "Starting benchmarks with METHOD-1 iteration 1")
-9. run_benchmark_code(code="...", description="METHOD-1 Iteration 1")
-10. record_observation("METHOD-1 Iter 1: MAE=50.2",
-                      "Code executed successfully",
-                      "Running iteration 2")
-... Continue for all methods and iterations ...
-11. save_tester_output(output_json={...})
+1. record_thought("Starting Stage 3.5 for plan PLAN-TSK-001",
+                  "First, checking if checkpoint exists to resume progress")
+2. load_checkpoint_stage3_5("PLAN-TSK-001")
+3. record_observation("No checkpoint found - starting fresh",
+                      "Need to load plan and understand data",
+                      "Loading Stage 3 plan")
+4. load_stage3_plan_for_tester("PLAN-TSK-001")
+5. record_observation("Plan loaded, it's a predictive task with files X, Y",
+                      "Need to inspect prepared data",
+                      "Checking for prepared parquet")
+6. python_sandbox_stage3_5("df = load_dataframe('prepared_PLAN-TSK-001.parquet'); print(df.head()); print(df.columns)")
+7. record_observation("Data has columns: Year, Rice_Export_USD, etc.",
+                      "Data is yearly from 2018-2024",
+                      "Will split: train 2018-2023, validation 2024")
+8. record_thought("Data structure clear, now proposing 3 methods and saving checkpoint",
+                  "Creating checkpoint with methods and split info to preserve memory")
+9. save_checkpoint_stage3_5({
+     "plan_id": "PLAN-TSK-001",
+     "data_split_strategy": "Train: 2018-2023, Validation: 2024",
+     "date_column": "Year",
+     "target_column": "Rice_Export_USD",
+     "train_period": "2018-2023",
+     "validation_period": "2024",
+     "test_period": None,
+     "methods_to_test": [
+       {"method_id": "METHOD-1", "name": "Moving Average", "description": "...", "implementation_code": "...", "libraries_required": [...]},
+       {"method_id": "METHOD-2", "name": "Linear Regression", "description": "...", "implementation_code": "...", "libraries_required": [...]},
+       {"method_id": "METHOD-3", "name": "Random Forest", "description": "...", "implementation_code": "...", "libraries_required": [...]}
+     ],
+     "methods_completed": [],
+     "benchmark_results": [],
+     "iteration_counts": {}
+   })
+10. record_observation("Checkpoint saved with 3 methods and split strategy",
+                       "Memory preserved - can resume from here if needed",
+                       "Running METHOD-1 iteration 1")
+11. run_benchmark_code(code="...", description="METHOD-1 Iteration 1")
+12. record_observation("METHOD-1 Iter 1: MAE=50.2, RMSE=75.3",
+                       "Code executed successfully, updating checkpoint",
+                       "Saving progress before continuing")
+13. save_checkpoint_stage3_5({
+      "plan_id": "PLAN-TSK-001",
+      "data_split_strategy": "Train: 2018-2023, Validation: 2024",
+      "date_column": "Year",
+      "target_column": "Rice_Export_USD",
+      "train_period": "2018-2023",
+      "validation_period": "2024",
+      "test_period": None,
+      "methods_to_test": [...],  # same 3 methods
+      "methods_completed": [],  # METHOD-1 not done yet
+      "benchmark_results": [
+        {"method_id": "METHOD-1", "method_name": "Moving Average", "metrics": {"MAE": 50.2, "RMSE": 75.3}, "status": "success", ...}
+      ],
+      "iteration_counts": {"METHOD-1": 1}
+    })
+14. verify_checkpoint_stage3_5("PLAN-TSK-001", {"METHOD-1": 1})  # VERIFY IT WAS SAVED!
+15. record_observation("Checkpoint verified - 1 iteration saved correctly",
+                      "Safe to proceed",
+                      "Running METHOD-1 iteration 2")
+... Continue: run_benchmark_code for METHOD-1 iter 2, save checkpoint, VERIFY, iter 3, save checkpoint, VERIFY with METHOD-1 in methods_completed ...
+... Then METHOD-2 and METHOD-3, always saving AND VERIFYING after each iteration ...
+16. save_tester_output(output_json={...})
 
 ═══════════════════════════════════════════════════════════════
 FINAL REMINDER
 ═══════════════════════════════════════════════════════════════
 
+**CHECKPOINT DISCIPLINE (MOST IMPORTANT!):**
+- **ALWAYS load checkpoint at start**: Call load_checkpoint_stage3_5(plan_id) FIRST
+- **SAVE CHECKPOINTS FREQUENTLY**:
+  * After proposing methods and identifying data split
+  * BEFORE each benchmark attempt (to preserve intent)
+  * AFTER each benchmark attempt (success OR failure)
+  * When fixing errors or trying alternative approaches
+  * When a method completes all 3 iterations
+  * **RULE OF THUMB**: Save checkpoint every 2-3 significant actions
+- **ALWAYS verify checkpoint after saving**: Call verify_checkpoint_stage3_5() immediately after every save
+- **If verification fails**: Re-save with corrected data before continuing
+- **USE THE SAME SPLIT FOR ALL METHODS**: Get it from checkpoint, don't recreate it
+
+**OTHER CRITICAL RULES:**
 - Follow ReAct framework religiously (record_thought before, record_observation after)
 - Run 3 iterations for each of 3 methods (9 benchmarks total)
 - Check result consistency to detect hallucinations
@@ -431,6 +596,8 @@ FINAL REMINDER
 - Treat Stage 3B prepared data as the source of truth; avoid re-cleaning or re-imputing
 - Save comprehensive TesterOutput when complete
 - Aim to finish within {max_rounds} rounds
+
+**IF YOU'RE STUCK IN ERRORS**: Save checkpoint documenting the issue, then try a different approach or skip to next method. Don't waste time on endless debugging without saving progress!
 """
 
 
@@ -574,6 +741,7 @@ def should_continue(state: MessagesState) -> str:
     tool_history = _tool_call_history(messages)
     save_called = any(name == "save_tester_output" for name in tool_history)
     benchmarks_run = sum(1 for name in tool_history if name == "run_benchmark_code")
+    checkpoint_saves = sum(1 for name in tool_history if name == "save_checkpoint_stage3_5")
     method_attempts = _benchmark_attempt_counts(messages)
     stalled_methods = [m for m, c in method_attempts.items() if c >= STAGE3_5_RETRY_LIMIT]
 
@@ -589,8 +757,9 @@ def should_continue(state: MessagesState) -> str:
     retry_note = ""
     if stalled_methods:
         retry_note = (
-            f"⚠️ Retry limit reached for {stalled_methods}. "
-            "Mark these methods as failure, record the error, clear debug context, and move on to the next method."
+            f"\n\n⚠️ Retry limit reached for {stalled_methods}. "
+            "Mark these methods as failure, SAVE CHECKPOINT with failure documented, "
+            "record the error, clear debug context, and move on to the next method."
         )
         pruned = messages
         for mid in stalled_methods:
@@ -617,13 +786,42 @@ def should_continue(state: MessagesState) -> str:
         if benchmarks_run >= 9
         else "Continue benchmarking until 9 run_benchmark_code calls, then save."
     )
+
+    # Add checkpoint reminder if history is getting long (near truncation threshold)
+    checkpoint_reminder = ""
+    if len(messages) > 22:  # Just after truncation threshold (20 + system + user)
+        checkpoint_reminder = (
+            "\n\n⚠️ MESSAGE HISTORY WAS TRUNCATED! "
+            "Call load_checkpoint_stage3_5(plan_id) to reload your progress. "
+            "The checkpoint contains all methods, data split, and results collected so far."
+        )
+
+    # Add periodic checkpoint reminder if not saving frequently enough
+    periodic_checkpoint_reminder = ""
+    if checkpoint_saves < 2 and benchmarks_run >= 1:
+        periodic_checkpoint_reminder = (
+            "\n\n📌 CHECKPOINT REMINDER: You should be saving checkpoints frequently! "
+            f"You've only saved {checkpoint_saves} checkpoint(s) but run {benchmarks_run} benchmark(s). "
+            "Save checkpoint BEFORE and AFTER each benchmark attempt (even if it fails). "
+            "This prevents losing progress when errors occur."
+        )
+    elif benchmarks_run > 0 and checkpoint_saves < benchmarks_run:
+        periodic_checkpoint_reminder = (
+            f"\n\n📌 CHECKPOINT REMINDER: Save checkpoint after EACH benchmark attempt. "
+            f"You've run {benchmarks_run} benchmarks but only saved {checkpoint_saves} checkpoints. "
+            "Save more frequently to prevent progress loss!"
+        )
+
     reminder = (
         f"No tool call detected. You must continue benchmarking and call save_tester_output when done.\n"
         f"run_benchmark_code calls so far: {benchmarks_run}/9. "
-        f"save_tester_output called: {save_called}.\n"
+        f"save_tester_output called: {save_called}. "
+        f"Checkpoints saved: {checkpoint_saves}.\n"
         f"{done_msg} "
         f"Most recent tool: {recent_tool or 'none yet'}. "
         f"Use the SAME train/val/test split for every method. {retry_note}"
+        f"{checkpoint_reminder}"
+        f"{periodic_checkpoint_reminder}"
     )
     messages.append(HumanMessage(content=reminder))
     return "agent"
@@ -754,13 +952,32 @@ def run_stage3_5(
     human_msg = HumanMessage(
         content=(
             f"Test and benchmark forecasting methods for plan '{plan_id}'.{excluded_context}\n\n"
+            f"⚠️ CRITICAL: START BY LOADING CHECKPOINT!\n"
+            f"Call load_checkpoint_stage3_5('{plan_id}') FIRST to check for existing progress.\n"
+            f"If checkpoint exists, resume from there. If not, start fresh.\n\n"
             f"Follow the ReAct framework strictly:\n"
+            f"0. CHECKPOINT: Load checkpoint to resume or start fresh\n"
             f"1. DATA UNDERSTANDING: Load plan, inspect data, identify structure\n"
-            f"2. METHOD PROPOSAL: Identify 3 suitable forecasting methods\n"
-            f"3. BENCHMARKING: Run each method 3 times, check consistency\n"
+            f"2. METHOD PROPOSAL: Identify 3 suitable forecasting methods + SAVE CHECKPOINT + VERIFY\n"
+            f"3. BENCHMARKING: For each benchmark iteration:\n"
+            f"   - SAVE CHECKPOINT (before running benchmark)\n"
+            f"   - Run benchmark code\n"
+            f"   - SAVE CHECKPOINT (after running benchmark, even if failed)\n"
+            f"   - VERIFY checkpoint was saved correctly\n"
             f"4. SELECTION: Choose best method based on averaged metrics\n"
             f"5. SAVE: Call save_tester_output() with complete results\n\n"
-            f"Remember:\n"
+            f"🔴 CHECKPOINT DISCIPLINE (MOST CRITICAL!):\n"
+            f"- **ALWAYS load_checkpoint_stage3_5() at the start**\n"
+            f"- **SAVE CHECKPOINTS FREQUENTLY** - every 2-3 significant actions:\n"
+            f"  * After proposing methods and identifying data split\n"
+            f"  * BEFORE each benchmark attempt\n"
+            f"  * AFTER each benchmark attempt (SUCCESS OR FAILURE)\n"
+            f"  * When encountering errors or trying alternative approaches\n"
+            f"  * When a method completes all iterations\n"
+            f"- **VERIFY every checkpoint save** with verify_checkpoint_stage3_5()\n"
+            f"- **If you encounter errors, SAVE CHECKPOINT before trying fixes**\n"
+            f"- **USE THE SAME DATA SPLIT for all methods** (from checkpoint)\n\n"
+            f"Other reminders:\n"
             f"- Use record_thought() BEFORE each action\n"
             f"- Use record_observation() AFTER each action\n"
             f"- Run 3 iterations per method to verify code execution\n"

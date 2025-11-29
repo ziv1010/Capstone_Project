@@ -23,7 +23,7 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE4_OUT_DIR, STAGE3_5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS
+from .config import STAGE4_OUT_DIR, STAGE3_5_OUT_DIR, STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS
 from .models import ExecutionResult, TesterOutput
 from .tools import STAGE4_TOOLS
 from .failsafe_agent import run_failsafe
@@ -121,6 +121,23 @@ IF TESTER OUTPUT IS PROVIDED:
 
 IF NO TESTER OUTPUT:
 - Proceed normally using methods from the Stage 3 plan
+
+═══════════════════════════════════════════════════════════════
+TROUBLESHOOTING & BEST PRACTICES
+═══════════════════════════════════════════════════════════════
+
+1. **Wide vs Long Format**:
+   - If columns are like 'Area-2020', 'Area-2021', the data is in WIDE format.
+   - Do NOT try to filter rows by date.
+   - Instead, select specific columns for X (features) and y (target).
+   - Example: X = df[['Area-2020', 'Area-2021']], y = df['Area-2022']
+
+2. **Placeholder Code**:
+   - If the `implementation_code` from the tester is just `pass` or a comment, YOU MUST WRITE THE FULL IMPLEMENTATION.
+   - Use the method name and description to guide your implementation.
+
+3. **Data Types**:
+   - Ensure you drop non-numeric columns (like 'Season', 'Crop') before training if the model requires numeric input.
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL: SAVE COMPREHENSIVE OUTPUTS FOR VISUALIZATION
@@ -246,6 +263,8 @@ def run_stage4(
             f"- Selected method ({selected_method.method_id}): {selected_method.name}\n"
             f"- Rationale: {tester_output.selection_rationale}\n"
             f"- Data split used: {tester_output.data_split_strategy}\n"
+            f"- Method Comparison Summary: {tester_output.method_comparison_summary}\n"
+            f"- Data Preprocessing Steps: {json.dumps(tester_output.data_preprocessing_steps, indent=2)}\n"
             f"{procedure_hint}\n"
             "- Apply this method to the full dataset; reuse/adapt the implementation code.\n"
             f"Implementation snippet:\n{snippet}\n"
@@ -267,7 +286,11 @@ def run_stage4(
             f"   - data_shape (final dimensions)\n"
             f"   - metrics (performance metrics)\n\n"
             f"Be autonomous. Handle any issues. Follow the plan.\n"
-            f"Your success = Plan executed + Comprehensive results saved.{tester_context}"
+            f"Your success = Plan executed + Comprehensive results saved.{tester_context}\n\n"
+            f"IMPORTANT PATHS:\n"
+            f"- STAGE3B_OUT_DIR: {STAGE3B_OUT_DIR}\n"
+            f"- STAGE4_OUT_DIR: {STAGE4_OUT_DIR}\n"
+            f"Use these absolute paths in your code."
         )
     )
 

@@ -1,0 +1,25 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "task_category": "predictive",
+  "status": "success",
+  "outputs": {
+    "output_parquet_path": "/scratch/ziv_baretto/llmserve/final_code/output/stage4_out/results_PLAN-TSK-002.parquet"
+  },
+  "metrics": {
+    "RMSE": 0.0,
+    "MAE": 0.0
+  },
+  "summary": "Executed Linear Regression forecast on prepared data. Perfect predictions achieved.",
+  "errors": [],
+  "detailed_log": [
+    "Loaded prepared data: prepared_PLAN-TSK-002.parquet",
+    "Data shape: (60, 19)",
+    "Applied imputation for missing values using mean strategy",
+    "Applied Linear Regression model",
+    "Training period: 2020-2023",
+    "Validation period: 2024",
+    "Generated predictions for the validation period",
+    "Calculated metrics: RMSE=0.00, MAE=0.00",
+    "Saved results to results_PLAN-TSK-002.parquet"
+  ]
+}

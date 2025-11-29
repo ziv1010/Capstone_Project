@@ -12,6 +12,7 @@ Uses a ReAct framework to:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -27,8 +28,11 @@ from .config import (
     SECONDARY_LLM_CONFIG,
     STAGE3_5_MAX_ROUNDS,
 )
-from .models import TesterOutput, ForecastingMethod, BenchmarkResult
+from .models import TesterOutput, ForecastingMethod, BenchmarkResult, PreparedDataOutput
 from .tools import STAGE3_5_TOOLS
+
+# Maximum allowed run_benchmark_code calls per method before forcing failure/skip
+STAGE3_5_RETRY_LIMIT = 15
 
 # ===========================
 # LLM Setup
@@ -89,21 +93,42 @@ With a valid TesterOutput containing:
 - selection_rationale: Why this method was chosen
 - data_split_strategy: How data was split
 
+**NEW - DETAILED DOCUMENTATION FOR STAGE 4:**
+- detailed_procedure: Step-by-step guide on how to replicate this benchmarking process
+  and apply the selected method. Include:
+  * How data files were loaded
+  * How columns were identified (date, target, features)
+  * How data was split (train/validation/test periods)
+  * Specific metrics used and why
+  * How to interpret the selected method's implementation code
+  
+- data_preprocessing_steps: Ordered list of preprocessing steps, e.g.:
+  * ["Loaded prepared_PLAN-TSK-001.parquet", "Identified date column: Year", 
+     "Identified target: Rice_Export_USD", "Split: 2018-2023 train, 2024 val"]
+  
+- method_comparison_summary: Table or formatted text comparing all methods, e.g.:
+  * "METHOD-1 (Moving Avg): MAE=150.2, RMSE=200.5 - Simple baseline
+     METHOD-2 (Linear Reg): MAE=120.3, RMSE=165.8 - Best performer ✓
+     METHOD-3 (Random Forest): FAILED - overfitting on small dataset"
+
 ═══════════════════════════════════════════════════════════════
 PHASE 1: DATA UNDERSTANDING (MANDATORY CHECKLIST)
 ═══════════════════════════════════════════════════════════════
 
 Before benchmarking, you MUST understand the data structure:
 
+□ First, check for Stage 3B prepared data + metadata (preferred path)
+□ If prepared parquet exists, load it directly and review its metadata (missing-value handling, columns created)
+□ Only inspect raw files if prepared data is missing or corrupt
 □ Load the Stage 3 plan (load_stage3_plan_for_tester)
-□ Identify required data files from the plan
-□ Inspect each file (inspect_data_file) to see columns and dtypes
+□ Identify required data files from the plan (for context/fallback)
+□ Inspect prepared data (or raw files if no prepared data) to see columns and dtypes
 □ Determine which column contains dates/timestamps
 □ Determine which column is the target variable (from plan)
 □ Understand temporal granularity (daily, monthly, yearly)
 □ Determine full date range (e.g., 2020-2024)
 □ Design train/validation/test split strategy
-□ Verify data can be loaded and split (use python_sandbox_stage3_5)
+□ Verify data can be loaded and split (use python_sandbox_stage3_5) WITHOUT redoing cleaning/imputation
 
 DO NOT proceed to benchmarking until ALL items are checked.
 
@@ -204,9 +229,9 @@ BEFORE loading raw data files, CHECK if prepared data exists:
 
 **If prepared data exists:**
 ✓ Load it directly: `prepared_df = load_dataframe('prepared_PLAN-TSK-001.parquet')`
-✓ Skip manual loading, merging, filtering
-✓ Prepared data already has joins, filters, and features applied
-✓ You only need to split it for benchmarking
+✓ Skip manual loading, merging, filtering, and missing-value handling (already done)
+✓ Prepared data already has joins, filters, features, and imputation applied
+✓ You only need to split it for benchmarking; keep preprocessing minimal (e.g., ensure datetime parsing)
 
 **If no prepared data:**
 ✗ Fall back to loading raw data files manually
@@ -230,11 +255,12 @@ Use run_benchmark_code(code="...", description="Testing METHOD-X Iteration Y")
    - Training: Earlier period (e.g., 2020-2023)
    - Validation: Later period (e.g., 2024)
    - Test: Optional future period (e.g., 2025 if available)
-4. Implement the forecasting method
-5. Make predictions on validation set
-6. Calculate metrics (MAE, RMSE, MAPE, etc.)
-7. Print results in a parseable format
-8. Optionally save artifacts to STAGE3_5_OUT_DIR
+4. Keep preprocessing light—Stage 3B already handled joins, formatting, and missing values. Only enforce type conversions needed for modeling (e.g., to_datetime).
+5. Implement the forecasting method
+6. Make predictions on validation set
+7. Calculate metrics (MAE, RMSE, MAPE, etc.)
+8. Print results in a parseable format
+9. Optionally save artifacts to STAGE3_5_OUT_DIR
 
 **Metric Calculation:**
 - MAE = Mean Absolute Error
@@ -327,7 +353,7 @@ If you encounter errors:
 4. **Metric calculation errors:**
    - Check for division by zero
    - Verify predictions and actuals have same shape
-   - Handle missing values appropriately
+   - Missing values should already be handled by Stage 3B; only guard against new NaN introduced by your split/code
 
 5. **Search for help:**
    - Use search() to find examples of forecasting code
@@ -375,22 +401,24 @@ EXAMPLE WORKFLOW
 2. load_stage3_plan_for_tester("PLAN-TSK-001")
 3. record_observation("Plan loaded, it's a predictive task with files X, Y", 
                       "Need to inspect data structure", 
-                      "Inspecting first data file")
-4. inspect_data_file("file1.csv")
-5. record_observation("Found date column 'Year' and target 'Production'",
+                      "Inspecting prepared parquet first")
+4. record_thought("Stage 3B produced prepared_PLAN-TSK-001.parquet; use it directly",
+                  "Loading prepared data and checking columns/nulls")
+5. python_sandbox_stage3_5("df = load_dataframe('prepared_PLAN-TSK-001.parquet'); print(df.head()); print(df.isna().sum())")
+6. record_observation("Prepared data loaded; null counts are zero and dtypes look good",
                       "Data is yearly from 2015-2024",
                       "Will split at 2023 for train/val")
-6. record_thought("Data structure clear, now proposing 3 methods",
+7. record_thought("Data structure clear, now proposing 3 methods",
                   "Proposing baseline, ARIMA, and RF methods")
-7. record_observation("3 methods identified: MA, ARIMA, RandomForest",
+8. record_observation("3 methods identified: MA, ARIMA, RandomForest",
                       "Methods are appropriate for yearly forecasting",
                       "Starting benchmarks with METHOD-1 iteration 1")
-8. run_benchmark_code(code="...", description="METHOD-1 Iteration 1")
-9. record_observation("METHOD-1 Iter 1: MAE=50.2",
+9. run_benchmark_code(code="...", description="METHOD-1 Iteration 1")
+10. record_observation("METHOD-1 Iter 1: MAE=50.2",
                       "Code executed successfully",
                       "Running iteration 2")
 ... Continue for all methods and iterations ...
-10. save_tester_output(output_json={...})
+11. save_tester_output(output_json={...})
 
 ═══════════════════════════════════════════════════════════════
 FINAL REMINDER
@@ -400,6 +428,7 @@ FINAL REMINDER
 - Run 3 iterations for each of 3 methods (9 benchmarks total)
 - Check result consistency to detect hallucinations
 - Be dataset-agnostic (discover structure, don't assume)
+- Treat Stage 3B prepared data as the source of truth; avoid re-cleaning or re-imputing
 - Save comprehensive TesterOutput when complete
 - Aim to finish within {max_rounds} rounds
 """
@@ -467,6 +496,75 @@ def _tool_call_history(messages: List[BaseMessage]) -> List[str]:
     return names
 
 
+def _benchmark_attempt_counts(messages: List[BaseMessage]) -> Dict[str, int]:
+    """Count run_benchmark_code attempts per method (parsed from description)."""
+    counts: Dict[str, int] = {}
+    for m in messages:
+        tool_calls = getattr(m, "tool_calls", None)
+        if not tool_calls:
+            continue
+        for tc in tool_calls:
+            name = None
+            desc = ""
+            if isinstance(tc, dict):
+                name = tc.get("name") or (tc.get("function") or {}).get("name")
+                args = tc.get("args") or {}
+                desc = args.get("description", "") or ""
+            else:
+                name = getattr(tc, "name", None) or getattr(getattr(tc, "function", None), "name", None)
+                args = getattr(tc, "args", {}) or getattr(getattr(tc, "function", None), "arguments", {}) or {}
+                desc = args.get("description", "") or ""
+
+            if name != "run_benchmark_code":
+                continue
+            match = re.search(r"(METHOD[- ]?\d+)", desc, flags=re.IGNORECASE)
+            method_id = match.group(1).upper() if match else "UNKNOWN"
+            counts[method_id] = counts.get(method_id, 0) + 1
+    return counts
+
+
+def _message_mentions_method(msg: BaseMessage, method_id: str) -> bool:
+    """Heuristic to detect if a message/tool call is about a given method."""
+    mid = method_id.lower()
+    content = (getattr(msg, "content", "") or "").lower()
+    if mid in content:
+        return True
+    tool_calls = getattr(msg, "tool_calls", None)
+    if not tool_calls:
+        return False
+    for tc in tool_calls:
+        desc = ""
+        name = None
+        if isinstance(tc, dict):
+            name = tc.get("name") or (tc.get("function") or {}).get("name")
+            args = tc.get("args") or {}
+            desc = args.get("description", "") or ""
+        else:
+            name = getattr(tc, "name", None) or getattr(getattr(tc, "function", None), "name", None)
+            args = getattr(tc, "args", {}) or getattr(getattr(tc, "function", None), "arguments", {}) or {}
+            desc = args.get("description", "") or ""
+        if mid in desc.lower():
+            return True
+        if name and mid in name.lower():
+            return True
+    return False
+
+
+def _clear_method_history(messages: List[BaseMessage], method_id: str, keep_first: int = 2) -> List[BaseMessage]:
+    """Drop messages tied to a specific method to 'reset' its debug context."""
+    if method_id == "UNKNOWN":
+        return messages
+    pruned: List[BaseMessage] = []
+    for idx, msg in enumerate(messages):
+        if idx < keep_first:
+            pruned.append(msg)
+            continue
+        if _message_mentions_method(msg, method_id):
+            continue
+        pruned.append(msg)
+    return pruned
+
+
 def should_continue(state: MessagesState) -> str:
     """Route based on tool calls, retrying agent when incomplete."""
     messages = state["messages"]
@@ -476,6 +574,8 @@ def should_continue(state: MessagesState) -> str:
     tool_history = _tool_call_history(messages)
     save_called = any(name == "save_tester_output" for name in tool_history)
     benchmarks_run = sum(1 for name in tool_history if name == "run_benchmark_code")
+    method_attempts = _benchmark_attempt_counts(messages)
+    stalled_methods = [m for m, c in method_attempts.items() if c >= STAGE3_5_RETRY_LIMIT]
 
     # If we just got a tool call, go execute it
     if hasattr(last, "tool_calls") and last.tool_calls:
@@ -484,6 +584,19 @@ def should_continue(state: MessagesState) -> str:
     # If already saved, we can end
     if save_called:
         return END
+
+    # If any method has exceeded retry limit, prune its history and instruct failure/skip
+    retry_note = ""
+    if stalled_methods:
+        retry_note = (
+            f"⚠️ Retry limit reached for {stalled_methods}. "
+            "Mark these methods as failure, record the error, clear debug context, and move on to the next method."
+        )
+        pruned = messages
+        for mid in stalled_methods:
+            pruned = _clear_method_history(pruned, mid)
+        state["messages"] = pruned
+        messages = pruned
 
     # If benchmarks are incomplete or save not called, nudge and continue agent
     recent_tool = None
@@ -509,7 +622,8 @@ def should_continue(state: MessagesState) -> str:
         f"run_benchmark_code calls so far: {benchmarks_run}/9. "
         f"save_tester_output called: {save_called}.\n"
         f"{done_msg} "
-        f"Most recent tool: {recent_tool or 'none yet'}."
+        f"Most recent tool: {recent_tool or 'none yet'}. "
+        f"Use the SAME train/val/test split for every method. {retry_note}"
     )
     messages.append(HumanMessage(content=reminder))
     return "agent"
@@ -530,13 +644,19 @@ stage3_5_app = builder.compile(checkpointer=memory)
 # Stage 3.5 Runner
 # ===========================
 
-def run_stage3_5(plan_id: str, max_rounds: int = STAGE3_5_MAX_ROUNDS, debug: bool = True) -> Dict:
+def run_stage3_5(
+    plan_id: str,
+    max_rounds: int = STAGE3_5_MAX_ROUNDS,
+    debug: bool = True,
+    prepared_metadata: Any = None
+) -> Dict:
     """Run Stage 3.5 method testing and benchmarking.
     
     Args:
         plan_id: Plan ID from Stage 3 (e.g., 'PLAN-TSK-001')
         max_rounds: Maximum number of agent rounds
         debug: Whether to print debug information
+        prepared_metadata: Optional PreparedDataOutput (or dict) from Stage 3B to pass richer context
         
     Returns:
         Final state from the graph execution
@@ -574,18 +694,63 @@ def run_stage3_5(plan_id: str, max_rounds: int = STAGE3_5_MAX_ROUNDS, debug: boo
             print(f"Warning: Could not load excluded columns: {e}")
     
     system_msg = SystemMessage(content=STAGE3_5_SYSTEM_PROMPT)
-    # Surface prepared parquet hints to the agent so it loads them first.
+    # Surface prepared data + metadata so benchmarking reuses the modeling-ready output.
+    prep_dict = None
+    if prepared_metadata:
+        try:
+            prep_dict = (
+                prepared_metadata.model_dump()
+                if hasattr(prepared_metadata, "model_dump")
+                else prepared_metadata
+            )
+        except Exception:
+            prep_dict = None
+    if prep_dict is None:
+        prep_files = sorted(STAGE3B_OUT_DIR.glob(f"prep_{plan_id}*.json"))
+        if prep_files:
+            try:
+                prep_dict = json.loads(prep_files[-1].read_text())
+            except Exception as e:
+                print(f"Warning: Could not load Stage 3B metadata: {e}")
+
     prepared_parquet = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
-    if prepared_parquet.exists():
+    prepared_file_name = None
+    prep_context = ""
+    if prep_dict:
+        prepared_file_path = prep_dict.get("prepared_file_path")
+        prepared_file_name = Path(prepared_file_path).name if prepared_file_path else None
+        if not prepared_file_name and prepared_parquet.exists():
+            prepared_file_name = prepared_parquet.name
         parquet_hint = (
-            f"\n\nPrepared data detected at: {prepared_parquet}\n"
-            f"Load with load_dataframe('{prepared_parquet.name}') and reuse it instead of raw CSVs."
+            f"\n\nPrepared data detected: {prepared_file_name or prepared_parquet}\n"
+            f"Always load with load_dataframe('{prepared_file_name or prepared_parquet.name}') "
+            "and reuse it instead of raw CSVs. Stage 3B already handled formatting and missing values."
+        )
+        dq_report = prep_dict.get("data_quality_report", {})
+        dq_text = json.dumps(dq_report, indent=2)
+        if len(dq_text) > 1200:
+            dq_text = dq_text[:600] + "\n...[truncated]...\n" + dq_text[-400:]
+        transformations = prep_dict.get("transformations_applied", [])
+        columns_created = prep_dict.get("columns_created", [])
+        prep_context = (
+            "\n\nStage 3B context (model-ready):\n"
+            f"- Prepared file path: {prepared_file_path or prepared_parquet}\n"
+            f"- Original rows → prepared rows: {prep_dict.get('original_row_count')} → {prep_dict.get('prepared_row_count')}\n"
+            f"- Columns created: {columns_created}\n"
+            f"- Transformations applied: {transformations}\n"
+            f"- Data quality & missing-value report:\n{dq_text}\n"
         )
     else:
-        parquet_hint = (
-            "\n\nNo prepared parquet found in Stage 3B output directory. "
-            "Proceed with raw data loading."
-        )
+        if prepared_parquet.exists():
+            parquet_hint = (
+                f"\n\nPrepared data detected at: {prepared_parquet}\n"
+                f"Load with load_dataframe('{prepared_parquet.name}') and reuse it instead of raw CSVs."
+            )
+        else:
+            parquet_hint = (
+                "\n\nNo prepared parquet found in Stage 3B output directory. "
+                "Proceed with raw data loading."
+            )
     human_msg = HumanMessage(
         content=(
             f"Test and benchmark forecasting methods for plan '{plan_id}'.{excluded_context}\n\n"
@@ -601,9 +766,10 @@ def run_stage3_5(plan_id: str, max_rounds: int = STAGE3_5_MAX_ROUNDS, debug: boo
             f"- Run 3 iterations per method to verify code execution\n"
             f"- Check coefficient of variation to detect hallucinations\n"
             f"- Be dataset-agnostic (discover column names)\n"
+            f"- Assume Stage 3B already handled formatting + missing values; avoid re-cleaning unless corruption is detected\n"
             f"- Use search() if you need examples or guidance\n\n"
             f"Your success metric: save_tester_output() called with valid TesterOutput."
-            f"{parquet_hint}"
+            f"{parquet_hint}{prep_context}"
         )
     )
 
@@ -724,7 +890,7 @@ def stage3_5_node(state: dict) -> dict:
     
     print(f"\n🧪 Starting Stage 3.5 for: {plan_id}\n")
     
-    result = run_stage3_5(plan_id, debug=True)
+    result = run_stage3_5(plan_id, debug=True, prepared_metadata=prepared_data)
     
     # Check for saved tester output
     tester_files = sorted(STAGE3_5_OUT_DIR.glob(f"tester_{plan_id}*.json"))

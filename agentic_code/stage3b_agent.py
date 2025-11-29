@@ -48,10 +48,11 @@ WORKFLOW:
 3. Apply filters per file_instructions
 4. Perform joins per join_steps
 5. Apply feature_engineering transformations
-6. Handle missing values
-7. Validate expected columns exist
-8. Save prepared data to parquet
-9. Call save_prepared_data() with metadata
+6. Handle missing values COMPLETELY (impute/drop with rationale; no NaN allowed in output)
+7. Standardize dtypes so numeric/date columns are usable downstream
+8. Validate expected columns exist
+9. Save prepared, model-ready data to parquet
+10. Call save_prepared_data() with detailed metadata
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL: REACT FRAMEWORK (MANDATORY)
@@ -106,11 +107,21 @@ Follow these steps systematically:
 □ Apply filters to each dataset
 □ Perform joins per join_steps (use left_on/right_on)
 □ Apply feature_engineering transformations
-□ Handle missing values (mean/median imputation per plan notes)
+□ Handle missing values END-TO-END (impute or drop; ensure no NaN/inf remain)
+□ Normalize dtypes for modeling (dates to datetime, numeric to floats/ints)
 □ Validate all expected_columns exist
 □ Calculate data quality metrics (nulls, duplicates, etc.)
+□ VERIFY NO NANS: Run a specific check to ensure 0 nulls remain.
 □ Save prepared DataFrame to parquet
 □ Call save_prepared_data() with metadata
+
+═══════════════════════════════════════════════════════════════
+MODEL-READY GUARANTEE (NON-NEGOTIABLE)
+═══════════════════════════════════════════════════════════════
+- Stage 3.5 will directly consume your output. Deliver a fully formatted, imputed dataset.
+- Do NOT leave NaN/inf/-inf in prepared_df. Impute or remove with justification.
+- You MUST verify that `df.isnull().sum().sum() == 0` before saving.
+- Document missing-value strategy and dtype fixes in transformations_applied and data_quality_report.
 
 ═══════════════════════════════════════════════════════════════
 STAGE 3 PLAN STRUCTURE
@@ -182,8 +193,14 @@ merged_df = base_df.merge(
 merged_df['new_feature'] = merged_df['col1'].shift(1)
 merged_df['growth_rate'] = (merged_df['col2'] - merged_df['col3']) / merged_df['col3']
 
-# Handle missing values
+# Handle missing values - CRITICAL STEP
+# Check for NaNs
+print("NaNs before fix:", merged_df.isnull().sum().sum())
+# Impute or drop
 merged_df.fillna(merged_df.mean(), inplace=True)
+# Verify no NaNs remain
+if merged_df.isnull().sum().sum() > 0:
+    raise ValueError("NaNs still present after imputation!")
 
 # Save prepared DataFrame
 prepared_df = merged_df  # This is what run_data_prep_code looks for
@@ -193,10 +210,11 @@ prepared_df.to_parquet(STAGE3B_OUT_DIR / 'prepared_PLAN-TSK-001.parquet')
 **Data Quality Report:**
 After preparing data, calculate quality metrics:
 - Total rows
-- Null counts per column
+- Null counts per column (MUST BE ZERO)
 - Duplicate count
 - Column dtypes
 - Value ranges
+- Missing-value strategy: which columns were imputed/dropped and how
 
 ═══════════════════════════════════════════════════════════════
 ERROR RECOVERY PROTOCOL
@@ -287,6 +305,7 @@ FINAL REMINDER
 - Follow ReAct framework religiously (record_thought before, record_observation after)
 - Execute transformations systematically per plan
 - Validate data at each step
+- **ENSURE NO NANS REMAIN** - Check `df.isnull().sum().sum() == 0`
 - Save prepared data as parquet for fast loading
 - Call save_prepared_data() when complete
 - Aim to finish within reasonable rounds
@@ -368,13 +387,16 @@ def run_stage3b(plan_id: str, max_rounds: int = STAGE3B_MAX_ROUNDS, debug: bool 
             f"2. FILTERING: Apply filters per file_instructions\n"
             f"3. JOINING: Merge datasets per join_steps\n"
             f"4. FEATURE ENGINEERING: Create new columns per plan\n"
-            f"5. VALIDATION: Check expected columns exist\n"
-            f"6. SAVE: Save prepared data and call save_prepared_data()\n\n"
+            f"5. VALIDATION: Check expected columns exist and dtypes are consistent\n"
+            f"6. MODEL-READY: Handle missing values fully (no NaN/inf left) and record the strategy\n"
+            f"7. SAVE: Save prepared data and call save_prepared_data() with rich metadata\n\n"
             f"Remember:\n"
             f"- Use record_thought() BEFORE each action\n"
             f"- Use record_observation() AFTER each action\n"
+            f"- **CRITICAL**: Ensure NO NaNs remain in the final dataset. Check `df.isnull().sum().sum() == 0`.\n"
             f"- Save as parquet: 'prepared_{plan_id}.parquet'\n"
-            f"- Calculate data quality report\n"
+            f"- Calculate data quality report (include missing-value handling and dtype fixes)\n"
+            f"- Do NOT leave unresolved missing values; Stage 3.5 will reuse this file directly\n"
             f"- Use search() if you need examples or guidance\n\n"
             f"Your success metric: save_prepared_data() called with valid metadata."
         )

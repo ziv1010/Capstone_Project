@@ -22,7 +22,7 @@ from pandas.api.types import (
     is_datetime64_any_dtype,
 )
 
-from .config import DATA_DIR, SUMMARIES_DIR
+from .config import DATA_DIR, SUMMARIES_DIR, STAGE3B_OUT_DIR
 
 
 # ===========================
@@ -318,12 +318,23 @@ def load_dataframe(
         ValueError: If file format is not supported
     """
     filepath = Path(filepath)
-    
-    # If not absolute, try relative to base_dir
+
+    # If not absolute, try resolving against provided base_dir, DATA_DIR, then STAGE3B_OUT_DIR
     if not filepath.is_absolute():
-        if base_dir is None:
-            base_dir = DATA_DIR
-        filepath = base_dir / filepath
+        search_roots = []
+        if base_dir:
+            search_roots.append(base_dir)
+        search_roots.extend([DATA_DIR, STAGE3B_OUT_DIR])
+        for root in search_roots:
+            candidate = root / filepath
+            if candidate.exists():
+                filepath = candidate
+                break
+    # As a final fallback, if absolute was provided but doesn't exist, check STAGE3B_OUT_DIR by name
+    if not filepath.exists():
+        alt = STAGE3B_OUT_DIR / filepath.name
+        if alt.exists():
+            filepath = alt
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")

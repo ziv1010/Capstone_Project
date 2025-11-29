@@ -350,6 +350,20 @@ class TesterOutput(BaseModel):
         description="How data was split for benchmarking, e.g., '2020-2023 train, 2024 validation'"
     )
     
+    # Detailed replication guide
+    detailed_procedure: str = Field(
+        default="",
+        description="Step-by-step procedure to replicate the benchmarking and use the selected method"
+    )
+    data_preprocessing_steps: List[str] = Field(
+        default_factory=list,
+        description="Ordered list of data preprocessing steps applied before benchmarking"
+    )
+    method_comparison_summary: str = Field(
+        default="",
+        description="Summary table or text comparing all methods tested with their metrics"
+    )
+    
     # Metadata
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
@@ -362,7 +376,7 @@ class ExecutionResult(BaseModel):
     status: Literal["success", "failure", "partial"]
     outputs: Dict[str, str] = Field(
         default_factory=dict,
-        description="Mapping of output type to file path"
+        description="Mapping of output type to file path (e.g., 'predictions': 'path/to/results.parquet')"
     )
     metrics: Dict[str, Any] = Field(
         default_factory=dict,
@@ -370,6 +384,25 @@ class ExecutionResult(BaseModel):
     )
     summary: str
     errors: List[str] = Field(default_factory=list)
+    
+    # Enhanced detailed outputs
+    output_parquet_path: Optional[str] = Field(
+        default=None,
+        description="Path to main parquet file containing all table data + predictions for visualization"
+    )
+    method_used: Optional[str] = Field(
+        default=None,
+        description="Name/ID of the forecasting method actually used"
+    )
+    detailed_log: List[str] = Field(
+        default_factory=list,
+        description="Step-by-step execution log for transparency and debugging"
+    )
+    data_shape: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Final data shape, e.g., {'rows': 1000, 'columns': 25}"
+    )
+    
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

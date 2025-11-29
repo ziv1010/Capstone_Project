@@ -419,8 +419,48 @@ def python_sandbox_stage3b(code: str) -> str:
     from .config import DATA_DIR, STAGE3B_OUT_DIR
     import pandas as pd
     import numpy as np
+    from pathlib import Path
     from io import StringIO
     import sys
+    import os
+    import traceback
+    
+    # Helper to resolve files relative to DATA_DIR when a bare filename is provided
+    def _resolve_path(file: str) -> Path:
+        path = Path(file)
+        # Try the provided path, then DATA_DIR / <file>, then DATA_DIR / <name>
+        candidates = [path]
+        if not path.is_absolute():
+            candidates.extend([
+                DATA_DIR / file,
+                STAGE3B_OUT_DIR / file,
+            ])
+        else:
+            candidates.extend([
+                DATA_DIR / path.name,
+                STAGE3B_OUT_DIR / path.name,
+            ])
+        for cand in candidates:
+            if cand.exists():
+                return cand
+        return path
+
+    # Safe CSV reader that falls back to DATA_DIR if needed
+    _pd_read_csv = pd.read_csv
+    def _safe_read_csv(file, *args, **kwargs):
+        target = _resolve_path(file)
+        if target.exists():
+            return _pd_read_csv(target, *args, **kwargs)
+        return _pd_read_csv(file, *args, **kwargs)
+
+    def _safe_load_dataframe(file, **kwargs):
+        target = _resolve_path(file)
+        if target.suffix in {".parquet", ".parq"}:
+            return pd.read_parquet(target, **kwargs)
+        return _safe_read_csv(target, **kwargs)
+    
+    # Inject helpers and monkeypatch read_csv so agent code using pd.read_csv works
+    pd.read_csv = _safe_read_csv
     
     # Setup environment
     local_env = {
@@ -428,12 +468,14 @@ def python_sandbox_stage3b(code: str) -> str:
         "np": np,
         "DATA_DIR": DATA_DIR,
         "STAGE3B_OUT_DIR": STAGE3B_OUT_DIR,
-        "load_dataframe": lambda f: pd.read_csv(DATA_DIR / f),
+        "Path": Path,
+        "load_dataframe": _safe_load_dataframe,
     }
     
     # Capture output
     old_stdout = sys.stdout
     sys.stdout = captured = StringIO()
+    old_cwd = os.getcwd()
     
     try:
         exec(code, local_env)
@@ -442,6 +484,8 @@ def python_sandbox_stage3b(code: str) -> str:
     except Exception as e:
         return f"[ERROR] {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
     finally:
+        pd.read_csv = _pd_read_csv
+        os.chdir(old_cwd)
         sys.stdout = old_stdout
 
 
@@ -462,11 +506,48 @@ Returns:
     from .config import DATA_DIR, STAGE3B_OUT_DIR
     import pandas as pd
     import numpy as np
+    from pathlib import Path
     from io import StringIO
     import sys
+    import os
     import traceback
     
     print(f"\n=== Running data preparation: {description} ===")
+
+    # Helper to resolve files relative to DATA_DIR when a bare filename is provided
+    def _resolve_path(file: str) -> Path:
+        path = Path(file)
+        candidates = [path]
+        if not path.is_absolute():
+            candidates.extend([
+                DATA_DIR / file,
+                STAGE3B_OUT_DIR / file,
+            ])
+        else:
+            candidates.extend([
+                DATA_DIR / path.name,
+                STAGE3B_OUT_DIR / path.name,
+            ])
+        for cand in candidates:
+            if cand.exists():
+                return cand
+        return path
+
+    _pd_read_csv = pd.read_csv
+    def _safe_read_csv(file, *args, **kwargs):
+        target = _resolve_path(file)
+        if target.exists():
+            return _pd_read_csv(target, *args, **kwargs)
+        return _pd_read_csv(file, *args, **kwargs)
+
+    def _safe_load_dataframe(file, **kwargs):
+        target = _resolve_path(file)
+        if target.suffix in {".parquet", ".parq"}:
+            return pd.read_parquet(target, **kwargs)
+        return _safe_read_csv(target, **kwargs)
+
+    # Monkeypatch pandas.read_csv so agent code using pd.read_csv(...) works
+    pd.read_csv = _safe_read_csv
     
     # Setup environment with helper functions
     local_env = {
@@ -474,14 +555,18 @@ Returns:
         "np": np,
         "DATA_DIR": DATA_DIR,
         "STAGE3B_OUT_DIR": STAGE3B_OUT_DIR,
-        "load_dataframe": lambda f: pd.read_csv(DATA_DIR / f),
+        "Path": Path,
+        "load_dataframe": _safe_load_dataframe,
     }
     
     # Capture output
     old_stdout = sys.stdout
     sys.stdout = captured = StringIO()
+    old_cwd = os.getcwd()
     
     try:
+        # Run prep code inside STAGE3B_OUT_DIR so relative writes land there
+        os.chdir(STAGE3B_OUT_DIR)
         exec(code, local_env)
         output = captured.getvalue()
         
@@ -501,6 +586,8 @@ Returns:
         print(error_msg, file=sys.stderr)
         return error_msg
     finally:
+        pd.read_csv = _pd_read_csv
+        os.chdir(old_cwd)
         sys.stdout = old_stdout
 
 

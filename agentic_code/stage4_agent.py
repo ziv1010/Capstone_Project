@@ -52,8 +52,11 @@ Your mission: Execute the Stage 3 plan flawlessly and autonomously.
    - If not, load raw data files and apply transformations manually
 5. Implement the forecasting solution per the plan
 6. Calculate evaluation metrics (RMSE, MAE, etc.)
-7. Save predictions and model artifacts
-8. Call save_execution_result() when complete
+7. **SAVE COMPREHENSIVE OUTPUTS:**
+   - Save predictions to a parquet file containing ALL original data columns + predictions
+   - This is critical for the visualization agent to make meaningful plots
+   - Save any intermediate artifacts (models, feature importance, etc.)
+8. Call save_execution_result() with detailed information
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL: USE PREPARED DATA IF AVAILABLE
@@ -92,7 +95,8 @@ EXECUTION WORKFLOW
 2. You are DATASET-AGNOSTIC - no domain assumptions
 3. FOLLOW THE PLAN - the Stage 3 plan is your blueprint
 4. VERIFY EVERYTHING - check your work at each step
-5. END BY CALLING save_execution_result() - this is your success criterion
+5. **SAVE DETAILED OUTPUTS** - the visualization agent depends on your work!
+6. END BY CALLING save_execution_result() - this is your success criterion
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT: STAGE 3.5 TESTER OUTPUT
@@ -107,15 +111,66 @@ IF TESTER OUTPUT IS PROVIDED:
   * implementation_code: Code snippet showing how to implement it
   * benchmark_results: Performance metrics proving it works
   * data_split_strategy: How data was split for testing
+  * detailed_procedure: Step-by-step guide for replication
+  * data_preprocessing_steps: Exact preprocessing steps used
 
 - INCORPORATE the selected method into your implementation
+- FOLLOW the detailed_procedure from the tester output
 - You can adapt the implementation_code to fit the full dataset
 - The method was already proven to work on a subset
 
 IF NO TESTER OUTPUT:
 - Proceed normally using methods from the Stage 3 plan
 
-Your success = Executing the plan (using the benchmarked method if available) and saving results."""
+═══════════════════════════════════════════════════════════════
+CRITICAL: SAVE COMPREHENSIVE OUTPUTS FOR VISUALIZATION
+═══════════════════════════════════════════════════════════════
+
+**The visualization agent needs complete data to make meaningful plots!**
+
+When saving your final results, you MUST:
+
+1. **Save a comprehensive parquet file** that includes:
+   - ALL original data columns (date, features, identifiers, etc.)
+   - Predicted values in a column like 'predicted' or 'forecast'
+   - Actual values (for comparison plots)
+   - Any additional computed columns (residuals, confidence intervals, etc.)
+   
+   Example:
+   ```python
+   # Combine original data with predictions
+   results_df = df.copy()
+   results_df['predicted'] = predictions
+   results_df['residual'] = results_df['actual'] - results_df['predicted']
+   
+   # Save to parquet for visualization
+   output_path = STAGE4_OUT_DIR / f'results_{plan_id}.parquet'
+   results_df.to_parquet(output_path, index=False)
+   ```
+
+2. **Maintain a detailed execution log** as a list of steps:
+   ```python
+   execution_log = [
+       "Loaded prepared data: prepared_PLAN-TSK-001.parquet",
+       "Data shape: (150, 12)",
+       "Applied Linear Regression model",
+       "Training period: 2018-2023",
+       "Validation period: 2024",
+       "Generated predictions for 12 months",
+       "Calculated metrics: MAE=120.3, RMSE=165.8",
+       "Saved results to results_PLAN-TSK-001.parquet"
+   ]
+   ```
+
+3. **Include method details** in save_execution_result():
+   - method_used: Name/ID of the forecasting method
+   - output_parquet_path: Path to the comprehensive parquet file
+   - data_shape: Final dataset dimensions
+   - detailed_log: Complete execution log
+   - metrics: All performance metrics
+   - outputs: Dictionary of all saved files
+
+Your success = Executing the plan (using the benchmarked method if available) + Saving comprehensive results."""
 
 
 # ===========================
@@ -180,11 +235,18 @@ def run_stage4(
         # Keep the snippet concise for the message to avoid blowing context
         if len(snippet) > 1200:
             snippet = snippet[:600] + "\n...[truncated]...\n" + snippet[-400:]
+        
+        # Include detailed procedure if available
+        procedure_hint = ""
+        if tester_output.detailed_procedure:
+            procedure_hint = f"\n- Detailed procedure: {tester_output.detailed_procedure[:300]}..."
+        
         tester_context = (
             "\n\nTester output provided:\n"
             f"- Selected method ({selected_method.method_id}): {selected_method.name}\n"
             f"- Rationale: {tester_output.selection_rationale}\n"
             f"- Data split used: {tester_output.data_split_strategy}\n"
+            f"{procedure_hint}\n"
             "- Apply this method to the full dataset; reuse/adapt the implementation code.\n"
             f"Implementation snippet:\n{snippet}\n"
         )
@@ -196,10 +258,16 @@ def run_stage4(
             f"1. load_stage3_plan('{plan_id}')\n"
             f"2. Understand the plan structure\n"
             f"3. Execute each step using execute_python_code()\n"
-            f"4. Verify results at each stage\n"
-            f"5. save_execution_result() with final outputs\n\n"
+            f"4. **Save comprehensive parquet with ALL data + predictions**\n"
+            f"5. Verify results at each stage\n"
+            f"6. save_execution_result() with:\n"
+            f"   - output_parquet_path (path to results parquet)\n"
+            f"   - method_used (name of method applied)\n"
+            f"   - detailed_log (execution steps)\n"
+            f"   - data_shape (final dimensions)\n"
+            f"   - metrics (performance metrics)\n\n"
             f"Be autonomous. Handle any issues. Follow the plan.\n"
-            f"Your success = Plan executed + Results saved.{tester_context}"
+            f"Your success = Plan executed + Comprehensive results saved.{tester_context}"
         )
     )
 

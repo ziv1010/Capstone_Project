@@ -298,8 +298,23 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
       "validation_years": null,
       "leakage_check": "How you avoid temporal leakage if applicable"
     },
-    "coverage_checks": [],
-    "cardinality_checks": [],
+    "coverage_checks": [
+      // Each coverage check must be an object with these fields:
+      {
+        "check": "Brief name of the check",
+        "threshold": 0.65,  // numeric threshold (e.g., 0.65 for 65% coverage)
+        "description": "Full description of what is being checked",
+        "action_if_violation": "What to do if check fails (can be null)"
+      }
+    ],
+    "cardinality_checks": [
+      // Each cardinality check must be an object with these fields:
+      {
+        "check": "Brief name of the check",
+        "expected": "Expected cardinality relationship (e.g., '1:1', '1:N', 'unique')",
+        "action_if_violation": "What to do if check fails"
+      }
+    ],
     "additional_checks": ["Data loaded", "No duplicates on join keys"]
   },
 

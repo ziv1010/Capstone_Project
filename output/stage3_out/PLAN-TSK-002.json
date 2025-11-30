@@ -1,9 +1,9 @@
 {
   "plan_id": "PLAN-TSK-002",
   "selected_task_id": "TSK-002",
-  "goal": "Forecast future food grain production and yield based on historical data.",
+  "goal": "Forecast food grain production and yield using historical data",
   "task_category": "predictive",
-  "created_at": "2025-11-29T04:09:55.938332",
+  "created_at": "2025-11-30T17:22:19.346201",
   "created_by": "stage3_agent",
   "artifacts": {
     "intermediate_table": "TSK-002_data.parquet",
@@ -28,14 +28,14 @@
       "Yield-2024-25"
     ],
     "expected_row_count_range": [
-      60,
+      40,
       60
     ]
   },
   "key_normalization": [],
   "file_instructions": [
     {
-      "file_id": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "file_id": "FILE-001",
       "original_name": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
       "alias": "food_grains",
       "filters": [],
@@ -60,7 +60,7 @@
         "Yield-2023-24",
         "Yield-2024-25"
       ],
-      "notes": "Data validation: All columns verified ≥65% complete."
+      "notes": "Data validated: All columns ≥65% complete"
     }
   ],
   "join_steps": [
@@ -86,54 +86,75 @@
   ],
   "feature_engineering": [
     {
-      "feature_name": "lagged_production",
-      "description": "Lagged production values",
-      "transform": "lag",
+      "feature_name": "Area_Growth_2020_2021",
+      "description": "Year-over-year area growth from 2020-21 to 2021-22",
+      "transform": "difference",
       "depends_on": [
-        "Production-2020-21",
-        "Production-2021-22",
-        "Production-2022-23",
-        "Production-2023-24"
+        "Area-2020-21",
+        "Area-2021-22"
       ],
-      "implementation": "df['lagged_production'] = df[['Production-2020-21', 'Production-2021-22', 'Production-2022-23', 'Production-2023-24']].shift(1)"
+      "implementation": "df['Area_Growth_2020_2021'] = df['Area-2021-22'] - df['Area-2020-21']"
     },
     {
-      "feature_name": "growth_rate",
-      "description": "Growth rate of production",
-      "transform": "growth",
+      "feature_name": "Production_Growth_2022_2023",
+      "description": "Year-over-year production growth from 2022-23 to 2023-24",
+      "transform": "difference",
       "depends_on": [
-        "Production-2020-21",
-        "Production-2021-22",
         "Production-2022-23",
         "Production-2023-24"
       ],
-      "implementation": "df['growth_rate'] = df['Production-2021-22'] / df['Production-2020-21'] - 1"
+      "implementation": "df['Production_Growth_2022_2023'] = df['Production-2023-24'] - df['Production-2022-23']"
+    },
+    {
+      "feature_name": "Yield_Avg_Recent",
+      "description": "Average yield from 2022-23 to 2023-24",
+      "transform": "mean",
+      "depends_on": [
+        "Yield-2022-23",
+        "Yield-2023-24"
+      ],
+      "implementation": "df['Yield_Avg_Recent'] = df[['Yield-2022-23', 'Yield-2023-24']].mean(axis=1)"
     }
   ],
   "validation": {
     "time_split": {
       "method": "year-based",
-      "train_years": "2020-21 to 2023-24",
+      "train_years": "all years before 2024-25",
       "test_years": "2024-25",
       "validation_years": null,
-      "leakage_check": "Ensure no data leakage by using time-based splits."
+      "leakage_check": "Use only historical data up to 2023-24 for training"
     },
-    "coverage_checks": [],
-    "cardinality_checks": [],
+    "coverage_checks": [
+      {
+        "check": "Target completeness",
+        "threshold": 1.0,
+        "description": "Verify 100% coverage in target column 'Production-2024-25'",
+        "action_if_violation": "Investigate missing values in target"
+      }
+    ],
+    "cardinality_checks": [
+      {
+        "check": "Unique crop-season combinations",
+        "expected": "unique",
+        "action_if_violation": "Remove duplicate crop-season entries"
+      }
+    ],
     "additional_checks": [
       "Data loaded",
       "No duplicates on join keys"
     ]
   },
   "expected_model_types": [
-    "Time Series",
-    "Regression"
+    "Regression",
+    "Time Series"
   ],
   "evaluation_metrics": [
+    "MAE",
     "RMSE",
-    "MAE"
+    "R2"
   ],
   "notes": [
-    "Data validation: All columns verified ≥65% complete."
+    "Data validation: All columns verified ≥65% complete",
+    "No currency conversion needed: No INR/USD columns present"
   ]
 }

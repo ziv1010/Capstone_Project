@@ -1187,7 +1187,273 @@ STAGE3B_TOOLS = [
     search,
 ]
 
-# Stage 3.5 tool list
+
+# ===========================
+# Stage 3.5a Tools (Method Proposal)
+# ===========================
+
+@tool
+def save_method_proposal_output(output_json: Dict[str, Any]) -> str:
+    """Save the method proposal output from Stage 3.5a.
+
+    Args:
+        output_json: JSON payload containing:
+            - plan_id: ID of the plan
+            - task_category: predictive/descriptive/unsupervised
+            - methods_proposed: list of 3 ForecastingMethod objects
+            - data_split_strategy: How data will be split
+            - date_column, target_column: Identified columns
+            - train_period, validation_period, test_period: Period specifications
+            - data_preprocessing_steps: Ordered list of preprocessing steps
+
+    Returns:
+        Confirmation message with save path
+    """
+    from .config import STAGE3_5A_OUT_DIR
+    from .models import MethodProposalOutput
+    from datetime import datetime
+
+    # Allow lenient inputs
+    if isinstance(output_json, str):
+        try:
+            output_data = json.loads(output_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}") from e
+    elif isinstance(output_json, dict):
+        output_data = output_json
+    else:
+        raise ValueError("output_json must be a dict or JSON string")
+
+    # Validate against schema
+    try:
+        proposal_output = MethodProposalOutput.model_validate(output_data)
+    except Exception as e:
+        raise ValueError(f"Schema validation failed: {e}")
+
+    plan_id = proposal_output.plan_id
+    # Enforce PLAN- prefix if missing
+    if not plan_id.startswith("PLAN-") and "PLAN-" not in plan_id:
+        if plan_id.startswith("TSK-"):
+            plan_id = f"PLAN-{plan_id}"
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    STAGE3_5A_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = STAGE3_5A_OUT_DIR / f"method_proposal_{plan_id}_{timestamp}.json"
+    output_path.write_text(json.dumps(output_data, indent=2))
+
+    return f"✅ Method proposal saved: {output_path.name}\n\nNext step: Run Stage 3.5b to benchmark these methods."
+
+
+# ===========================
+# Stage 3.5b Tools (Method Benchmarking)
+# ===========================
+
+@tool
+def load_method_proposals(plan_id: str) -> str:
+    """Load method proposals from Stage 3.5a.
+
+    Args:
+        plan_id: Plan ID (e.g., 'PLAN-TSK-001')
+
+    Returns:
+        JSON string containing MethodProposalOutput
+    """
+    from .config import STAGE3_5A_OUT_DIR
+
+    # Find the latest method proposal file for this plan
+    proposal_files = sorted(STAGE3_5A_OUT_DIR.glob(f"method_proposal_*{plan_id}*.json"))
+
+    if not proposal_files:
+        return f"ERROR: No method proposals found for plan_id '{plan_id}' in {STAGE3_5A_OUT_DIR}"
+
+    latest_file = proposal_files[-1]
+    proposal_data = json.loads(latest_file.read_text())
+
+    return json.dumps(proposal_data, indent=2)
+
+
+@tool
+def save_checkpoint_stage3_5b(checkpoint_json: Dict[str, Any]) -> str:
+    """Save checkpoint for Stage 3.5b.
+    
+    SIMPLIFIED STRATEGY: Save checkpoint only when a method completes all 3 iterations
+    with consistent results (CV < 0.3).
+
+    This checkpoint should contain:
+    - plan_id: The plan being tested
+    - data_split_strategy: Summary of how data is split
+    - date_column, target_column: Column names
+    - train_period, validation_period, test_period: Period specifications
+    - methods_to_test: List of ForecastingMethod dicts
+    - methods_completed: List of method_ids that completed 3 iterations successfully
+    - completed_results: List of BenchmarkResult dicts (averaged, one per completed method)
+
+    Args:
+        checkpoint_json: Complete checkpoint data as dict
+
+    Returns:
+        Confirmation message with save path
+    """
+    from .config import STAGE3_5B_OUT_DIR
+    from .models import Stage3_5Checkpoint
+    from datetime import datetime
+
+    # Allow lenient inputs
+    if isinstance(checkpoint_json, str):
+        try:
+            checkpoint_data = json.loads(checkpoint_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}") from e
+    elif isinstance(checkpoint_json, dict):
+        checkpoint_data = checkpoint_json
+    else:
+        raise ValueError("checkpoint_json must be a dict or JSON string")
+
+    # Add/update timestamp
+    checkpoint_data["updated_at"] = datetime.now().isoformat()
+    if "created_at" not in checkpoint_data:
+        checkpoint_data["created_at"] = checkpoint_data["updated_at"]
+
+    # Validate against schema
+    try:
+        checkpoint = Stage3_5Checkpoint.model_validate(checkpoint_data)
+    except Exception as e:
+        raise ValueError(f"Checkpoint validation failed: {e}")
+
+    plan_id = checkpoint.plan_id
+
+    STAGE3_5B_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = STAGE3_5B_OUT_DIR / f"checkpoint_{plan_id}.json"
+    checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2))
+
+    # Build progress summary
+    methods_completed = checkpoint.methods_completed
+    total_methods = len(checkpoint.methods_to_test)
+    completed_count = len(methods_completed)
+
+    summary = (
+        f"✅ Checkpoint saved: {checkpoint_path.name}\n"
+        f"📊 Progress: {completed_count}/{total_methods} methods completed\n"
+    )
+
+    if methods_completed:
+        summary += "   Completed methods:\n"
+        for method_id in methods_completed:
+            summary += f"   - {method_id} ✓\n"
+
+    remaining = [m.get("method_id", "?") for m in checkpoint.methods_to_test 
+                 if m.get("method_id") not in methods_completed]
+    if remaining:
+        summary += f"\n   Remaining methods: {', '.join(remaining)}\n"
+
+    return summary
+
+
+@tool
+def load_checkpoint_stage3_5b(plan_id: str) -> str:
+    """Load existing checkpoint for Stage 3.5b to resume progress.
+
+    Args:
+        plan_id: Plan ID (e.g., 'PLAN-TSK-001')
+
+    Returns:
+        JSON string containing checkpoint data, or error message if no checkpoint
+    """
+    from .config import STAGE3_5B_OUT_DIR
+
+    checkpoint_path = STAGE3_5B_OUT_DIR / f"checkpoint_{plan_id}.json"
+
+    if not checkpoint_path.exists():
+        return f"No checkpoint found for plan '{plan_id}'. Starting fresh."
+
+    checkpoint_data = json.loads(checkpoint_path.read_text())
+
+    # Build summary
+    methods_completed = checkpoint_data.get("methods_completed", [])
+    methods_to_test = checkpoint_data.get("methods_to_test", [])
+    total_methods = len(methods_to_test)
+    completed_count = len(methods_completed)
+
+    summary = (
+        f"✅ Checkpoint loaded: {checkpoint_path.name}\n"
+        f"📊 Progress: {completed_count}/{total_methods} methods completed\n"
+    )
+
+    if methods_completed:
+        summary += "   Completed methods:\n"
+        for method_id in methods_completed:
+            summary += f"   - {method_id} ✓\n"
+
+    remaining = [m.get("method_id", "?") for m in methods_to_test 
+                 if m.get("method_id") not in methods_completed]
+    if remaining:
+        summary += f"\n   ⚠️  Need to benchmark: {', '.join(remaining)}\n"
+        summary += "   Run 3 iterations for each remaining method, check consistency, then save checkpoint.\n"
+
+    summary += f"\n📋 Full checkpoint data:\n{json.dumps(checkpoint_data, indent=2)}"
+
+    return summary
+
+
+@tool
+def python_sandbox_stage3_5b(code: str) -> str:
+    """Quick Python sandbox for Stage 3.5b data exploration.
+
+    Use this to:
+    - Inspect data structure before benchmarking
+    - Test code snippets
+    - Debug data loading issues
+
+    Args:
+        code: Python code to execute
+
+    Returns:
+        Execution result (stdout + stderr)
+    """
+    # Reuse the same implementation as python_sandbox_stage3_5
+    return python_sandbox_stage3_5(code)
+
+
+# Stage 3.5a tool list
+STAGE3_5A_TOOLS = [
+    record_thought,  # ReAct: explicit reasoning before action
+    record_observation,  # ReAct: reflection after action
+    load_stage3_plan_for_tester,
+    list_data_files,
+    inspect_data_file,
+    python_sandbox_stage3_5,
+    search,
+    save_method_proposal_output,
+]
+
+# Stage 3.5b tool list (SIMPLIFIED CHECKPOINT STRATEGY)
+STAGE3_5B_TOOLS = [
+    # ReAct tools
+    record_thought,  # Record thoughts before actions
+    record_observation,  # Record observations after actions
+    
+    # Checkpoint tools (SIMPLIFIED - no verification)
+    load_checkpoint_stage3_5b,  # Load existing checkpoint
+    save_checkpoint_stage3_5b,  # Save checkpoint when method completes
+    
+    # Method Proposals
+    load_method_proposals,  # Load proposals from Stage 3.5a
+    
+    # Data exploration
+    list_data_files,  # List available data files
+    inspect_data_file,  # Inspect data file structure
+    python_sandbox_stage3_5b,  # Quick Python execution
+    
+    # Benchmarking
+    run_benchmark_code,  # Execute benchmarking code
+    search,  # Search for examples
+    
+    # Final output
+    save_tester_output,  # Save final recommendation
+]
+
+# Stage 3.5 tool list (Legacy - kept for compatibility)
 STAGE3_5_TOOLS = [
     record_thought,  # ReAct: explicit reasoning before action
     record_observation,  # ReAct: reflection after action

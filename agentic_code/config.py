@@ -23,7 +23,9 @@ SUMMARIES_DIR = OUTPUT_ROOT / "summaries"
 STAGE2_OUT_DIR = OUTPUT_ROOT / "stage2_out"
 STAGE3_OUT_DIR = OUTPUT_ROOT / "stage3_out"
 STAGE3B_OUT_DIR = OUTPUT_ROOT / "stage3b_data_prep"  # Data preparation stage
-STAGE3_5_OUT_DIR = OUTPUT_ROOT / "stage3_5_tester"
+STAGE3_5A_OUT_DIR = OUTPUT_ROOT / "stage3_5a_method_proposal"  # Method proposal
+STAGE3_5B_OUT_DIR = OUTPUT_ROOT / "stage3_5b_benchmarking"  # Method benchmarking
+STAGE3_5_OUT_DIR = OUTPUT_ROOT / "stage3_5_tester"  # Legacy - kept for compatibility
 STAGE4_OUT_DIR = OUTPUT_ROOT / "stage4_out"
 STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
 FAILSAFE_OUT_DIR = OUTPUT_ROOT / "failsafe_out"
@@ -34,7 +36,9 @@ STAGE_FILE_PATHS = {
     "stage2": STAGE2_OUT_DIR,
     "stage3": STAGE3_OUT_DIR,
     "stage3b": STAGE3B_OUT_DIR,
-    "stage3_5": STAGE3_5_OUT_DIR,
+    "stage3_5a": STAGE3_5A_OUT_DIR,
+    "stage3_5b": STAGE3_5B_OUT_DIR,
+    "stage3_5": STAGE3_5_OUT_DIR,  # Legacy - kept for compatibility
     "stage4": STAGE4_OUT_DIR,
     "stage5": STAGE5_OUT_DIR,
 }
@@ -44,7 +48,9 @@ STAGE_FILE_PATHS = {
 FILE_NAMING_PATTERNS = {
     "stage3_plan": "*{plan_id}*.json",  # Matches PLAN-TSK-001.json or TSK-001.json
     "stage3b_data": "prepared_*{plan_id}*.parquet",
-    "stage3_5_output": "tester_output_*{plan_id}*.json",
+    "stage3_5a_output": "method_proposal_*{plan_id}*.json",
+    "stage3_5b_output": "tester_*{plan_id}*.json",
+    "stage3_5_output": "tester_output_*{plan_id}*.json",  # Legacy pattern
     "stage4_result": "execution_result_*{plan_id}*.json",
     "stage5_report": "visualization_report_*{plan_id}*.json",
 }
@@ -60,7 +66,9 @@ for dir_path in [
     STAGE2_OUT_DIR,
     STAGE3_OUT_DIR,
     STAGE3B_OUT_DIR,  # Data preparation
-    STAGE3_5_OUT_DIR,
+    STAGE3_5A_OUT_DIR,  # Method proposal
+    STAGE3_5B_OUT_DIR,  # Method benchmarking
+    STAGE3_5_OUT_DIR,  # Legacy
     STAGE4_OUT_DIR,
     STAGE5_OUT_DIR,
     STAGE4_WORKSPACE,
@@ -121,7 +129,13 @@ STAGE3_MAX_ROUNDS = 15  # Max rounds for planning agent
 # Stage 3B: Data Preparation
 STAGE3B_MAX_ROUNDS = 100  # Max rounds for data prep agent
 
-# Stage 3.5: Method Testing & Benchmarking
+# Stage 3.5a: Method Proposal
+STAGE3_5A_MAX_ROUNDS = 30  # Max rounds for method proposal agent (lighter task)
+
+# Stage 3.5b: Method Benchmarking & Selection
+STAGE3_5B_MAX_ROUNDS = 100  # Max rounds for benchmarking agent (benchmarking may take longer)
+
+# Stage 3.5: Method Testing & Benchmarking (Legacy - kept for compatibility)
 STAGE3_5_MAX_ROUNDS = 100  # Max rounds for tester agent (benchmarking may take longer)
 
 # Stage 4: Execution

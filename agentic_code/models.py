@@ -292,7 +292,11 @@ class PreparedDataOutput(BaseModel):
 # ===========================
 
 class Stage3_5Checkpoint(BaseModel):
-    """Checkpoint for Stage 3.5 to maintain memory across conversation truncation."""
+    """Checkpoint for Stage 3.5 to maintain memory across conversation truncation.
+    
+    Simplified strategy: Save only when a method completes all 3 iterations
+    with consistent results (CV < 0.3).
+    """
     plan_id: str = Field(description="Plan ID being tested")
 
     # Data split information (to maintain consistency across all methods)
@@ -317,22 +321,16 @@ class Stage3_5Checkpoint(BaseModel):
         description="List of methods that need to be tested (serialized ForecastingMethod)"
     )
 
-    # Progress tracking
+    # Progress tracking - SIMPLIFIED
     methods_completed: List[str] = Field(
         default_factory=list,
-        description="List of method_ids that have been fully benchmarked (3 iterations each)"
+        description="List of method_ids that completed all 3 iterations with consistent results"
     )
 
-    # Results so far
-    benchmark_results: List[Dict[str, Any]] = Field(
+    # SIMPLIFIED: Only store final averaged results for completed methods
+    completed_results: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="Accumulated benchmark results (serialized BenchmarkResult objects)"
-    )
-
-    # Iteration tracking per method
-    iteration_counts: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Number of successful iterations completed per method_id"
+        description="Final averaged benchmark results for completed methods (serialized BenchmarkResult)"
     )
 
     # Metadata
@@ -372,11 +370,47 @@ class BenchmarkResult(BaseModel):
     )
 
 
-class TesterOutput(BaseModel):
-    """Output from Stage 3.5 Tester."""
+class MethodProposalOutput(BaseModel):
+    """Output from Stage 3.5a Method Proposal."""
     plan_id: str = Field(description="Links back to Stage 3 plan")
     task_category: TaskCategory
-    
+
+    # Methods proposed
+    methods_proposed: List[ForecastingMethod] = Field(
+        description="All methods proposed for benchmarking (exactly 3)"
+    )
+
+    # Data split strategy used
+    data_split_strategy: str = Field(
+        description="How data will be split for benchmarking, e.g., '2020-2023 train, 2024 validation'"
+    )
+    date_column: Optional[str] = Field(
+        default=None,
+        description="Name of the date/time column identified in the data"
+    )
+    target_column: Optional[str] = Field(
+        default=None,
+        description="Name of the target variable column"
+    )
+    train_period: str = Field(description="Training period, e.g., '2020-2023'")
+    validation_period: str = Field(description="Validation period, e.g., '2024'")
+    test_period: Optional[str] = Field(default=None, description="Test period if applicable")
+
+    # Data preprocessing guide
+    data_preprocessing_steps: List[str] = Field(
+        default_factory=list,
+        description="Ordered list of data preprocessing steps to apply before benchmarking"
+    )
+
+    # Metadata
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class TesterOutput(BaseModel):
+    """Output from Stage 3.5b Tester (final benchmarking result)."""
+    plan_id: str = Field(description="Links back to Stage 3 plan")
+    task_category: TaskCategory
+
     # Methods evaluated
     methods_proposed: List[ForecastingMethod] = Field(
         description="All methods proposed for benchmarking"
@@ -384,7 +418,7 @@ class TesterOutput(BaseModel):
     benchmark_results: List[BenchmarkResult] = Field(
         description="Results from benchmarking each method"
     )
-    
+
     # Selection
     selected_method_id: str = Field(description="ID of the best performing method")
     selected_method: ForecastingMethod = Field(
@@ -393,12 +427,12 @@ class TesterOutput(BaseModel):
     selection_rationale: str = Field(
         description="Why this method was selected over others"
     )
-    
+
     # Data split strategy used
     data_split_strategy: str = Field(
         description="How data was split for benchmarking, e.g., '2020-2023 train, 2024 validation'"
     )
-    
+
     # Detailed replication guide
     detailed_procedure: str = Field(
         default="",
@@ -412,7 +446,7 @@ class TesterOutput(BaseModel):
         default="",
         description="Summary table or text comparing all methods tested with their metrics"
     )
-    
+
     # Metadata
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 

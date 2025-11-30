@@ -3,7 +3,7 @@
   "selected_task_id": "TSK-002",
   "goal": "Forecast food grain production and yield using historical data",
   "task_category": "predictive",
-  "created_at": "2025-11-30T17:22:19.346201",
+  "created_at": "2025-11-30T17:33:56.698531",
   "created_by": "stage3_agent",
   "artifacts": {
     "intermediate_table": "TSK-002_data.parquet",
@@ -28,8 +28,8 @@
       "Yield-2024-25"
     ],
     "expected_row_count_range": [
-      40,
-      60
+      50,
+      70
     ]
   },
   "key_normalization": [],
@@ -60,7 +60,7 @@
         "Yield-2023-24",
         "Yield-2024-25"
       ],
-      "notes": "Data validated: All columns ≥65% complete"
+      "notes": "No joins required"
     }
   ],
   "join_steps": [
@@ -86,57 +86,47 @@
   ],
   "feature_engineering": [
     {
-      "feature_name": "Area_Growth_2020_2021",
-      "description": "Year-over-year area growth from 2020-21 to 2021-22",
-      "transform": "difference",
-      "depends_on": [
-        "Area-2020-21",
-        "Area-2021-22"
-      ],
-      "implementation": "df['Area_Growth_2020_2021'] = df['Area-2021-22'] - df['Area-2020-21']"
-    },
-    {
-      "feature_name": "Production_Growth_2022_2023",
-      "description": "Year-over-year production growth from 2022-23 to 2023-24",
-      "transform": "difference",
-      "depends_on": [
-        "Production-2022-23",
-        "Production-2023-24"
-      ],
-      "implementation": "df['Production_Growth_2022_2023'] = df['Production-2023-24'] - df['Production-2022-23']"
-    },
-    {
-      "feature_name": "Yield_Avg_Recent",
-      "description": "Average yield from 2022-23 to 2023-24",
+      "feature_name": "avg_area_prev_2_years",
+      "description": "Average area of the two previous years",
       "transform": "mean",
       "depends_on": [
-        "Yield-2022-23",
-        "Yield-2023-24"
+        "Area-2022-23",
+        "Area-2023-24"
       ],
-      "implementation": "df['Yield_Avg_Recent'] = df[['Yield-2022-23', 'Yield-2023-24']].mean(axis=1)"
+      "implementation": "df['avg_area_prev_2_years'] = (df['Area-2022-23'] + df['Area-2023-24']) / 2"
+    },
+    {
+      "feature_name": "production_growth_2023_2024",
+      "description": "Growth rate of production from 2023-24 to 2024-25",
+      "transform": "growth rate",
+      "depends_on": [
+        "Production-2023-24",
+        "Production-2024-25"
+      ],
+      "implementation": "df['production_growth_2023_2024'] = (df['Production-2024-25'] - df['Production-2023-24']) / df['Production-2023-24']"
     }
   ],
   "validation": {
     "time_split": {
       "method": "year-based",
-      "train_years": "all years before 2024-25",
+      "train_years": "2020-23",
       "test_years": "2024-25",
       "validation_years": null,
-      "leakage_check": "Use only historical data up to 2023-24 for training"
+      "leakage_check": "Ensure test set contains only future years"
     },
     "coverage_checks": [
       {
-        "check": "Target completeness",
-        "threshold": 1.0,
-        "description": "Verify 100% coverage in target column 'Production-2024-25'",
-        "action_if_violation": "Investigate missing values in target"
+        "check": "Data completeness",
+        "threshold": 0.65,
+        "description": "Verify all columns have ≥65% non-null values",
+        "action_if_violation": "Impute missing values using mean/median"
       }
     ],
     "cardinality_checks": [
       {
-        "check": "Unique crop-season combinations",
+        "check": "Unique crop-season pairs",
         "expected": "unique",
-        "action_if_violation": "Remove duplicate crop-season entries"
+        "action_if_violation": "Remove duplicates or aggregate"
       }
     ],
     "additional_checks": [
@@ -149,12 +139,11 @@
     "Time Series"
   ],
   "evaluation_metrics": [
-    "MAE",
     "RMSE",
-    "R2"
+    "MAE"
   ],
   "notes": [
     "Data validation: All columns verified ≥65% complete",
-    "No currency conversion needed: No INR/USD columns present"
+    "No currency conversion needed"
   ]
 }

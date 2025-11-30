@@ -328,6 +328,21 @@ tool_node = ToolNode(STAGE3B_TOOLS)
 def should_continue(state: MessagesState) -> str:
     """Route based on tool calls."""
     last = state["messages"][-1]
+    
+    # Check if save_prepared_data was successfully called in recent messages
+    # If so, we're done and should terminate
+    for msg in reversed(state["messages"][-5:]):  # Check last 5 messages
+        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if tool_call.get("name") == "save_prepared_data":
+                    # Check if there's a successful response
+                    msg_idx = state["messages"].index(msg)
+                    if msg_idx + 1 < len(state["messages"]):
+                        next_msg = state["messages"][msg_idx + 1]
+                        if hasattr(next_msg, 'content') and 'saved::prep_' in next_msg.content:
+                            # Success! Terminate
+                            return END
+    
     if hasattr(last, 'tool_calls') and last.tool_calls:
         return "tools"
     return END

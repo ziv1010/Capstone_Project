@@ -28,6 +28,27 @@ STAGE4_OUT_DIR = OUTPUT_ROOT / "stage4_out"
 STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
 FAILSAFE_OUT_DIR = OUTPUT_ROOT / "failsafe_out"
 
+# Centralized Path Registry for Agents
+STAGE_FILE_PATHS = {
+    "stage1": SUMMARIES_DIR,
+    "stage2": STAGE2_OUT_DIR,
+    "stage3": STAGE3_OUT_DIR,
+    "stage3b": STAGE3B_OUT_DIR,
+    "stage3_5": STAGE3_5_OUT_DIR,
+    "stage4": STAGE4_OUT_DIR,
+    "stage5": STAGE5_OUT_DIR,
+}
+
+# File Naming Patterns
+# Agents should use these patterns to find files, handling the PLAN_ prefix variation
+FILE_NAMING_PATTERNS = {
+    "stage3_plan": "*{plan_id}*.json",  # Matches PLAN-TSK-001.json or TSK-001.json
+    "stage3b_data": "prepared_*{plan_id}*.parquet",
+    "stage3_5_output": "tester_output_*{plan_id}*.json",
+    "stage4_result": "execution_result_*{plan_id}*.json",
+    "stage5_report": "visualization_report_*{plan_id}*.json",
+}
+
 # Working directories for code execution
 STAGE4_WORKSPACE = STAGE4_OUT_DIR / "code_workspace"
 STAGE5_WORKSPACE = STAGE5_OUT_DIR / "viz_workspace"
@@ -63,14 +84,25 @@ PRIMARY_LLM_CONFIG = {
     "max_tokens": 2048,  # Reduced to allow for longer conversation histories
 }
 
+# SECONDARY_LLM_CONFIG = {
+#     "model": "Qwen/Qwen2.5-32B-Instruct",
+#     "base_url": "http://127.0.0.1:8001/v1",
+#     "api_key": "EMPTY",
+#     "temperature": 0.0,
+#     "max_tokens": 2048,  # Reduced to allow for longer conversation histories
+#     "stop": ["<|im_start|>", "<|im_end|>"],
+
+# }
+
 SECONDARY_LLM_CONFIG = {
-    "model": "Qwen/Qwen2.5-32B-Instruct",
+    "model": "Qwen/Qwen3-32B",
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 2048,  # Reduced to allow for longer conversation histories
-    "stop": ["<|im_start|>", "<|im_end|>"],
-
+    "max_tokens": 2048,
+    # "model_kwargs": {
+    #     "tool_choice": "auto",
+    # },
 }
 
 # ===========================

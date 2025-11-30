@@ -22,7 +22,7 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE3B_MAX_ROUNDS
+from .config import STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE3B_MAX_ROUNDS, STAGE_FILE_PATHS, FILE_NAMING_PATTERNS
 from .models import PreparedDataOutput
 from .tools import STAGE3B_TOOLS
 
@@ -394,7 +394,8 @@ def run_stage3b(plan_id: str, max_rounds: int = STAGE3B_MAX_ROUNDS, debug: bool 
             f"- Use record_thought() BEFORE each action\n"
             f"- Use record_observation() AFTER each action\n"
             f"- **CRITICAL**: Ensure NO NaNs remain in the final dataset. Check `df.isnull().sum().sum() == 0`.\n"
-            f"- Save as parquet: 'prepared_{plan_id}.parquet'\n"
+            f"- **CRITICAL**: Ensure NO NaNs remain in the final dataset. Check `df.isnull().sum().sum() == 0`.\n"
+            f"- Save as parquet: 'prepared_{plan_id}.parquet' (matches FILE_NAMING_PATTERNS['stage3b_data'])\n"
             f"- Calculate data quality report (include missing-value handling and dtype fixes)\n"
             f"- Do NOT leave unresolved missing values; Stage 3.5 will reuse this file directly\n"
             f"- Use search() if you need examples or guidance\n\n"

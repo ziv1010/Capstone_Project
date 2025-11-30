@@ -23,7 +23,7 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE4_OUT_DIR, STAGE3_5_OUT_DIR, STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS
+from .config import STAGE4_OUT_DIR, STAGE3_5_OUT_DIR, STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE4_MAX_ROUNDS, STAGE_FILE_PATHS, FILE_NAMING_PATTERNS
 from .models import ExecutionResult, TesterOutput
 from .tools import STAGE4_TOOLS
 from .failsafe_agent import run_failsafe
@@ -47,7 +47,9 @@ Your mission: Execute the Stage 3 plan flawlessly and autonomously.
 
 3. Read file_instructions to know which data to load
 4. **CHECK FOR PREPARED DATA FIRST:**
-   - Look for 'prepared_PLAN-ID.parquet' in STAGE3B_OUT_DIR
+   - Look for prepared data in STAGE3B_OUT_DIR (see STAGE_FILE_PATHS['stage3b'])
+   - USE GLOB PATTERNS: Files may be named 'prepared_TSK-...' or 'prepared_PLAN-TSK-...'
+   - Example: `list(Path(STAGE_FILE_PATHS['stage3b']).glob('*TSK-001*'))`
    - If it exists, load it directly - it already has joins, filters, features
    - If not, load raw data files and apply transformations manually
 5. Implement the forecasting solution per the plan

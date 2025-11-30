@@ -31,7 +31,10 @@ from .config import (
     STAGE4_OUT_DIR,
     STAGE5_OUT_DIR,
     STAGE4_WORKSPACE,
+    STAGE4_WORKSPACE,
     STAGE5_WORKSPACE,
+    STAGE_FILE_PATHS,
+    FILE_NAMING_PATTERNS,
 )
 from .models import Stage2Output, Stage3Plan, ExecutionResult
 from .utils import (
@@ -443,6 +446,22 @@ def python_sandbox_stage3b(code: str) -> str:
         for cand in candidates:
             if cand.exists():
                 return cand
+        
+        # Robust lookup: Try globbing if exact match fails
+        name = path.name
+        for search_dir in [DATA_DIR, STAGE3B_OUT_DIR]:
+            # 1. Try exact name glob
+            matches = list(search_dir.glob(f"*{name}*"))
+            if matches:
+                return matches[0]
+            
+            # 2. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+            if "TSK-" in name and "PLAN-" not in name:
+                pattern = name.replace("TSK-", "*TSK-")
+                matches = list(search_dir.glob(pattern))
+                if matches:
+                    return matches[0]
+                    
         return path
 
     # Safe CSV reader that falls back to DATA_DIR if needed
@@ -531,6 +550,22 @@ Returns:
         for cand in candidates:
             if cand.exists():
                 return cand
+                
+        # Robust lookup: Try globbing if exact match fails
+        name = path.name
+        for search_dir in [DATA_DIR, STAGE3B_OUT_DIR]:
+            # 1. Try exact name glob
+            matches = list(search_dir.glob(f"*{name}*"))
+            if matches:
+                return matches[0]
+            
+            # 2. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+            if "TSK-" in name and "PLAN-" not in name:
+                pattern = name.replace("TSK-", "*TSK-")
+                matches = list(search_dir.glob(pattern))
+                if matches:
+                    return matches[0]
+
         return path
 
     _pd_read_csv = pd.read_csv
@@ -696,9 +731,26 @@ def run_benchmark_code(code: str, description: str = "Running benchmark") -> str
         try:
             return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
         except FileNotFoundError:
+            # Try exact match in STAGE3B
             prepared_path = STAGE3B_OUT_DIR / filename
             if prepared_path.exists():
                 return load_dataframe(prepared_path)
+            
+            # Robust lookup in STAGE3B_OUT_DIR
+            name = Path(filename).name
+            
+            # 1. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+            if "TSK-" in name and "PLAN-" not in name:
+                pattern = name.replace("TSK-", "*TSK-")
+                matches = list(STAGE3B_OUT_DIR.glob(pattern))
+                if matches:
+                     return load_dataframe(matches[0])
+            
+            # 2. Try general glob
+            matches = list(STAGE3B_OUT_DIR.glob(f"*{name}*"))
+            if matches:
+                return load_dataframe(matches[0])
+                
             raise
 
     globals_dict = {
@@ -756,9 +808,26 @@ def python_sandbox_stage3_5(code: str) -> str:
         try:
             return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
         except FileNotFoundError:
+            # Try exact match in STAGE3B
             prepared_path = STAGE3B_OUT_DIR / filename
             if prepared_path.exists():
                 return load_dataframe(prepared_path)
+            
+            # Robust lookup in STAGE3B_OUT_DIR
+            name = Path(filename).name
+            
+            # 1. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+            if "TSK-" in name and "PLAN-" not in name:
+                pattern = name.replace("TSK-", "*TSK-")
+                matches = list(STAGE3B_OUT_DIR.glob(pattern))
+                if matches:
+                     return load_dataframe(matches[0])
+            
+            # 2. Try general glob
+            matches = list(STAGE3B_OUT_DIR.glob(f"*{name}*"))
+            if matches:
+                return load_dataframe(matches[0])
+                
             raise
 
     globals_dict = {
@@ -819,6 +888,12 @@ def save_checkpoint_stage3_5(checkpoint_json: Dict[str, Any]) -> str:
     checkpoint_dict["updated_at"] = datetime.now().isoformat()
 
     plan_id = checkpoint.plan_id
+    # Enforce PLAN- prefix if missing, as per user requirement
+    if not plan_id.startswith("PLAN-") and "PLAN-" not in plan_id:
+        # Check if it's just TSK-XXX
+        if plan_id.startswith("TSK-"):
+            plan_id = f"PLAN-{plan_id}"
+            
     STAGE3_5_OUT_DIR.mkdir(parents=True, exist_ok=True)
     checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
 
@@ -881,6 +956,14 @@ def load_checkpoint_stage3_5(plan_id: str) -> str:
     from .config import STAGE3_5_OUT_DIR
 
     checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
+    
+    if not checkpoint_path.exists():
+        # Try finding by pattern using FILE_NAMING_PATTERNS
+        # This handles the case where plan_id is 'TSK-001' but file is 'checkpoint_PLAN-TSK-001.json'
+        pattern = f"checkpoint_*{plan_id}*.json"
+        matches = list(STAGE3_5_OUT_DIR.glob(pattern))
+        if matches:
+            checkpoint_path = matches[0]
 
     if not checkpoint_path.exists():
         return f"[INFO] No checkpoint found for {plan_id}. Starting fresh."
@@ -937,6 +1020,13 @@ def verify_checkpoint_stage3_5(plan_id: str, expected_iterations: Dict[str, int]
     from .config import STAGE3_5_OUT_DIR
 
     checkpoint_path = STAGE3_5_OUT_DIR / f"checkpoint_{plan_id}.json"
+    
+    if not checkpoint_path.exists():
+        # Try finding by pattern
+        pattern = f"checkpoint_*{plan_id}*.json"
+        matches = list(STAGE3_5_OUT_DIR.glob(pattern))
+        if matches:
+            checkpoint_path = matches[0]
 
     if not checkpoint_path.exists():
         return f"❌ VERIFICATION FAILED: No checkpoint file found at {checkpoint_path}"
@@ -1021,6 +1111,11 @@ def save_tester_output(output_json: Dict[str, Any]) -> str:
         raise ValueError(f"Schema validation failed: {e}")
     
     plan_id = tester_output.plan_id
+    # Enforce PLAN- prefix if missing
+    if not plan_id.startswith("PLAN-") and "PLAN-" not in plan_id:
+        if plan_id.startswith("TSK-"):
+            plan_id = f"PLAN-{plan_id}"
+            
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     STAGE3_5_OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1359,14 +1454,32 @@ def create_visualizations(code: str, description: str = "Creating visualizations
     def load_dataframe_viz(filepath):
         """Load a dataframe from any supported format."""
         filepath = Path(filepath)
-        if not filepath.exists():
-            # Try relative to STAGE4_OUT_DIR
-            filepath = STAGE4_OUT_DIR / filepath.name
         
-        if not filepath.exists():
-            raise FileNotFoundError(f"File not found: {filepath}")
+        # 1. Try exact path
+        if filepath.exists():
+            return load_dataframe(filepath, base_dir=STAGE4_OUT_DIR)
+            
+        # 2. Try relative to STAGE4_OUT_DIR (exact)
+        candidate = STAGE4_OUT_DIR / filepath.name
+        if candidate.exists():
+            return load_dataframe(candidate, base_dir=STAGE4_OUT_DIR)
+            
+        # 3. Robust lookup in STAGE4_OUT_DIR
+        name = filepath.name
         
-        return load_dataframe(filepath, base_dir=STAGE4_OUT_DIR)
+        # 3a. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+        if "TSK-" in name and "PLAN-" not in name:
+            pattern = name.replace("TSK-", "*TSK-")
+            matches = list(STAGE4_OUT_DIR.glob(pattern))
+            if matches:
+                 return load_dataframe(matches[0], base_dir=STAGE4_OUT_DIR)
+        
+        # 3b. Try general glob
+        matches = list(STAGE4_OUT_DIR.glob(f"*{name}*"))
+        if matches:
+            return load_dataframe(matches[0], base_dir=STAGE4_OUT_DIR)
+        
+        raise FileNotFoundError(f"File not found: {filepath} (tried exact and glob in {STAGE4_OUT_DIR})")
     
     globals_dict = {
         "__name__": "__stage5_visualizer__",

@@ -21,7 +21,7 @@ from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 
-from .config import STAGE5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE5_MAX_ROUNDS
+from .config import STAGE5_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE5_MAX_ROUNDS, STAGE_FILE_PATHS, FILE_NAMING_PATTERNS
 from .models import VisualizationReport
 from .tools import STAGE5_TOOLS
 from .failsafe_agent import run_failsafe
@@ -207,10 +207,11 @@ def run_stage5(plan_id: str, max_rounds: int = STAGE5_MAX_ROUNDS, debug: bool = 
             f"Create visualizations for plan: '{plan_id}'\n\n"
             f"REACT WORKFLOW (MANDATORY):\n\n"
             f"1️⃣ ANALYZE PHASE:\n"
-            f"   - list_stage4_results() to find the execution result\n"
+            f"   - list_stage4_results() to find the execution result (look in STAGE_FILE_PATHS['stage4'])\n"
             f"   - load_stage4_result() to understand what was done\n"
             f"   - load_stage3_plan() to get the original task context\n"
-            f"   - analyze_data_columns() on the output parquet to categorize columns\n\n"
+            f"   - analyze_data_columns() on the output parquet to categorize columns\n"
+            f"   - NOTE: Handle file naming variations! Files might be named 'execution_result_TSK-...' or 'execution_result_PLAN-TSK-...'. Use glob patterns.\n\n"
             f"2️⃣ PLANNING PHASE:\n"
             f"   - For EACH plot you want to make:\n"
             f"     * Use plan_visualization() to document your reasoning\n"

@@ -27,6 +27,8 @@ from .config import (
     STAGE3B_OUT_DIR,
     SECONDARY_LLM_CONFIG,
     STAGE3_5_MAX_ROUNDS,
+    STAGE_FILE_PATHS,
+    FILE_NAMING_PATTERNS,
 )
 from .models import TesterOutput, ForecastingMethod, BenchmarkResult, PreparedDataOutput
 from .tools import STAGE3_5_TOOLS
@@ -321,8 +323,10 @@ CRITICAL: USE PREPARED DATA IF AVAILABLE
 
 BEFORE loading raw data files, CHECK if prepared data exists:
 - Look for prepared data file mentioned in Stage 3 plan metadata
-- Typical format: 'prepared_PLAN-TSK-001.parquet'
-- Location: STAGE3B_OUT_DIR or mentioned in plan
+- Typical format: 'prepared_PLAN-TSK-001.parquet' (or similar pattern)
+- Location: STAGE3B_OUT_DIR (see STAGE_FILE_PATHS['stage3b'])
+- USE PATTERN MATCHING: Files may be named 'prepared_TSK-...' or 'prepared_PLAN-TSK-...'
+- ALWAYS use glob patterns (e.g. `*TSK-001*`) to find files to avoid "not found" errors.
 
 **If prepared data exists:**
 ✓ Load it directly: `prepared_df = load_dataframe('prepared_PLAN-TSK-001.parquet')`

@@ -75,6 +75,12 @@ CRITICAL RULES
    • Exception: Only use USD if user explicitly requested it
    • Document choice in plan notes
 
+8. **KEEP JSON CONCISE**
+   • Feature engineering "implementation" fields MUST be brief (< 100 chars)
+   • Use simple pandas syntax: "df['new_col'] = df['col1'] / df['col2']"
+   • DO NOT include full column names repeatedly
+   • Use abbreviations where possible without losing clarity
+
 ═══════════════════════════════════════════════════════════════
 VALIDATION WORKFLOW (EXECUTE FIRST)
 ═══════════════════════════════════════════════════════════════
@@ -244,6 +250,11 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
     "expected_row_count_range": [min, max]       // optional but preferred, if you can infer a rough range
   },
 
+  "key_normalization": [
+    // If you need to harmonize keys (e.g. trimming spaces, standardizing codes),
+    // describe the transformations here.
+  ],
+
   "file_instructions": [
     {
       "file_id": "FILE-XXX",                     // whatever identifier your tools expose
@@ -286,7 +297,7 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
       "description": "What it captures",
       "transform": "lag/growth/ratio/mean/etc",
       "depends_on": ["base_col1", "base_col2"],
-      "implementation": "df['new_feature'] = ..."
+      "implementation": "df['new_feature'] = df['col1'] / df['col2']"
     }
   ],
 
@@ -340,11 +351,6 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
 
   "notes": [
     "Any important caveats, assumptions, or follow-up questions."
-  ],
-
-  "key_normalization": [
-    // If you need to harmonize keys (e.g. trimming spaces, standardizing codes),
-    // describe the transformations here.
   ]
 }
 

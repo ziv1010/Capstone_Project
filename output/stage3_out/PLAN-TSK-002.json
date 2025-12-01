@@ -1,0 +1,160 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "selected_task_id": "TSK-002",
+  "goal": "Predict crop production trends using historical area and yield data across seasons",
+  "task_category": "predictive",
+  "created_at": "2025-12-01T22:03:33.209488",
+  "created_by": "stage3_agent",
+  "artifacts": {
+    "intermediate_table": "TSK-002_data.parquet",
+    "intermediate_format": "parquet",
+    "expected_columns": [
+      "Crop",
+      "Season",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24"
+    ],
+    "expected_row_count_range": [
+      50,
+      60
+    ]
+  },
+  "key_normalization": [],
+  "file_instructions": [
+    {
+      "file_id": "FILE-001",
+      "original_name": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "alias": "crop_data",
+      "filters": [],
+      "rename_columns": {},
+      "join_keys": [
+        "Crop",
+        "Season"
+      ],
+      "keep_columns": [
+        "Crop",
+        "Season",
+        "Area-2020-21",
+        "Area-2021-22",
+        "Area-2022-23",
+        "Area-2023-24",
+        "Production-2020-21",
+        "Production-2021-22",
+        "Production-2022-23",
+        "Production-2023-24",
+        "Production-2024-25",
+        "Yield-2020-21",
+        "Yield-2021-22",
+        "Yield-2022-23",
+        "Yield-2023-24"
+      ],
+      "notes": "All columns verified ≥65% data completeness"
+    }
+  ],
+  "join_steps": [
+    {
+      "step": 1,
+      "description": "Load base table",
+      "left_table": "crop_data",
+      "right_table": null,
+      "join_type": "base",
+      "join_keys": [
+        "Crop",
+        "Season"
+      ],
+      "left_on": [],
+      "right_on": [],
+      "expected_cardinality": "base",
+      "validation": {
+        "check_duplicates_on_keys": [
+          "Crop",
+          "Season"
+        ],
+        "expected_unique": false,
+        "check_row_count_stable": true,
+        "check_no_duplicates_introduced": true,
+        "acceptable_coverage": 0.65,
+        "max_cardinality_ratio": 5.0
+      }
+    }
+  ],
+  "feature_engineering": [
+    {
+      "feature_name": "Area_rolling_avg_3yr",
+      "description": "3-year rolling average of area cultivated",
+      "transform": "rolling_mean",
+      "depends_on": [
+        "Area-2020-21",
+        "Area-2021-22",
+        "Area-2022-23",
+        "Area-2023-24"
+      ],
+      "implementation": "df['Area_rolling_avg_3yr'] = df[['Area-2020-21', 'Area-2021-22', 'Area-2022-23', 'Area-2023-24']].rolling(3).mean().iloc[:, -1]"
+    },
+    {
+      "feature_name": "Yield_yoy_change",
+      "description": "Year-over-year percentage change in yield",
+      "transform": "percentage_change",
+      "depends_on": [
+        "Yield-2020-21",
+        "Yield-2021-22",
+        "Yield-2022-23",
+        "Yield-2023-24"
+      ],
+      "implementation": "df['Yield_yoy_change'] = df[['Yield-2020-21', 'Yield-2021-22', 'Yield-2022-23', 'Yield-2023-24']].pct_change().iloc[:, -1]"
+    }
+  ],
+  "validation": {
+    "time_split": {
+      "method": "year-based",
+      "train_years": "2018-21",
+      "test_years": "2022-24",
+      "validation_years": null,
+      "leakage_check": "Ensure future years not used in training"
+    },
+    "coverage_checks": [
+      {
+        "check": "Data completeness",
+        "threshold": 0.65,
+        "description": "Verify all feature columns have ≥65% non-null values",
+        "action_if_violation": "Impute missing values using crop-specific averages"
+      }
+    ],
+    "cardinality_checks": [
+      {
+        "check": "Unique crop-season combinations",
+        "expected": "1:N",
+        "action_if_violation": "Aggregate duplicate entries by mean"
+      }
+    ],
+    "additional_checks": [
+      "Data loaded",
+      "No duplicates on join keys"
+    ]
+  },
+  "expected_model_types": [
+    "Regression",
+    "Time Series"
+  ],
+  "evaluation_metrics": [
+    "R2",
+    "MAE",
+    "RMSE"
+  ],
+  "notes": [
+    "Data validation: All columns verified ≥65% complete",
+    "Using 3-year rolling averages for area features",
+    "Year-over-year changes for yield features"
+  ]
+}

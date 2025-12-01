@@ -1,9 +1,9 @@
 
-PLOT 1: Actual vs Predicted Production (2024-25)
+PLOT 5: Seasonal Production: Actual vs Predicted (2024-25)
 ================================================================================
 
 What it shows:
-Scatter plot comparing actual production values (2024-25) against model predictions
+Bar chart comparing actual vs predicted production values across different seasons
 
 Given data (from original dataset):
 'Production-2024-25' column (actual values from the dataset)
@@ -12,6 +12,6 @@ Predicted data (from model output):
 'predicted_Production-2024-25' column (output from Linear Regression model)
 
 Key insights:
-Perfect alignment with 45-degree line (R2=1.0) indicates accurate predictions. MAE=3.18 and RMSE=4.11 suggest small average errors.
+Perfect alignment between actual and predicted values across all seasons, consistent with R2=1.0 metric. 'Total' season shows highest production volume.
 
 ================================================================================

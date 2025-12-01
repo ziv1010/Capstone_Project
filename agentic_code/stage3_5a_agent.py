@@ -618,14 +618,31 @@ def run_stage3_5a(
     print("\n" + "=" * 80)
     print(f"✅ Complete - {round_num} rounds")
     print("=" * 80)
-    
+
     # ===========================
     # POST-EXECUTION SAVE VERIFICATION
     # ===========================
     print("\n" + "=" * 80)
     print("🔍 VERIFYING SAVE...")
     print("=" * 80)
-    
+
+    # Check for looping pattern (agent repeatedly claiming completion)
+    completion_claims = 0
+    for msg in messages[-10:] if len(messages) >= 10 else messages:
+        content = getattr(msg, "content", "") or ""
+        if any(phrase in content.lower() for phrase in [
+            "successfully completed",
+            "successfully finalized",
+            "ready for implementation",
+            "proposal completed",
+            "methods are ready"
+        ]):
+            completion_claims += 1
+
+    if completion_claims >= 3:
+        print(f"⚠️  LOOP DETECTED: Agent claimed completion {completion_claims} times without actual save")
+        print("🔧 Triggering force-save mechanism...")
+
     # Check if file actually exists
     proposal_files = sorted(STAGE3_5A_OUT_DIR.glob(f"method_proposal_{plan_id}*.json"))
     

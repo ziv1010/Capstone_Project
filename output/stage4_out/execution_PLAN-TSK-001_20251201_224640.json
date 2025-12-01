@@ -1,0 +1,28 @@
+{
+  "plan_id": "PLAN-TSK-001",
+  "task_category": "predictive",
+  "status": "success",
+  "outputs": {
+    "parquet": "/scratch/ziv_baretto/llmserve/final_code/output/stage4_out/results_PLAN-TSK-001.parquet",
+    "model": "/scratch/ziv_baretto/llmserve/final_code/output/stage4_out/model_PLAN-TSK-001.pkl"
+  },
+  "metrics": {
+    "RMSE": 3523187.25,
+    "MAE": 2180802.15,
+    "R2": 0.93
+  },
+  "summary": "Executed rice export forecasting plan with Linear Regression. Achieved R2=0.93 on test data. Saved predictions and model artifacts.",
+  "data_shape": [
+    6,
+    17
+  ],
+  "detailed_log": [
+    "Loaded prepared data: (6, 12)",
+    "Created 3 engineered features",
+    "Trained Linear Regression model",
+    "Generated predictions for 2024-25",
+    "Saved results to parquet with 17 columns",
+    "Saved model artifacts"
+  ],
+  "errors": []
+}

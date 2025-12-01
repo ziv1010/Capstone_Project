@@ -1,0 +1,29 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-002.parquet",
+  "original_row_count": 60,
+  "prepared_row_count": 60,
+  "columns_created": [
+    "Area_rolling_avg_3yr",
+    "Yield_yoy_change"
+  ],
+  "transformations_applied": [
+    "Crop-specific mean imputation for all numeric columns",
+    "3-year rolling average (min_periods=1) for area",
+    "Year-over-year percentage change for yield",
+    "NaN handling in pct_change filled with 0"
+  ],
+  "data_quality_report": {
+    "nulls_before_imputation": {
+      "Area-2020-21": 11,
+      "Area-2021-22": 11,
+      "Yield-2020-21": 11,
+      "Yield-2021-22": 11
+    },
+    "imputation_strategy": "Group-based mean imputation by crop",
+    "final_nulls": 0,
+    "row_count": 60,
+    "column_count": 17
+  },
+  "created_at": "2025-12-01T22:10:14.175562"
+}

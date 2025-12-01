@@ -107,7 +107,7 @@ SECONDARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 2048,
+    "max_tokens": 4096,  # Increased to support larger JSON tool calls (e.g., Stage3Plan)
     # "model_kwargs": {
     #     "tool_choice": "auto",
     # },
@@ -124,7 +124,7 @@ STAGE1_SAMPLE_ROWS = 5000  # Number of rows to sample for profiling
 STAGE2_MAX_EXPLORATION_STEPS = 10  # Max tool calls during exploration
 
 # Stage 3: Planning
-STAGE3_MAX_ROUNDS = 15  # Max rounds for planning agent
+STAGE3_MAX_ROUNDS = 25  # Max rounds for planning agent
 
 # Stage 3B: Data Preparation
 STAGE3B_MAX_ROUNDS = 100  # Max rounds for data prep agent

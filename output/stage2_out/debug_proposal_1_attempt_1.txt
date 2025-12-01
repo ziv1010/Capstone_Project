@@ -1,0 +1,68 @@
+<think>
+Okay, let's tackle this. The user wants a proposal based on the dataset summaries and tool outputs. First, I need to look at the data files mentioned. There's the export data for rice varieties to Bangladesh, the production estimates, and the crop-wise area data.
+
+The main goal here is to create a predictive task. The export data has years from 2018-19 to 2024-25, but the production data starts from 2020-21. The user mentioned preferring INR over USD, so I should focus on the INR columns. Also, all columns need to have at least 65% non-NaN data. Checking the summaries, the export data for 2020-21 onwards has no nulls, which meets the requirement. The production data also has no nulls from 2020-21 onwards.
+
+The problem statement should mention predicting future export values based on production data. The target would be the export value in INR. The features would include production metrics like area, production quantity, and yield. The join plan would link the export data with production data on the year and crop, using 'Rice' as the crop type. Excluded columns would be the USD values and any redundant columns like HS Code or Description since they're mapped to 'Rice'.
+
+Handling missingness: Since the data from 2020-21 onwards is complete, maybe forward-fill or drop earlier years with missing data. Validation would use time-series split to avoid future leakage. Expected outputs would be a regression model's metrics and visualizations showing the relationship between production and exports.
+
+Need to make sure all columns in the required files meet the 65% completeness. The export data's 2020-21 to 2024-25 has 8 rows, which is 100% non-null for those years. The production data's columns for those years also have no nulls. So, the required files are valid. Excluding the USD columns and redundant keys is necessary for the model.
+</think>
+
+{
+  "id": "TSK-001",
+  "category": "predictive",
+  "title": "Predict Indian Rice Export Value to Bangladesh Using Domestic Production Metrics",
+  "problem_statement": "Forecast annual rice export value (INR) to Bangladesh using Indian production data for 2020-21 to 2024-25. All columns verified ≥65% data completeness with critical metrics (area, production, yield) fully populated for overlapping years. Focus on INR values per preference.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [["Year", "Crop"]],
+    "notes": "Join on financial year and 'Rice' crop type. Map all export descriptions to 'Rice' category. Use 'Total' season from production data for annual aggregation."
+  },
+  "target": {
+    "name": "Value (INR)_export",
+    "granularity": ["Year", "Crop"],
+    "horizon": "annual"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24",
+      "Yield-2024-25"
+    ],
+    "transform_ideas": [
+      "Lag production metrics by 1 year to align with export timing",
+      "Normalize yield values by regional production capacity",
+      "Create interaction terms between production volume and yield rates"
+    ],
+    "handling_missingness": "Forward-fill historical production data; drop pre-2020-21 records with >65% missingness"
+  },
+  "validation_plan": "Time-series cross-validation with 80% training (2020-21 to 2023-24) and 20% testing (2024-25). Use RMSE and R² metrics for evaluation.",
+  "quality_checks": [
+    "Verify INR/USD conversion consistency",
+    "Confirm crop type mapping accuracy",
+    "Check temporal alignment between production and export cycles"
+  ],
+  "excluded_columns": [
+    {"column_name": "HS Code", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Mapped to unified 'Rice' category"},
+    {"column_name": "Description", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Aggregated to 'Rice' for prediction"},
+    {"column_name": "Value (USD)_export", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Preference for INR metrics"}
+  ],
+  "expected_outputs": [
+    "Regression model coefficients table",
+    "Year-over-year prediction vs actual scatter plot",
+    "Feature importance ranking",
+    "RMSE and R² metrics for 2024-25 forecast"
+  ]
+}

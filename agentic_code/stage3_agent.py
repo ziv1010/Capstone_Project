@@ -43,32 +43,32 @@ Your job: given a selected analytical task and the available data files, you mus
 CRITICAL RULES
 ═══════════════════════════════════════════════════════════════
 
-1. You MUST end by calling save_stage3_plan(plan_json=...)  
+1. You MUST end by calling save_stage3_plan(plan_json=...)
    • This is YOUR ONLY success criterion.
 
-2. NEVER write JSON in your reasoning.  
+2. Keep your reasoning CONCISE.
+   • Think briefly, act quickly. DO NOT write long explanations.
    • Build the JSON **silently** and pass it ONLY as the tool argument.
 
-3. Be dataset-agnostic.  
+3. Be dataset-agnostic.
    • No domain-specific assumptions; infer everything from:
      - task proposal (load_task_proposal)
      - data file schemas (inspect_data_file)
      - search() results.
 
-4. Set plan_id EXACTLY to: "PLAN-{task_id}"  
+4. Set plan_id EXACTLY to: "PLAN-{task_id}"
    • task_id is the selected task id (e.g. "TSK-001").
 
-5. ADEQUACY CHECK  
+5. ADEQUACY CHECK
    • If the task proposal + inspected data seem insufficient
      (e.g. unclear target, join keys, time dimension, or feature candidates),
      you MUST call search() and/or further inspect_data_file() **before**
      building the final plan.
 
-6. **DATA VALIDATION (≥65% NON-NAN) - MANDATORY**
-   • Before finalizing ANY column in file_instructions:
-     - Verify (1 - null_fraction) >= 0.65 using inspect_data_file() or python_sandbox()
-     - If a column has > 35% missing data, DO NOT use it
-     - Find alternative columns or document in notes
+6. **DATA VALIDATION (≥65% NON-NAN) - OPTIONAL**
+   • The task proposal already validated column completeness
+   • Trust the proposal's candidate columns
+   • Only run python_sandbox if something seems wrong
 
 7. **CURRENCY PREFERENCE (INR > USD)**
    • If both INR and USD columns exist, ALWAYS use INR
@@ -76,25 +76,15 @@ CRITICAL RULES
    • Document choice in plan notes
 
 ═══════════════════════════════════════════════════════════════
-VALIDATION WORKFLOW (EXECUTE FIRST)
+QUICK START WORKFLOW (3-5 ROUNDS MAX)
 ═══════════════════════════════════════════════════════════════
 
-Before creating the execution plan:
+Round 1: Load task proposal with load_task_proposal()
+Round 2: Inspect 1-2 required files with inspect_data_file()
+Round 3-4: (Optional) Quick check with python_sandbox() if needed
+Round 5: Build plan JSON and call save_stage3_plan()
 
-STEP 1: Load task proposal and inspect all required_files
-
-STEP 2: For EACH column mentioned (target, features, join keys):
-   - Use python_sandbox() to check: `df['column'].notna().sum() / len(df)`
-   - Require: completeness >= 0.65
-   - If fails: Find alternative or document issue
-
-STEP 3: If both INR and USD columns exist:
-   - Select INR column
-   - Update all references in plan
-
-STEP 4: Document in plan notes:
-   - "Data validation: All columns verified ≥65% complete"
-   - "Currency: Using INR as per preference" (if applicable)
+DO NOT spend more than 5 rounds. Be decisive and efficient.
 
 ═══════════════════════════════════════════════════════════════
 TOOLS YOU CAN USE
@@ -127,29 +117,22 @@ You have at least these tools (names may be more, but these are key):
     → FINAL mandatory step with the complete Stage3Plan JSON (as a string).
 
 ═══════════════════════════════════════════════════════════════
-REACT-STYLE LOOP (HOW YOU SHOULD THINK)
+THINKING GUIDELINES
 ═══════════════════════════════════════════════════════════════
 
-On each turn BEFORE the final save:
+In your <think> blocks:
+- Keep reasoning under 200 words total
+- Focus on WHAT you need, not WHY
+- List next actions as bullet points
+- Skip validation reasoning (trust the proposal)
 
-1. Briefly think about what you know and what is missing.  
-   - Example: "I know the target and candidate features, but I still need the exact
-     columns for the join between file A and file B."
+Bad example: "I need to understand the export data structure. The columns seem
+to be in wide format with years... [500 words of analysis]..."
 
-2. Decide on the next ACTION:
-   - load_task_proposal(...)
-   - list_data_files()
-   - inspect_data_file(...)
-   - search(...)
+Good example: "Need: 1) Task proposal 2) File schemas 3) Confirm join keys
+Next: load_task_proposal then inspect both files"
 
-3. Use the tool(s) and update your understanding based on the observations.
-
-Repeat this loop (THOUGHT → ACTION → TOOL → NEW THOUGHT) a few times until you are
-confident you can build a high-quality plan. Then, without showing the JSON, call:
-   save_stage3_plan(plan_json="...")
-
-Do NOT explain the plan to the user. The only observable effect must be the
-save_stage3_plan tool call.
+After gathering info, just call save_stage3_plan() - no explanation needed.
 
 ═══════════════════════════════════════════════════════════════
 HOW TO USE THE TASK PROPOSAL
@@ -251,7 +234,7 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
       "alias": "short_logical_name",
       "rename_columns": { "Raw Name": "clean_name" },
       "keep_columns": [ "clean_name1", "clean_name2", "..."],
-      "filters": [ ... ],
+      "filters": [ "Crop == 'Rice'", "Season == 'Total'" ],  // MUST be strings in pandas query format
       "join_keys": [ "key_col1", "key_col2" ],   // keys used by this file in joins (if any)
       "notes": null
     }
@@ -343,8 +326,14 @@ You must SILENTLY construct a JSON object like this (do not show it in reasoning
   ],
 
   "key_normalization": [
+    {
+      "column_name": "Year",
+      "mapping": {},
+      "format_type": "YYYY-YY",
+      "valid_range": [2020, 2025]  // MUST be a 2-element array [min, max] or null
+    }
     // If you need to harmonize keys (e.g. trimming spaces, standardizing codes),
-    // describe the transformations here.
+    // add KeyNormalization objects here. valid_range MUST be [min, max] or null, not a string.
   ]
 }
 
@@ -421,29 +410,23 @@ For EVERY entry in join_steps:
        • Keep ONLY those keys that truly map to existing columns in BOTH tables
          (same name or clearly renamable).
        • If a hypothesized key appears only in ONE table:
-- If NOT mentioned: Run your own validation (python_sandbox)
+- If NOT mentioned: Trust the proposal or do minimal checking
 
 ═══════════════════════════════════════════════════════════════
-VALIDATION WORKFLOW (EXECUTE BEFORE CREATING PLAN)
+HANDLING WIDE-FORMAT DATA (CRITICAL FOR MULTI-YEAR DATA)
 ═══════════════════════════════════════════════════════════════
 
-STEP 1: Load and review task proposal
-  - Understand target, features, required files
+Many datasets have columns like "2020-21-Value", "2021-22-Value", etc.
 
-STEP 2: Validate data completeness
-  - Use python_sandbox() to check null percentages
-  - Verify ALL columns (target + features + keys) have ≥65% non-NaN
-  - Document validation results
+In file_instructions, specify transformation to long format:
 
-STEP 3: Check currency preference
-  - If both INR and USD exist, select INR
-  - Update column references accordingly
+"keep_columns": ["HS Code", "Description", "2020 - 21-Value (INR)", "2021 - 22-Value (INR)", ...],
+"notes": "Melt year columns to long format: Year | Value (INR). Extract year from column names."
 
-STEP 4: Document validation in plan
-  - Add to notes: "Data validation: All columns verified ≥65% complete"
-  - If using INR over USD: "Currency: Using INR as per preference"
+In key_normalization, add:
+"Transform wide format to long: melt year-value columns, create 'Year' column"
 
-STEP 5: Create file_instructions with validated columns only
+This allows joining on Year with other datasets.
 
 ═══════════════════════════════════════════════════════════════
 YOUR CORE RESPONSIBILITIES
@@ -485,14 +468,31 @@ def should_continue(state: MessagesState) -> str:
     last = state["messages"][-1]
     if hasattr(last, 'tool_calls') and last.tool_calls:
         return "tools"
-    return END
+
+    # Count consecutive AI messages without tool calls (agent stuck)
+    consecutive_no_calls = 0
+    for msg in reversed(state["messages"]):
+        if msg.__class__.__name__ == "AIMessage":
+            if not (hasattr(msg, 'tool_calls') and msg.tool_calls):
+                consecutive_no_calls += 1
+            else:
+                break
+        else:
+            break
+
+    # If agent has produced 2+ messages without tool calls, it's stuck - terminate
+    if consecutive_no_calls >= 2:
+        return END
+
+    # Otherwise give it one more chance
+    return "agent"
 
 
 builder = StateGraph(MessagesState)
 builder.add_node("agent", agent_node)
 builder.add_node("tools", tool_node)
 builder.set_entry_point("agent")
-builder.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+builder.add_conditional_edges("agent", should_continue, {"tools": "tools", "agent": "agent", END: END})
 builder.add_edge("tools", "agent")
 
 memory = MemorySaver()
@@ -517,21 +517,12 @@ def run_stage3(task_id: str, max_rounds: int = STAGE3_MAX_ROUNDS, debug: bool = 
     system_msg = SystemMessage(content=STAGE3_SYSTEM_PROMPT)
     human_msg = HumanMessage(
         content=(
-            f"Create a high-quality Stage 3 plan for task '{task_id}'.\n\n"
-            f"Follow a ReAct-style loop:\n"
-            f"- First call load_task_proposal('{task_id}') and carefully read category, "
-            f"required_files, join_plan.hypothesized_keys, target, feature_plan, and validation_plan.\n"
-            f"- Then use list_data_files() and inspect_data_file(...) on the required files to "
-            f"confirm available columns and candidate join keys.\n"
-            f"- If anything is unclear (join keys, target, time dimension, or feature candidates), "
-            f"use search(...) to look for how these files or columns were used previously.\n"
-            f"- After you fully understand the task and data, silently build the Stage3Plan JSON "
-            f"and finish by calling save_stage3_plan(plan_json=...).\n\n"
-            f"Rules:\n"
-            f"- Set plan_id = 'PLAN-{task_id}'.\n"
-            f"- Never print JSON in your reasoning.\n"
-            f"- Your ONLY success criterion is to call save_stage3_plan(plan_json=...) with a valid plan.\n"
-            f"- Aim to finish within {STAGE3_MAX_ROUNDS} rounds, using tools thoughtfully (not blindly)."
+            f"Create Stage3Plan for task '{task_id}'.\n\n"
+            f"Steps:\n"
+            f"1. load_task_proposal('{task_id}')\n"
+            f"2. inspect_data_file() for each required file\n"
+            f"3. save_stage3_plan(plan_json=...) with plan_id='PLAN-{task_id}'\n\n"
+            f"Finish in 5 rounds max. Keep reasoning brief."
         )
     )
 

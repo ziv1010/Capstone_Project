@@ -1,0 +1,76 @@
+{
+  "id": "TSK-001",
+  "category": "predictive",
+  "title": "Predict Indian Rice Export Value to Bangladesh Using Domestic Production Metrics",
+  "problem_statement": "Forecast annual rice export value (INR) to Bangladesh using Indian production data for 2020-21 to 2024-25. All columns verified \u226565% data completeness with critical metrics (area, production, yield) fully populated for overlapping years. Focus on INR values per preference.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Year",
+        "Crop"
+      ]
+    ],
+    "notes": "Join on financial year and 'Rice' crop type. Map all export descriptions to 'Rice' category. Use 'Total' season from production data for annual aggregation."
+  },
+  "target": {
+    "name": "Value (INR)_export",
+    "granularity": [
+      "Year",
+      "Crop"
+    ],
+    "horizon": "annual"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24",
+      "Yield-2024-25"
+    ],
+    "transform_ideas": [
+      "Lag production metrics by 1 year to align with export timing",
+      "Normalize yield values by regional production capacity",
+      "Create interaction terms between production volume and yield rates"
+    ],
+    "handling_missingness": "Forward-fill historical production data; drop pre-2020-21 records with >65% missingness"
+  },
+  "validation_plan": "Time-series cross-validation with 80% training (2020-21 to 2023-24) and 20% testing (2024-25). Use RMSE and R\u00b2 metrics for evaluation.",
+  "quality_checks": [
+    "Verify INR/USD conversion consistency",
+    "Confirm crop type mapping accuracy",
+    "Check temporal alignment between production and export cycles"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "HS Code",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Mapped to unified 'Rice' category"
+    },
+    {
+      "column_name": "Description",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Aggregated to 'Rice' for prediction"
+    },
+    {
+      "column_name": "Value (USD)_export",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Preference for INR metrics"
+    }
+  ],
+  "expected_outputs": [
+    "Regression model coefficients table",
+    "Year-over-year prediction vs actual scatter plot",
+    "Feature importance ranking",
+    "RMSE and R\u00b2 metrics for 2024-25 forecast"
+  ]
+}

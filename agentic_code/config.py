@@ -107,7 +107,7 @@ SECONDARY_LLM_CONFIG = {
     "base_url": "http://127.0.0.1:8001/v1",
     "api_key": "EMPTY",
     "temperature": 0.0,
-    "max_tokens": 2048,
+    "max_tokens": 4096,  # Increased to prevent truncation during planning
     # "model_kwargs": {
     #     "tool_choice": "auto",
     # },

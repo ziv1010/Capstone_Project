@@ -3,29 +3,28 @@
     {
       "id": "TSK-001",
       "category": "predictive",
-      "title": "Predict Total Rice Exports to Bangladesh Using Production Metrics",
-      "problem_statement": "Predict annual rice export quantities to Bangladesh using Indian production data (area, yield, and total production) for Rice. All columns verified \u226565% data completeness for 2020-21 to 2024-25, with critical features (Production-2020-21 to Production-2024-25) having 100% non-null values. Export quantity targets for 2020-21 and 2021-22 meet completeness requirements.",
+      "title": "Predict Indian Rice Export Value to Bangladesh Using Domestic Production Metrics",
+      "problem_statement": "Forecast annual rice export value (INR) to Bangladesh using Indian production data for 2020-21 to 2024-25. All columns verified \u226565% data completeness with critical metrics (area, production, yield) fully populated for overlapping years. Focus on INR values per preference.",
       "required_files": [
-        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
         "hypothesized_keys": [
           [
-            "Year"
+            "Year",
+            "Crop"
           ]
         ],
-        "notes": "Join on implicit year alignment between production data (2020-21 to 2024-25) and export data (2020-21 to 2024-25). Aggregate rice varieties in export data to match crop-level production data."
+        "notes": "Join on financial year and 'Rice' crop type. Map all export descriptions to 'Rice' category. Use 'Total' season from production data for annual aggregation."
       },
       "target": {
-        "name": "Total_Export_Quantity",
+        "name": "Value (INR)_export",
         "granularity": [
-          "2020 - 21-Quantity",
-          "2021 - 22-Quantity",
-          "2022 - 23-Quantity",
-          "2024 - 25-Quantity"
+          "Year",
+          "Crop"
         ],
-        "horizon": "Annual"
+        "horizon": "annual"
       },
       "feature_plan": {
         "candidates": [
@@ -41,160 +40,182 @@
           "Yield-2024-25"
         ],
         "transform_ideas": [
-          "Normalize production/yield values by area",
-          "Create year-over-year change features",
-          "Aggregate rice variety exports to total quantity per year"
+          "Lag production metrics by 1 year to align with export timing",
+          "Normalize yield values by regional production capacity",
+          "Create interaction terms between production volume and yield rates"
         ],
-        "handling_missingness": "Drop 2023-24 export data (62.5% null) and impute missing 2022-23 values using forward-fill"
+        "handling_missingness": "Forward-fill historical production data; drop pre-2020-21 records with >65% missingness"
       },
-      "validation_plan": "Time-based split: Train on 2020-21 to 2022-23, validate on 2024-25. Use R\u00b2 and MAE metrics for regression evaluation.",
+      "validation_plan": "Time-series cross-validation with 80% training (2020-21 to 2023-24) and 20% testing (2024-25). Use RMSE and R\u00b2 metrics for evaluation.",
       "quality_checks": [
-        "Verify \u226565% non-null values in all features/targets",
-        "Confirm INR currency preference for monetary features"
+        "Verify INR/USD conversion consistency",
+        "Confirm crop type mapping accuracy",
+        "Check temporal alignment between production and export cycles"
       ],
       "excluded_columns": [
         {
-          "column_name": "2023 - 24-Quantity",
+          "column_name": "HS Code",
           "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "reason": "62.5% null values below 65% threshold"
+          "reason": "Mapped to unified 'Rice' category"
         },
         {
-          "column_name": "Value (USD)",
+          "column_name": "Description",
           "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "reason": "Currency preference for INR"
+          "reason": "Aggregated to 'Rice' for prediction"
+        },
+        {
+          "column_name": "Value (USD)_export",
+          "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "reason": "Preference for INR metrics"
         }
       ],
       "expected_outputs": [
-        "Regression model predicting export quantity from production metrics",
-        "Correlation matrix between production features and exports",
-        "Time series plot of actual vs predicted exports"
+        "Regression model coefficients table",
+        "Year-over-year prediction vs actual scatter plot",
+        "Feature importance ranking",
+        "RMSE and R\u00b2 metrics for 2024-25 forecast"
       ]
     },
     {
       "id": "TSK-002",
-      "category": "predictive",
-      "title": "Forecast Regional Rice Production Using Area and Yield Trends",
-      "problem_statement": "Predict annual rice production across Indian agricultural seasons (Kharif/Rabi) using cultivated area and yield trends. All columns verified \u226565% data completeness for 2020-21 to 2024-25, with critical features (Area, Yield) having 100% completeness in recent years.",
+      "category": "descriptive",
+      "title": "Characterize Rice Export Composition and Correlation with Domestic Production Metrics",
+      "problem_statement": "Analyze the distribution of rice varieties exported to Bangladesh and their relationship with national production metrics. All columns verified \u226565% data completeness by filtering to 2018-19 to 2022-23 (export data) and 2020-21 to 2024-25 (production data) where completeness exceeds 75%.",
       "required_files": [
-        "All-India-profile_-Crop-wise-Area.csv",
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
         "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
         "hypothesized_keys": [
           [
-            "Crop",
-            "Season"
+            "Year"
           ]
         ],
-        "notes": "Join on Crop and Season columns, aligning area data (2015-16 to 2024-25) with production/yield data (2020-21 to 2024-25). Filter to overlapping years (2020-21+) for complete data."
+        "notes": "Join on financial year (2018-19 to 2022-23) where both datasets have \u226575% non-null values. Map 'Rice' in production data to all 'Description' entries in export data."
       },
       "target": {
-        "name": "Production-2024-25",
+        "name": "Description",
         "granularity": [
-          "Crop",
-          "Season"
+          "HS Code",
+          "Description"
         ],
-        "horizon": "annual"
+        "horizon": null
       },
       "feature_plan": {
         "candidates": [
-          "Area-2024-25",
-          "Yield-2023-24",
-          "Area-2023-24",
-          "Yield-2022-23"
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23"
         ],
         "transform_ideas": [
-          "Lagged yield as feature",
-          "Area growth rate calculation",
-          "Seasonal interaction terms"
+          "Normalize export quantities by total annual rice production",
+          "Calculate year-over-year growth rates for exports and production"
         ],
-        "handling_missingness": "Exclude pre-2020-21 records where target has >35% nulls"
+        "handling_missingness": "Drop rows with missing values in joined year columns (\u226425% missingness)"
       },
-      "validation_plan": "Time-series cross-validation using rolling window (2020-21 to 2024-25), holding out most recent year for final evaluation",
+      "validation_plan": "Cross-validate export quantity trends against production totals using Pearson correlation (r \u2265 0.6 expected for basmati/broken rice)",
       "quality_checks": [
-        "Verify \u226565% non-null in all feature columns",
-        "Confirm no multicollinearity between area and yield features"
+        "Verify \u226565% non-null values in all joined columns",
+        "Confirm production data 'Total' season aligns with export data calendar years"
       ],
       "excluded_columns": [
         {
-          "column_name": "Area-2015-16",
-          "file": "All-India-profile_-Crop-wise-Area.csv",
-          "reason": "Exceeds 35% null threshold"
+          "column_name": "2023 - 24-Quantity",
+          "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "reason": "62.5% missingness"
         },
         {
-          "column_name": "Production-2020-21",
+          "column_name": "Yield-2024-25",
           "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-          "reason": "Low uniqueness (0.816) suggests data redundancy"
+          "reason": "Not required for composition analysis"
         }
       ],
       "expected_outputs": [
-        "Production forecast model (Random Forest/Ridge Regression)",
-        "Feature importance plot",
-        "Seasonal production trend visualization"
+        "Top 5 rice variety export profiles by volume/value (2018-2022)",
+        "Heatmap of export quantity vs. production correlation by year",
+        "Stacked bar chart of rice type composition over time"
       ]
     },
     {
       "id": "TSK-003",
-      "category": "predictive",
-      "title": "Forecast Future Crop-Specific Cultivated Area Using Historical Trends",
-      "problem_statement": "Predict annual cultivated area for major crops across seasons using 10-year historical trends. All columns verified \u226565% data completeness with 2015-25 time series coverage. Focus on Kharif/Rabi season patterns and crop-specific area dynamics.",
+      "category": "unsupervised",
+      "title": "Unsupervised Segmentation of Rice Export Varieties Using Domestic Production and Export Performance Metrics",
+      "problem_statement": "Identify latent clusters of rice export varieties based on their export quantity/value trajectories and corresponding domestic production metrics. All columns verified \u226565% data completeness",
       "required_files": [
-        "All-India-profile_-Crop-wise-Area.csv"
+        "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
         "hypothesized_keys": [
           [
-            "Crop",
-            "Season"
+            "Year",
+            "Crop"
           ]
         ],
-        "notes": "No external joins required - all temporal features exist within single dataset"
+        "notes": "Join filtered export data (2020-25) with production data on Year and mapped 'Rice' crop, using Total season production metrics"
       },
       "target": {
-        "name": "Area-2025-26",
-        "granularity": [
-          "Crop",
-          "Season"
-        ],
-        "horizon": "1-year-ahead forecast"
+        "name": null,
+        "granularity": null,
+        "horizon": null
       },
       "feature_plan": {
         "candidates": [
-          "Area-2015-16",
-          "Area-2016-17",
-          "Area-2017-18",
-          "Area-2018-19",
-          "Area-2019-20",
-          "Area-2020-21",
-          "Area-2021-22",
-          "Area-2022-23",
-          "Area-2023-24",
-          "Area-2024-25"
+          "2020 - 21-Value (INR)",
+          "2021 - 22-Value (INR)",
+          "2022 - 23-Value (INR)",
+          "2023 - 24-Value (INR)",
+          "2024 - 25-Value (INR)",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25"
         ],
         "transform_ideas": [
-          "Year-over-year percentage change",
-          "5-year moving averages",
-          "Seasonal decomposition components"
+          "Normalize time-series values by domestic production",
+          "Calculate year-over-year growth rates",
+          "Create export-value-to-production ratios"
         ],
-        "handling_missingness": "Forward-fill with crop-season specific means for <5% missing values"
+        "handling_missingness": "Drop rows with missing values in core time-series columns (\u226412.5% missing in 2018-19 data)"
       },
-      "validation_plan": "Time-series cross-validation with 3-year rolling windows (2015-22 train, 2023-25 test)",
+      "validation_plan": "Evaluate clustering stability using silhouette scores and domain-validated cluster interpretations",
       "quality_checks": [
-        "Stationarity tests (ADF)",
-        "Seasonal decomposition analysis",
-        "Crop-season group completeness check"
+        "Verify \u226565% completeness in all feature columns post-join",
+        "Check multicollinearity between production and export metrics"
       ],
       "excluded_columns": [
         {
-          "column_name": "Area-2015-16",
-          "file": "All-India-profile_-Crop-wise-Area.csv",
-          "reason": "Used as baseline feature rather than predictive target"
+          "column_name": "HS Code",
+          "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "reason": "Non-numeric identifier"
+        },
+        {
+          "column_name": "Description",
+          "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "reason": "Categorical text not needed for clustering"
+        },
+        {
+          "column_name": "Value (USD)",
+          "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "reason": "Preference for INR metrics"
+        },
+        {
+          "column_name": "Yield-*",
+          "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "reason": "Lower relevance to export value analysis"
         }
       ],
       "expected_outputs": [
-        "Crop-season area forecast table",
-        "Time series decomposition plots",
-        "RMSE/MASE error metrics"
+        "Cluster assignments with rice variety groupings",
+        "Feature importance rankings for clustering",
+        "Parallel coordinate plots showing cluster characteristics",
+        "Silhouette score validation metrics"
       ]
     }
   ]

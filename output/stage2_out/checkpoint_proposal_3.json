@@ -1,0 +1,77 @@
+{
+  "id": "TSK-003",
+  "category": "unsupervised",
+  "title": "Unsupervised Segmentation of Rice Export Varieties Using Domestic Production and Export Performance Metrics",
+  "problem_statement": "Identify latent clusters of rice export varieties based on their export quantity/value trajectories and corresponding domestic production metrics. All columns verified \u226565% data completeness",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Year",
+        "Crop"
+      ]
+    ],
+    "notes": "Join filtered export data (2020-25) with production data on Year and mapped 'Rice' crop, using Total season production metrics"
+  },
+  "target": {
+    "name": null,
+    "granularity": null,
+    "horizon": null
+  },
+  "feature_plan": {
+    "candidates": [
+      "2020 - 21-Value (INR)",
+      "2021 - 22-Value (INR)",
+      "2022 - 23-Value (INR)",
+      "2023 - 24-Value (INR)",
+      "2024 - 25-Value (INR)",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25"
+    ],
+    "transform_ideas": [
+      "Normalize time-series values by domestic production",
+      "Calculate year-over-year growth rates",
+      "Create export-value-to-production ratios"
+    ],
+    "handling_missingness": "Drop rows with missing values in core time-series columns (\u226412.5% missing in 2018-19 data)"
+  },
+  "validation_plan": "Evaluate clustering stability using silhouette scores and domain-validated cluster interpretations",
+  "quality_checks": [
+    "Verify \u226565% completeness in all feature columns post-join",
+    "Check multicollinearity between production and export metrics"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "HS Code",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Non-numeric identifier"
+    },
+    {
+      "column_name": "Description",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Categorical text not needed for clustering"
+    },
+    {
+      "column_name": "Value (USD)",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Preference for INR metrics"
+    },
+    {
+      "column_name": "Yield-*",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Lower relevance to export value analysis"
+    }
+  ],
+  "expected_outputs": [
+    "Cluster assignments with rice variety groupings",
+    "Feature importance rankings for clustering",
+    "Parallel coordinate plots showing cluster characteristics",
+    "Silhouette score validation metrics"
+  ]
+}

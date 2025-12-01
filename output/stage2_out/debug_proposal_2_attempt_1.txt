@@ -1,0 +1,74 @@
+<think>
+Okay, let's tackle this proposal. The user wants a second task that's different from the first one, which was predictive about export value using production metrics. Now, I need to focus on a different aspect.
+
+Looking at the datasets, there's export data with various rice types and production data. The second proposal could be about understanding the relationship between different rice types and their export performance. Maybe a descriptive analysis to identify which rice varieties are most exported and how they correlate with production metrics.
+
+First, check the datasets. The export file has HS Code, Description, and yearly data. The production file has Crop, Season, and yearly area, production, yield. Since the first proposal used production metrics for prediction, this one can be descriptive, analyzing the composition of exports.
+
+The target here isn't a predictive target but rather to describe the distribution. So category is descriptive. The problem statement should mention using the export data to analyze rice varieties and their relation to production. All columns need to have ≥65% non-NaN. The export data has 8 rows, but some columns have up to 62.5% nulls. Wait, the 2023-24 and 2024-25 columns have higher null fractions. But the user requires ≥65% non-NaN. Let me check the summary again.
+
+In the export summary, columns like 2023-24 have 62.5% nulls, which is 37.5% non-null. That's below 65%. So those columns can't be used. But the problem statement says to use columns with ≥65% data. So maybe exclude those years. The overlapping years between export and production are 2020-21 to 2024-25, but some years in export have higher nulls. Wait, the 2020-21 columns have 0% nulls, 2021-22 also 0%, 2022-23 has 25% nulls (so 75% non-null), 2023-24 has 62.5% nulls (37.5% non-null), which is below 65%. So maybe only use up to 2022-23. But the user wants the problem statement to state that all columns are verified ≥65% complete. So need to select columns that meet that.
+
+Looking at the export data columns:
+
+- 2018-19: 87.5% non-null (since null fraction is 0.125)
+- 2019-20: same as above
+- 2020-21: 100% non-null
+- 2021-22: 100% non-null
+- 2022-23: 75% non-null
+- 2023-24: 37.5% (excluded)
+- 2024-25: 75% non-null (since null fraction is 0.25)
+
+So if we include up to 2022-23 and 2024-25, those have 75% non-null. But 75% is above 65%, so acceptable. The 2023-24 is excluded. So the required files would be the export data, and the production data for Rice. The join plan would be on the years where data is available. The target is to describe the export composition, so the target could be the 'Description' column, analyzing which rice types are most exported. The features would be the quantities and values from the export data, and the production metrics from the production data. Need to handle missingness by dropping rows with missing values in the selected columns. The validation plan would involve checking data completeness and cross-referencing with production data. Excluded columns would be the ones with high nulls like 2023-24 and 2024-25? Wait, 2024-25 has 25% nulls, which is 75% non-null, so acceptable. So maybe include all years except 2023-24. The quality checks would ensure data completeness and consistency between datasets. The expected outputs would be tables showing top rice varieties, plots of export trends, and correlation matrices.
+</think>
+
+{
+  "id": "TSK-002",
+  "category": "descriptive",
+  "title": "Characterize Rice Export Composition and Correlation with Domestic Production Metrics",
+  "problem_statement": "Analyze the distribution of rice varieties exported to Bangladesh and their relationship with national production metrics. All columns verified ≥65% data completeness by filtering to 2018-19 to 2022-23 (export data) and 2020-21 to 2024-25 (production data) where completeness exceeds 75%.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [["Year"]],
+    "notes": "Join on financial year (2018-19 to 2022-23) where both datasets have ≥75% non-null values. Map 'Rice' in production data to all 'Description' entries in export data."
+  },
+  "target": {
+    "name": "Description",
+    "granularity": ["HS Code", "Description"],
+    "horizon": null
+  },
+  "feature_plan": {
+    "candidates": [
+      "2018 - 19-Quantity",
+      "2019 - 20-Quantity",
+      "2020 - 21-Quantity",
+      "2021 - 22-Quantity",
+      "2022 - 23-Quantity",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23"
+    ],
+    "transform_ideas": [
+      "Normalize export quantities by total annual rice production",
+      "Calculate year-over-year growth rates for exports and production"
+    ],
+    "handling_missingness": "Drop rows with missing values in joined year columns (≤25% missingness)"
+  },
+  "validation_plan": "Cross-validate export quantity trends against production totals using Pearson correlation (r ≥ 0.6 expected for basmati/broken rice)",
+  "quality_checks": [
+    "Verify ≥65% non-null values in all joined columns",
+    "Confirm production data 'Total' season aligns with export data calendar years"
+  ],
+  "excluded_columns": [
+    {"column_name": "2023 - 24-Quantity", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "62.5% missingness"},
+    {"column_name": "Yield-2024-25", "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv", "reason": "Not required for composition analysis"}
+  ],
+  "expected_outputs": [
+    "Top 5 rice variety export profiles by volume/value (2018-2022)",
+    "Heatmap of export quantity vs. production correlation by year",
+    "Stacked bar chart of rice type composition over time"
+  ]
+}

@@ -508,7 +508,19 @@ def inspect_data_file(filename: str, n_rows: int = 10) -> str:
 
 @tool
 def python_sandbox_stage3(code: str) -> str:
-    """Execute Python code for data exploration in Stage 3."""
+    """Execute Python code for data exploration in Stage 3.
+
+    Available globals:
+    - pd: pandas module
+    - json: json module
+    - Path: pathlib.Path
+    - DATA_DIR: Path to data directory
+    - load_dataframe(filename, n_rows=None): Helper to load CSV files from DATA_DIR
+
+    To load data files, use one of:
+    - df = load_dataframe('filename.csv')  # Recommended
+    - df = pd.read_csv(DATA_DIR / 'filename.csv')
+    """
     def load_dataframe_helper(filename: str, n_rows: Optional[int] = None):
         return load_dataframe(filename, nrows=n_rows, base_dir=DATA_DIR)
     
@@ -534,28 +546,50 @@ def python_sandbox_stage3(code: str) -> str:
 @tool
 def save_stage3_plan(plan_json: str) -> str:
     """Validate and save a Stage3Plan.
-    
+
     Args:
         plan_json: Complete JSON string of Stage3Plan
-        
+
     Returns:
         Success message with path, or raises ValueError
     """
     # Parse JSON (with a light sanitization pass for invalid escapes)
     invalid_escape = re.compile(r'\\([^"\\/bfnrtu])')
     sanitized_payload = invalid_escape.sub(r"\1", plan_json)
+
+    # Try to fix common LLM JSON errors (extra braces, trailing commas, etc.)
+    # Attempt 1: Parse as-is
+    raw_obj = None
     try:
         raw_obj = json.loads(sanitized_payload)
     except json.JSONDecodeError as e:
-        debug_path = STAGE3_OUT_DIR / "failed_stage3_plan.json"
-        debug_path.write_text(plan_json)
-        start = max(e.pos - 40, 0)
-        end = min(e.pos + 40, len(plan_json))
-        snippet = plan_json[start:end]
-        raise ValueError(
-            f"Invalid JSON: {e}. Saved raw payload to {debug_path}. "
-            f"Context: {snippet}"
-        ) from e
+        # Attempt 2: Try to strip trailing garbage after the main JSON object
+        # Find the position of the first complete JSON object
+        depth = 0
+        for i, char in enumerate(sanitized_payload):
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    # Found the end of the first complete object
+                    try:
+                        raw_obj = json.loads(sanitized_payload[:i+1])
+                        break
+                    except json.JSONDecodeError:
+                        continue
+
+        # If still no valid JSON, save debug file and raise
+        if raw_obj is None:
+            debug_path = STAGE3_OUT_DIR / "failed_stage3_plan.json"
+            debug_path.write_text(plan_json)
+            start = max(e.pos - 40, 0)
+            end = min(e.pos + 40, len(plan_json))
+            snippet = plan_json[start:end]
+            raise ValueError(
+                f"Invalid JSON: {e}. Saved raw payload to {debug_path}. "
+                f"Context: {snippet}"
+            ) from e
 
     # Schema validation
     try:
@@ -601,11 +635,21 @@ def save_stage3_plan(plan_json: str) -> str:
             if js.join_keys:
                 missing_left = [k for k in js.join_keys if k not in df_left.columns]
                 if missing_left:
+                    # Check if this is expected due to wide-format transformation
+                    fi_left = next((f for f in plan.file_instructions if f.alias == js.left_table), None)
+                    if fi_left and fi_left.notes and ('melt' in fi_left.notes.lower() or 'wide' in fi_left.notes.lower()):
+                        # Transformation expected - skip validation
+                        continue
                     raise ValueError(f"Join {idx}: keys {missing_left} missing in {js.left_table}")
                 
                 if df_right is not None:
                     missing_right = [k for k in js.join_keys if k not in df_right.columns]
                     if missing_right:
+                        # Check if this is expected due to wide-format transformation
+                        fi_right = next((f for f in plan.file_instructions if f.alias == js.right_table), None)
+                        if fi_right and fi_right.notes and ('melt' in fi_right.notes.lower() or 'wide' in fi_right.notes.lower()):
+                            # Transformation expected - skip validation
+                            continue
                         raise ValueError(f"Join {idx}: keys {missing_right} missing in {js.right_table}")
 
             # Case 2: Different keys with left_on/right_on

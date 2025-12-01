@@ -1,0 +1,65 @@
+{
+  "id": "TSK-002",
+  "category": "descriptive",
+  "title": "Characterize Rice Export Composition and Correlation with Domestic Production Metrics",
+  "problem_statement": "Analyze the distribution of rice varieties exported to Bangladesh and their relationship with national production metrics. All columns verified \u226565% data completeness by filtering to 2018-19 to 2022-23 (export data) and 2020-21 to 2024-25 (production data) where completeness exceeds 75%.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Year"
+      ]
+    ],
+    "notes": "Join on financial year (2018-19 to 2022-23) where both datasets have \u226575% non-null values. Map 'Rice' in production data to all 'Description' entries in export data."
+  },
+  "target": {
+    "name": "Description",
+    "granularity": [
+      "HS Code",
+      "Description"
+    ],
+    "horizon": null
+  },
+  "feature_plan": {
+    "candidates": [
+      "2018 - 19-Quantity",
+      "2019 - 20-Quantity",
+      "2020 - 21-Quantity",
+      "2021 - 22-Quantity",
+      "2022 - 23-Quantity",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23"
+    ],
+    "transform_ideas": [
+      "Normalize export quantities by total annual rice production",
+      "Calculate year-over-year growth rates for exports and production"
+    ],
+    "handling_missingness": "Drop rows with missing values in joined year columns (\u226425% missingness)"
+  },
+  "validation_plan": "Cross-validate export quantity trends against production totals using Pearson correlation (r \u2265 0.6 expected for basmati/broken rice)",
+  "quality_checks": [
+    "Verify \u226565% non-null values in all joined columns",
+    "Confirm production data 'Total' season aligns with export data calendar years"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "2023 - 24-Quantity",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "62.5% missingness"
+    },
+    {
+      "column_name": "Yield-2024-25",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Not required for composition analysis"
+    }
+  ],
+  "expected_outputs": [
+    "Top 5 rice variety export profiles by volume/value (2018-2022)",
+    "Heatmap of export quantity vs. production correlation by year",
+    "Stacked bar chart of rice type composition over time"
+  ]
+}

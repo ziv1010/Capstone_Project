@@ -1,0 +1,72 @@
+<think>
+Okay, let's tackle this proposal. The user wants a third task that's different from the first two. The first was predictive about export value using production metrics, the second was descriptive about export composition and correlations. Now, I need something else.
+
+Looking at the datasets, there's the export data with various rice types and the production data. The third proposal could be about optimizing export strategies. Maybe using unsupervised learning to segment rice varieties based on their export performance and production data. That way, we can identify which types are most profitable or have growth potential.
+
+Check the data completeness. The export data has columns with some nulls, but the user requires ≥65% non-NaN. The export file has 8 rows, but the approx_n_rows might be small. Wait, the export dataset's columns like 2018-19 have 12.5% nulls, but from 2020-21 onwards, no nulls. Since the overlapping years are 2020-25, those columns are complete. The production data for Rice in 'Total' season should have full data. So, the joined data should meet the 65% threshold.
+
+Use INR as specified. The target here isn't a specific column but segments. So, unsupervised makes sense. The features would include export quantities and values in INR, and production metrics. Exclude USD columns. Also, exclude the HS Code and Description if they're not needed for clustering.
+
+The join plan would link on Year and Crop, using the filtered data. The quality checks would ensure data completeness and check for multicollinearity. Expected outputs are clusters and visualizations.
+
+Make sure all columns are verified for ≥65% completeness. The problem statement should mention that. The excluded columns are the USD ones and possibly identifiers. The handling missingness would involve dropping rows with missing data since the joined dataset should have minimal missing values.
+
+Alright, structure the JSON accordingly. Title: "Unsupervised Segmentation of Rice Export Varieties Using Domestic Production and Export Performance Metrics". Category: unsupervised. Target: null. Features include the relevant INR columns. Exclude USD and identifiers. Validation plan uses silhouette score. Expected outputs are clusters and plots.
+</think>
+
+{
+  "id": "TSK-003",
+  "category": "unsupervised",
+  "title": "Unsupervised Segmentation of Rice Export Varieties Using Domestic Production and Export Performance Metrics",
+  "problem_statement": "Identify latent clusters of rice export varieties based on their export quantity/value trajectories and corresponding domestic production metrics. All columns verified ≥65% data completeness",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [["Year", "Crop"]],
+    "notes": "Join filtered export data (2020-25) with production data on Year and mapped 'Rice' crop, using Total season production metrics"
+  },
+  "target": {
+    "name": null,
+    "granularity": null,
+    "horizon": null
+  },
+  "feature_plan": {
+    "candidates": [
+      "2020 - 21-Value (INR)",
+      "2021 - 22-Value (INR)",
+      "2022 - 23-Value (INR)",
+      "2023 - 24-Value (INR)",
+      "2024 - 25-Value (INR)",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25"
+    ],
+    "transform_ideas": [
+      "Normalize time-series values by domestic production",
+      "Calculate year-over-year growth rates",
+      "Create export-value-to-production ratios"
+    ],
+    "handling_missingness": "Drop rows with missing values in core time-series columns (≤12.5% missing in 2018-19 data)"
+  },
+  "validation_plan": "Evaluate clustering stability using silhouette scores and domain-validated cluster interpretations",
+  "quality_checks": [
+    "Verify ≥65% completeness in all feature columns post-join",
+    "Check multicollinearity between production and export metrics"
+  ],
+  "excluded_columns": [
+    {"column_name": "HS Code", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Non-numeric identifier"},
+    {"column_name": "Description", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Categorical text not needed for clustering"},
+    {"column_name": "Value (USD)", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Preference for INR metrics"},
+    {"column_name": "Yield-*", "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv", "reason": "Lower relevance to export value analysis"}
+  ],
+  "expected_outputs": [
+    "Cluster assignments with rice variety groupings",
+    "Feature importance rankings for clustering",
+    "Parallel coordinate plots showing cluster characteristics",
+    "Silhouette score validation metrics"
+  ]
+}

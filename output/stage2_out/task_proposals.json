@@ -3,76 +3,90 @@
     {
       "id": "TSK-001",
       "category": "predictive",
-      "title": "Forecast Rice Export Quantities and Values",
-      "problem_statement": "Predict future rice export quantities and values based on historical data. All columns verified \u226565% data completeness.",
+      "title": "Predict Total Rice Exports to Bangladesh Using Production Metrics",
+      "problem_statement": "Predict annual rice export quantities to Bangladesh using Indian production data (area, yield, and total production) for Rice. All columns verified \u226565% data completeness for 2020-21 to 2024-25, with critical features (Production-2020-21 to Production-2024-25) having 100% non-null values. Export quantity targets for 2020-21 and 2021-22 meet completeness requirements.",
       "required_files": [
+        "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
         "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [],
-        "notes": "Single dataset, no join required."
+        "hypothesized_keys": [
+          [
+            "Year"
+          ]
+        ],
+        "notes": "Join on implicit year alignment between production data (2020-21 to 2024-25) and export data (2020-21 to 2024-25). Aggregate rice varieties in export data to match crop-level production data."
       },
       "target": {
-        "name": "2024 - 25-Quantity",
+        "name": "Total_Export_Quantity",
         "granularity": [
-          "HS Code",
-          "Description"
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2024 - 25-Quantity"
         ],
-        "horizon": "1-year ahead"
+        "horizon": "Annual"
       },
       "feature_plan": {
         "candidates": [
-          "2018 - 19-Quantity",
-          "2018 - 19-Value (INR)",
-          "2019 - 20-Quantity",
-          "2019 - 20-Value (INR)",
-          "2020 - 21-Quantity",
-          "2020 - 21-Value (INR)",
-          "2021 - 22-Quantity",
-          "2021 - 22-Value (INR)",
-          "2022 - 23-Quantity",
-          "2022 - 23-Value (INR)"
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
         ],
         "transform_ideas": [
-          "lagged features",
-          "growth rates"
+          "Normalize production/yield values by area",
+          "Create year-over-year change features",
+          "Aggregate rice variety exports to total quantity per year"
         ],
-        "handling_missingness": "Impute missing values using mean or median."
+        "handling_missingness": "Drop 2023-24 export data (62.5% null) and impute missing 2022-23 values using forward-fill"
       },
-      "validation_plan": "Split data into training and test sets based on time. Evaluate using RMSE and MAE.",
+      "validation_plan": "Time-based split: Train on 2020-21 to 2022-23, validate on 2024-25. Use R\u00b2 and MAE metrics for regression evaluation.",
       "quality_checks": [
-        "Verify no missing values in key columns.",
-        "Ensure no data leakage by using time-based splits."
+        "Verify \u226565% non-null values in all features/targets",
+        "Confirm INR currency preference for monetary features"
       ],
       "excluded_columns": [
         {
           "column_name": "2023 - 24-Quantity",
           "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "reason": "Only 37.5% non-NaN data, below 65% threshold."
+          "reason": "62.5% null values below 65% threshold"
         },
         {
-          "column_name": "2023 - 24-Value (INR)",
+          "column_name": "Value (USD)",
           "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "reason": "Only 37.5% non-NaN data, below 65% threshold."
+          "reason": "Currency preference for INR"
         }
       ],
       "expected_outputs": [
-        "tables",
-        "plots",
-        "model_metrics"
+        "Regression model predicting export quantity from production metrics",
+        "Correlation matrix between production features and exports",
+        "Time series plot of actual vs predicted exports"
       ]
     },
     {
       "id": "TSK-002",
       "category": "predictive",
-      "title": "Forecast Food Grain Production and Yield",
-      "problem_statement": "Predict future food grain production and yield based on historical data. All columns verified \u226565% data completeness.",
+      "title": "Forecast Regional Rice Production Using Area and Yield Trends",
+      "problem_statement": "Predict annual rice production across Indian agricultural seasons (Kharif/Rabi) using cultivated area and yield trends. All columns verified \u226565% data completeness for 2020-21 to 2024-25, with critical features (Area, Yield) having 100% completeness in recent years.",
       "required_files": [
+        "All-India-profile_-Crop-wise-Area.csv",
         "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [],
-        "notes": "Single dataset, no join required."
+        "hypothesized_keys": [
+          [
+            "Crop",
+            "Season"
+          ]
+        ],
+        "notes": "Join on Crop and Season columns, aligning area data (2015-16 to 2024-25) with production/yield data (2020-21 to 2024-25). Filter to overlapping years (2020-21+) for complete data."
       },
       "target": {
         "name": "Production-2024-25",
@@ -80,60 +94,69 @@
           "Crop",
           "Season"
         ],
-        "horizon": "1-year ahead"
+        "horizon": "annual"
       },
       "feature_plan": {
         "candidates": [
-          "Area-2020-21",
-          "Area-2021-22",
-          "Area-2022-23",
+          "Area-2024-25",
+          "Yield-2023-24",
           "Area-2023-24",
-          "Production-2020-21",
-          "Production-2021-22",
-          "Production-2022-23",
-          "Production-2023-24",
-          "Yield-2020-21",
-          "Yield-2021-22",
-          "Yield-2022-23",
-          "Yield-2023-24"
+          "Yield-2022-23"
         ],
         "transform_ideas": [
-          "lagged features",
-          "growth rates"
+          "Lagged yield as feature",
+          "Area growth rate calculation",
+          "Seasonal interaction terms"
         ],
-        "handling_missingness": "Impute missing values using mean or median."
+        "handling_missingness": "Exclude pre-2020-21 records where target has >35% nulls"
       },
-      "validation_plan": "Split data into training and test sets based on time. Evaluate using RMSE and MAE.",
+      "validation_plan": "Time-series cross-validation using rolling window (2020-21 to 2024-25), holding out most recent year for final evaluation",
       "quality_checks": [
-        "Verify no missing values in key columns.",
-        "Ensure no data leakage by using time-based splits."
+        "Verify \u226565% non-null in all feature columns",
+        "Confirm no multicollinearity between area and yield features"
       ],
-      "excluded_columns": [],
+      "excluded_columns": [
+        {
+          "column_name": "Area-2015-16",
+          "file": "All-India-profile_-Crop-wise-Area.csv",
+          "reason": "Exceeds 35% null threshold"
+        },
+        {
+          "column_name": "Production-2020-21",
+          "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "reason": "Low uniqueness (0.816) suggests data redundancy"
+        }
+      ],
       "expected_outputs": [
-        "tables",
-        "plots",
-        "model_metrics"
+        "Production forecast model (Random Forest/Ridge Regression)",
+        "Feature importance plot",
+        "Seasonal production trend visualization"
       ]
     },
     {
       "id": "TSK-003",
       "category": "predictive",
-      "title": "Forecast Crop Area Under Cultivation",
-      "problem_statement": "Predict future crop area under cultivation based on historical data. All columns verified \u226565% data completeness.",
+      "title": "Forecast Future Crop-Specific Cultivated Area Using Historical Trends",
+      "problem_statement": "Predict annual cultivated area for major crops across seasons using 10-year historical trends. All columns verified \u226565% data completeness with 2015-25 time series coverage. Focus on Kharif/Rabi season patterns and crop-specific area dynamics.",
       "required_files": [
         "All-India-profile_-Crop-wise-Area.csv"
       ],
       "join_plan": {
-        "hypothesized_keys": [],
-        "notes": "Single dataset, no join required."
+        "hypothesized_keys": [
+          [
+            "Crop",
+            "Season"
+          ]
+        ],
+        "notes": "No external joins required - all temporal features exist within single dataset"
       },
       "target": {
-        "name": "Area-2024-25",
+        "name": "Area-2025-26",
         "granularity": [
           "Crop",
           "Season"
         ],
-        "horizon": "1-year ahead"
+        "horizon": "1-year-ahead forecast"
       },
       "feature_plan": {
         "candidates": [
@@ -145,24 +168,33 @@
           "Area-2020-21",
           "Area-2021-22",
           "Area-2022-23",
-          "Area-2023-24"
+          "Area-2023-24",
+          "Area-2024-25"
         ],
         "transform_ideas": [
-          "lagged features",
-          "growth rates"
+          "Year-over-year percentage change",
+          "5-year moving averages",
+          "Seasonal decomposition components"
         ],
-        "handling_missingness": "Impute missing values using mean or median."
+        "handling_missingness": "Forward-fill with crop-season specific means for <5% missing values"
       },
-      "validation_plan": "Split data into training and test sets based on time. Evaluate using RMSE and MAE.",
+      "validation_plan": "Time-series cross-validation with 3-year rolling windows (2015-22 train, 2023-25 test)",
       "quality_checks": [
-        "Verify no missing values in key columns.",
-        "Ensure no data leakage by using time-based splits."
+        "Stationarity tests (ADF)",
+        "Seasonal decomposition analysis",
+        "Crop-season group completeness check"
       ],
-      "excluded_columns": [],
+      "excluded_columns": [
+        {
+          "column_name": "Area-2015-16",
+          "file": "All-India-profile_-Crop-wise-Area.csv",
+          "reason": "Used as baseline feature rather than predictive target"
+        }
+      ],
       "expected_outputs": [
-        "tables",
-        "plots",
-        "model_metrics"
+        "Crop-season area forecast table",
+        "Time series decomposition plots",
+        "RMSE/MASE error metrics"
       ]
     }
   ]

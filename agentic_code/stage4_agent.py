@@ -213,6 +213,15 @@ tool_node = ToolNode(STAGE4_TOOLS)
 
 def should_continue(state: MessagesState) -> str:
     """Route based on tool calls."""
+    # Check if save_execution_result was called in any recent tool message
+    for msg in reversed(state["messages"]):
+        if hasattr(msg, 'name') and msg.name == "save_execution_result":
+            # Result was saved, terminate
+            return END
+        # Only check recent messages (last 5)
+        if state["messages"].index(msg) < len(state["messages"]) - 5:
+            break
+
     last = state["messages"][-1]
     if hasattr(last, 'tool_calls') and last.tool_calls:
         return "tools"

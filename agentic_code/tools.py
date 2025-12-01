@@ -146,6 +146,264 @@ def search(
     return "\n".join(hits) if hits else "[search] No matches found."
 
 # ===========================
+# Stage 1: Dataset Profiling Tools
+# ===========================
+
+@tool
+def list_csv_files() -> List[str]:
+    """List all CSV files in the data directory.
+
+    Returns:
+        List of CSV filenames
+    """
+    csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")])
+    return csv_files
+
+
+@tool
+def profile_single_csv(filename: str, sample_rows: int = 5000) -> str:
+    """Profile a single CSV file and return basic statistics.
+
+    Args:
+        filename: Name of the CSV file to profile
+        sample_rows: Number of rows to sample for profiling
+
+    Returns:
+        JSON string containing the profile data
+    """
+    from .utils import profile_csv
+
+    csv_path = DATA_DIR / filename
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {filename}")
+
+    profile = profile_csv(csv_path, sample_rows=sample_rows)
+    return json.dumps(profile, indent=2)
+
+
+@tool
+def python_sandbox_stage1(code: str) -> str:
+    """Execute Python code for dataset exploration in Stage 1.
+
+    Use this to:
+    - Load and explore CSV files
+    - Compute additional statistics
+    - Analyze data distributions
+    - Identify relationships between columns
+    - Generate insights about the dataset
+    - Convert profile data to summary JSON (recommended)
+
+    Available in environment:
+    - pd (pandas)
+    - np (numpy)
+    - json
+    - Path
+    - DATA_DIR, SUMMARIES_DIR
+    - load_dataframe(filename, nrows=None)
+    - profile_csv(filepath, sample_rows=5000) - for profiling
+    - last_profile_result - stores the last profile_single_csv result
+
+    Returns:
+        Output from code execution
+    """
+    def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
+        """Helper to load dataframes from DATA_DIR."""
+        from .utils import load_dataframe
+        return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+
+    from .utils import profile_csv as profile_csv_func
+
+    globals_dict = {
+        "__name__": "__stage1_sandbox__",
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "SUMMARIES_DIR": SUMMARIES_DIR,
+        "load_dataframe": load_dataframe_helper,
+        "profile_csv": profile_csv_func,
+        "last_profile_result": LAST_TOOL_RESULT,
+    }
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            exec(code, globals_dict, globals_dict)
+    except Exception as e:
+        import traceback
+        return f"[ERROR] {e}\n\nTraceback:\n{traceback.format_exc()}"
+
+    return buf.getvalue() or "[No output]"
+
+
+@tool
+def save_dataset_summary(summary_json: str) -> str:
+    """Save a validated DatasetSummary to the summaries directory.
+
+    This tool accepts a JSON string representing a complete DatasetSummary.
+    The JSON must include: dataset_name, path, columns (with all required fields),
+    and optionally candidate_primary_keys, notes, and inferences.
+
+    Args:
+        summary_json: JSON string of the DatasetSummary. Can be formatted with
+                     newlines and indentation for readability.
+
+    Returns:
+        Confirmation message with save path
+
+    Example:
+        save_dataset_summary('''
+        {
+          "dataset_name": "mydata.csv",
+          "path": "/path/to/mydata.csv",
+          "approx_n_rows": 1000,
+          "columns": [
+            {
+              "name": "id",
+              "physical_dtype": "int64",
+              "logical_type": "integer",
+              "description": "Unique identifier",
+              "nullable": false,
+              "null_fraction": 0.0,
+              "unique_fraction": 1.0,
+              "examples": ["1", "2", "3"],
+              "is_potential_key": true
+            }
+          ],
+          "candidate_primary_keys": [["id"]],
+          "notes": "Clean data, no issues found.",
+          "inferences": "Data appears to be time-series with yearly granularity"
+        }
+        ''')
+    """
+    from .models import DatasetSummary
+
+    # Clean up the JSON string (remove extra whitespace, etc.)
+    summary_json = summary_json.strip()
+
+    try:
+        data = json.loads(summary_json)
+        
+        # Sanitize: Ensure all examples are strings to satisfy Pydantic model
+        if "columns" in data and isinstance(data["columns"], list):
+            for col in data["columns"]:
+                if "examples" in col and isinstance(col["examples"], list):
+                    col["examples"] = [str(x) for x in col["examples"]]
+
+        summary = DatasetSummary.model_validate(data)
+    except json.JSONDecodeError as e:
+        return f"❌ ERROR: Invalid JSON format: {e}\nPlease check your JSON syntax and try again."
+    except Exception as e:
+        return f"❌ ERROR: Validation failed: {e}\nPlease ensure all required fields are present and correct."
+
+    # Extract dataset name to create filename
+    dataset_name = summary.dataset_name
+    if dataset_name.endswith('.csv'):
+        base_name = dataset_name[:-4]
+    else:
+        base_name = dataset_name
+
+    SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = SUMMARIES_DIR / f"{base_name}.summary.json"
+    output_path.write_text(summary.model_dump_json(indent=2))
+
+    return f"✅ Summary saved successfully to: {output_path.name}\n\nYou can now move on to the next dataset!"
+
+
+@tool
+def profile_and_save_csv(filename: str, sample_rows: int = 5000) -> str:
+    """Profile a CSV file and save its summary in one step.
+
+    This tool combines profiling and saving to make the workflow simpler.
+
+    Args:
+        filename: Name of the CSV file to profile
+        sample_rows: Number of rows to sample for profiling
+
+    Returns:
+        Confirmation message with save path
+    """
+    from .models import DatasetSummary, ColumnSummary
+    from .utils import profile_csv
+
+    csv_path = DATA_DIR / filename
+    if not csv_path.exists():
+        return f"❌ ERROR: CSV file not found: {filename}"
+
+    # Get raw profile data
+    profile = profile_csv(csv_path, sample_rows=sample_rows)
+
+    # Convert to DatasetSummary
+    columns = []
+    for col in profile['columns']:
+        # Map logical_type_guess to logical_type
+        logical_type = col.get('logical_type_guess', 'unknown')
+
+        # Create simple description from column name
+        col_name = col['name']
+        if logical_type == 'categorical':
+            desc = f"Categorical variable: {col_name}"
+        elif logical_type in ['integer', 'float', 'numeric']:
+            desc = f"Numeric variable: {col_name}"
+        elif 'date' in col_name.lower() or 'time' in col_name.lower():
+            desc = f"Temporal variable: {col_name}"
+        else:
+            desc = f"Variable: {col_name}"
+
+        # Convert examples to strings
+        examples = [str(x) for x in col.get('examples', [])[:5]]
+
+        col_summary = ColumnSummary(
+            name=col_name,
+            physical_dtype=col.get('physical_dtype', 'unknown'),
+            logical_type=logical_type,
+            description=desc,
+            nullable=col.get('null_fraction', 0.0) > 0,
+            null_fraction=col.get('null_fraction', 0.0),
+            unique_fraction=col.get('unique_fraction', 0.0),
+            examples=examples,
+            is_potential_key=(col.get('unique_fraction', 0.0) > 0.95 and col.get('null_fraction', 0.0) == 0.0)
+        )
+        columns.append(col_summary)
+
+    # Identify candidate keys
+    candidate_keys = []
+    for col in columns:
+        if col.is_potential_key:
+            candidate_keys.append([col.name])
+
+    # Create summary
+    summary = DatasetSummary(
+        dataset_name=filename,
+        path=str(csv_path),
+        approx_n_rows=profile.get('n_rows_sampled'),
+        columns=columns,
+        candidate_primary_keys=candidate_keys,
+        notes=f"Profiled {len(columns)} columns from {profile.get('n_rows_sampled')} rows.",
+        inferences=None  # LLM can add this later if needed
+    )
+
+    # Save
+    base_name = csv_path.stem
+    SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = SUMMARIES_DIR / f"{base_name}.summary.json"
+    output_path.write_text(summary.model_dump_json(indent=2))
+
+    return f"✅ Summary saved successfully to: {output_path.name}\n\nYou can now move on to the next dataset!"
+
+
+# Stage 1 tool list
+STAGE1_TOOLS = [
+    profile_and_save_csv,
+    profile_single_csv,
+    python_sandbox_stage1,
+    save_dataset_summary,
+    search,
+]
+
+
+# ===========================
 # Stage 2: Task Proposal Tools
 # ===========================
 
@@ -2115,6 +2373,7 @@ FAILSAFE_TOOLS = [
 # ===========================
 
 ALL_TOOLS = {
+    "stage1": STAGE1_TOOLS,
     "stage2": STAGE2_TOOLS,
     "stage3": STAGE3_TOOLS,
     "stage3_5": STAGE3_5_TOOLS,

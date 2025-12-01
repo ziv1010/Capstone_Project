@@ -47,6 +47,10 @@ class DatasetSummary(BaseModel):
         description="Each entry is a list of column names that could form a primary key."
     )
     notes: Optional[str] = None
+    inferences: Optional[str] = Field(
+        default=None,
+        description="Additional insights or patterns discovered by the LLM during profiling."
+    )
 
 
 # ===========================

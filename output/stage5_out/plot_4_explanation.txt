@@ -1,0 +1,17 @@
+
+PLOT 4: Historical Average Area Trend with 2024-25 Prediction
+================================================================================
+
+What it shows:
+Line plot showing average area values from 2015-16 to 2023-24 with the 2024-25 prediction highlighted
+
+Given data (from original dataset):
+Area-2015-16 to Area-2023-24 columns (historical actual values from the dataset)
+
+Predicted data (from model output):
+predicted_Area-2024-25 column (output from Linear Regression model)
+
+Key insights:
+The model's 2024-25 prediction (1325 ha) aligns with the long-term upward trend, showing a 2.3% increase from 2023-24 values. This suggests the model is capturing the historical growth pattern in agricultural area.
+
+================================================================================

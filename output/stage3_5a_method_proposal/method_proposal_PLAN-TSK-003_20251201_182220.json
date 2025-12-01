@@ -1,0 +1,49 @@
+{
+  "plan_id": "PLAN-TSK-003",
+  "task_category": "predictive",
+  "methods_proposed": [
+    {
+      "method_id": "METHOD-1",
+      "name": "Moving Average Baseline",
+      "description": "Use avg_area_prev_5_years as direct prediction",
+      "implementation_code": "import pandas as pd\nfrom sklearn.metrics import mean_absolute_error, mean_squared_error\n\n# Load data\ndf = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-003.parquet')\n\n# Identify target\ntarget_col = [col for col in df.columns if 'Area-2024-25' in col][0]\n\n# Split data\ntrain_df = df[df['Season'] != '2024-25']\ntest_df = df[df['Season'] == '2024-25']\n\n# Predict using baseline\ntrain_avg = df['avg_area_prev_5_years'].mean()\npredictions = [train_avg] * len(test_df)\n\n# Calculate metrics\nmae = mean_absolute_error(test_df[target_col], predictions)\nrmse = mean_squared_error(test_df[target_col], predictions, squared=False)\n\nprint(f'Baseline MAE: {mae:.2f}, RMSE: {rmse:.2f}')",
+      "libraries_required": [
+        "pandas",
+        "scikit-learn"
+      ]
+    },
+    {
+      "method_id": "METHOD-2",
+      "name": "Linear Regression",
+      "description": "Regression using all engineered features",
+      "implementation_code": "import pandas as pd\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error, mean_squared_error\n\n# Load data\ndf = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-003.parquet')\n\n# Identify target\ntarget_col = [col for col in df.columns if 'Area-2024-25' in col][0]\n\n# Split data\ntrain_df = df[df['Season'] != '2024-25']\ntest_df = df[df['Season'] == '2024-25']\n\n# Prepare features\nX_train = train_df.drop(columns=[target_col, 'Crop', 'Season'])\ny_train = train_df[target_col]\nX_test = test_df.drop(columns=[target_col, 'Crop', 'Season'])\n\n# Train model\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\n\n# Predict\npredictions = model.predict(X_test)\n\n# Calculate metrics\nmae = mean_absolute_error(test_df[target_col], predictions)\nrmse = mean_squared_error(test_df[target_col], predictions, squared=False)\n\nprint(f'Linear Regression MAE: {mae:.2f}, RMSE: {rmse:.2f}')",
+      "libraries_required": [
+        "pandas",
+        "scikit-learn"
+      ]
+    },
+    {
+      "method_id": "METHOD-3",
+      "name": "Random Forest Regressor",
+      "description": "Tree-based model with feature importance",
+      "implementation_code": "import pandas as pd\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error, mean_squared_error\n\n# Load data\ndf = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-003.parquet')\n\n# Identify target\ntarget_col = [col for col in df.columns if 'Area-2024-25' in col][0]\n\n# Split data\ntrain_df = df[df['Season'] != '2024-25']\ntest_df = df[df['Season'] == '2024-25']\n\n# Prepare features\nX_train = train_df.drop(columns=[target_col, 'Crop', 'Season'])\ny_train = train_df[target_col]\nX_test = test_df.drop(columns=[target_col, 'Crop', 'Season'])\n\n# Train model\nmodel = RandomForestRegressor(n_estimators=100, random_state=42)\nmodel.fit(X_train, y_train)\n\n# Predict\npredictions = model.predict(X_test)\n\n# Calculate metrics\nmae = mean_absolute_error(test_df[target_col], predictions)\nrmse = mean_squared_error(test_df[target_col], predictions, squared=False)\n\nprint(f'Random Forest MAE: {mae:.2f}, RMSE: {rmse:.2f}')",
+      "libraries_required": [
+        "pandas",
+        "scikit-learn"
+      ]
+    }
+  ],
+  "data_split_strategy": "Train: all years except 2024-25 (Season != '2024-25'), Test: 2024-25 (Season == '2024-25')",
+  "date_column": "Season",
+  "target_column": "Area-2024-25",
+  "train_period": "2015-2023",
+  "validation_period": "2024-25",
+  "test_period": null,
+  "data_preprocessing_steps": [
+    "Load prepared_PLAN-TSK-003.parquet",
+    "Identify target column containing 'Area-2024-25'",
+    "Split data by Season: train (Season != '2024-25'), test (Season == '2024-25')",
+    "Drop non-feature columns (Crop, Season)",
+    "Handle missing values (already imputed in Stage 3B)"
+  ]
+}

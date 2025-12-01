@@ -1,0 +1,17 @@
+
+PLOT 1: Actual vs Predicted Area-2024-25
+================================================================================
+
+What it shows:
+Scatter plot comparing actual values (x-axis) to model predictions (y-axis) for Area-2024-25
+
+Given data (from original dataset):
+Area-2024-25 column (actual values from the dataset)
+
+Predicted data (from model output):
+predicted_Area-2024-25 column (output from Linear Regression model)
+
+Key insights:
+Points close to the red dashed line indicate accurate predictions. The model shows reasonable accuracy with R²=0.89 but has some systematic errors visible in the scatter pattern.
+
+================================================================================

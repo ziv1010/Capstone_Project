@@ -451,7 +451,7 @@ def _benchmark_attempt_counts(messages: List[BaseMessage]) -> Dict[str, int]:
             desc = ""
             if isinstance(tc, dict):
                 name = tc.get("name") or (tc.get("function") or {}).get("name")
-                args = tc.get("args") or {}
+                args = tc.get("args", {})
                 desc = args.get("description", "") or ""
             else:
                 name = getattr(tc, "name", None) or getattr(getattr(tc, "function", None), "name", None)
@@ -464,6 +464,90 @@ def _benchmark_attempt_counts(messages: List[BaseMessage]) -> Dict[str, int]:
             method_id = match.group(1).upper() if match else "UNKNOWN"
             counts[method_id] = counts.get(method_id, 0) + 1
     return counts
+
+
+def _check_and_force_save_checkpoint(state: MessagesState, plan_id: str, checkpoint_data: dict) -> bool:
+    """Check if a method just completed 3 iterations and force-save checkpoint if agent didn't save.
+    
+    Returns True if checkpoint was force-saved.
+    """
+    from .config import STAGE3_5B_OUT_DIR
+    from datetime import datetime
+    import json
+    
+    messages = state["messages"]
+    
+    # Count benchmark runs per method
+    benchmark_counts = _benchmark_attempt_counts(messages)
+    
+    # Count checkpoint saves per method (detect when agent actually saved after completing a method)
+    checkpoint_saves = []
+    for m in messages:
+        tool_calls = getattr(m, "tool_calls", None)
+        if not tool_calls:
+            continue
+        for tc in tool_calls:
+            name = None
+            if isinstance(tc, dict):
+                name = tc.get("name")
+            else:
+                name = getattr(tc, "name", None)
+            
+            if name == "save_checkpoint_stage3_5b":
+                checkpoint_saves.append(m)
+    
+    # Find methods that have 3+ benchmarks but aren't marked complete in checkpoint
+    methods_completed = set(checkpoint_data.get("methods_completed", []))
+    methods_to_save = []
+    
+    for method_id, count in benchmark_counts.items():
+        if count >= 3 and method_id not in methods_completed:
+            # Check if there's been a checkpoint save since the 3rd benchmark
+            # If not, we should force-save
+            methods_to_save.append(method_id)
+    
+    if not methods_to_save:
+        return False
+    
+    # Force-save checkpoint with the newly completed method
+    print("\n" + "="*80)
+    print(f"🔧 AUTO-SAVE DETECTED: {methods_to_save} completed 3 iterations but not in checkpoint")
+    print("   Triggering automatic checkpoint save...")
+    print("="*80)
+    
+    try:
+        # Update checkpoint with completed method
+        for method_id in methods_to_save:
+            if method_id not in methods_completed:
+                checkpoint_data.setdefault("methods_completed", []).append(method_id)
+                
+                # Add a placeholder result (agent should have generated this)
+                # This is a fallback - ideally agent would save properly
+                checkpoint_data.setdefault("completed_results", []).append({
+                    "method_id": method_id,
+                    "method_name": f"{method_id} (auto-saved)",
+                    "metrics": {"MAE": 999.99, "RMSE": 999.99},  # Placeholder
+                    "train_period": checkpoint_data.get("train_period", ""),
+                    "validation_period": checkpoint_data.get("validation_period", ""),
+                    "test_period": checkpoint_data.get("test_period"),
+                    "execution_time_seconds": 0,
+                    "status": "incomplete",
+                    "error_message": "Auto-saved by failsafe - agent did not save checkpoint",
+                    "predictions_sample": []
+                })
+        
+        # Save checkpoint
+        checkpoint_data["updated_at"] = datetime.now().isoformat()
+        checkpoint_path = STAGE3_5B_OUT_DIR / f"checkpoint_{plan_id}.json"
+        checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2))
+        
+        print(f"✅ AUTO-SAVED checkpoint with {methods_to_save}")
+        print("="*80 + "\n")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Auto-save failed: {e}\n")
+        return False
 
 
 def _message_mentions_method(msg: BaseMessage, method_id: str) -> bool:
@@ -521,33 +605,224 @@ def should_continue(state: MessagesState) -> str:
     method_attempts = _benchmark_attempt_counts(messages)
     stalled_methods = [m for m, c in method_attempts.items() if c >= STAGE3_5B_RETRY_LIMIT]
 
-    # Check if all methods are completed by loading the checkpoint
+    # CRITICAL: Load checkpoint FIRST - always need this for force-save check
     from .config import STAGE3_5B_OUT_DIR
     import json
     
     all_methods_done = False
-    try:
-        # Extract plan_id from messages
-        plan_id = None
-        for msg in messages:
-            content = getattr(msg, "content", "")
-            if "PLAN-TSK-" in content:
-                import re
-                match = re.search(r"(PLAN-TSK-\d+)", content)
-                if match:
-                    plan_id = match.group(1)
-                    break
-        
-        if plan_id:
+    plan_id = None
+    checkpoint_data = None
+    
+    # Extract plan_id from messages
+    for msg in messages:
+        content = getattr(msg, "content", "")
+        if "PLAN-TSK-" in content or "PLAN-" in content:
+            import re
+            match = re.search(r"(PLAN-TSK-\d+)", content)
+            if not match:
+                match = re.search(r"(PLAN-\w+-\d+)", content)
+            if match:
+                plan_id = match.group(1)
+                break
+    
+    # 🔥 CRITICAL FIX: Always scan for ALL checkpoints if plan_id extraction fails
+    # This ensures we find the checkpoint even if plan_id parsing has issues
+    if not plan_id or not checkpoint_data:
+        print(f"\n🔍 SCANNING: Looking for ANY checkpoint files...")
+        all_checkpoints = list(STAGE3_5B_OUT_DIR.glob("checkpoint_PLAN-*.json"))
+        if all_checkpoints:
+            # Use the most recent checkpoint
+            latest_checkpoint = max(all_checkpoints, key=lambda p: p.stat().st_mtime)
+            print(f"   Found checkpoint: {latest_checkpoint.name}")
+            try:
+                checkpoint_data = json.loads(latest_checkpoint.read_text())
+                plan_id = checkpoint_data.get("plan_id", plan_id)
+                methods_completed = checkpoint_data.get("methods_completed", [])
+                methods_to_test = checkpoint_data.get("methods_to_test", [])
+                print(f"   Extracted plan_id: {plan_id}")
+                print(f"   Methods: {len(methods_completed)}/{len(methods_to_test)} complete")
+                all_methods_done = len(methods_completed) >= len(methods_to_test) and len(methods_to_test) > 0
+            except Exception as e:
+                print(f"   Failed to parse checkpoint: {e}")
+
+    # Load checkpoint if we have plan_id
+    if plan_id and not checkpoint_data:
+        checkpoint_path = STAGE3_5B_OUT_DIR / f"checkpoint_{plan_id}.json"
+        print(f"\n🔍 DEBUG - Checking checkpoint at: {checkpoint_path}")
+        print(f"   Checkpoint exists: {checkpoint_path.exists()}")
+        if checkpoint_path.exists():
+            try:
+                checkpoint_data = json.loads(checkpoint_path.read_text())
+                methods_completed = checkpoint_data.get("methods_completed", [])
+                methods_to_test = checkpoint_data.get("methods_to_test", [])
+                print(f"   Loaded checkpoint - methods_completed: {methods_completed}")
+                print(f"   Loaded checkpoint - methods_to_test: {len(methods_to_test)} methods")
+                all_methods_done = len(methods_completed) >= len(methods_to_test) and len(methods_to_test) > 0
+                print(f"   Calculated all_methods_done: {all_methods_done}")
+            except Exception as e:
+                print(f"⚠️ Failed to load checkpoint: {e}")
+                import traceback
+                traceback.print_exc()
+
+    # AUTO-SAVE CHECKPOINT: Check if a method just completed 3 iterations
+    if plan_id and checkpoint_data:
+        _check_and_force_save_checkpoint(state, plan_id, checkpoint_data)
+        # Reload checkpoint data after potential save
+        try:
             checkpoint_path = STAGE3_5B_OUT_DIR / f"checkpoint_{plan_id}.json"
             if checkpoint_path.exists():
-                checkpoint = json.loads(checkpoint_path.read_text())
-                methods_completed = checkpoint.get("methods_completed", [])
-                methods_to_test = checkpoint.get("methods_to_test", [])
+                checkpoint_data = json.loads(checkpoint_path.read_text())
+                methods_completed = checkpoint_data.get("methods_completed", [])
+                methods_to_test = checkpoint_data.get("methods_to_test", [])
                 all_methods_done = len(methods_completed) >= len(methods_to_test) and len(methods_to_test) > 0
-    except Exception:
-        pass
+                print(f"   RELOADED checkpoint - all_methods_done: {all_methods_done}")
+        except Exception as e:
+            print(f"⚠️ Failed to reload checkpoint: {e}")
 
+    # DEBUG: Print condition values
+    print(f"\n🔍 DEBUG - Force-save condition check:")
+    print(f"   all_methods_done: {all_methods_done}")
+    print(f"   save_called: {save_called}")
+    print(f"   has checkpoint_data: {checkpoint_data is not None}")
+    print(f"   has plan_id: {plan_id is not None}")
+    if checkpoint_data:
+        print(f"   methods_completed: {checkpoint_data.get('methods_completed', [])}")
+        print(f"   methods_to_test count: {len(checkpoint_data.get('methods_to_test', []))}")
+    print(f"   TRIGGER? {all_methods_done and not save_called and checkpoint_data and plan_id}\n")
+
+    # 🔥 ALTERNATIVE CHECK: If checkpoint_data loaded but all_methods_done still False,
+    # manually recheck the condition (in case of subtle bug in the logic above)
+    if not all_methods_done and checkpoint_data and not save_called:
+        methods_completed = checkpoint_data.get("methods_completed", [])
+        methods_to_test = checkpoint_data.get("methods_to_test", [])
+        if len(methods_completed) >= len(methods_to_test) > 0:
+            print("\n⚠️ ALERT: all_methods_done was False but checkpoint shows all methods complete!")
+            print(f"   Overriding all_methods_done to True")
+            print(f"   methods_completed: {methods_completed}")
+            print(f"   methods_to_test: {len(methods_to_test)}")
+            all_methods_done = True
+
+    # 🚨 ABSOLUTE FAILSAFE: If plan_id wasn't extracted but checkpoint shows completion,
+    # try to extract plan_id from checkpoint data directly and trigger force-save
+    if not plan_id and checkpoint_data and not save_called:
+        checkpoint_plan_id = checkpoint_data.get("plan_id")
+        if checkpoint_plan_id:
+            methods_completed = checkpoint_data.get("methods_completed", [])
+            methods_to_test = checkpoint_data.get("methods_to_test", [])
+            if len(methods_completed) >= len(methods_to_test) > 0:
+                print("\n🔴 FAILSAFE ACTIVATED: Using plan_id from checkpoint")
+                print(f"   plan_id: {checkpoint_plan_id}")
+                plan_id = checkpoint_plan_id
+                all_methods_done = True
+
+    # 🚨 IMMEDIATE FORCE-SAVE: All methods done but no save yet? SAVE NOW!
+    # This triggers EVERY round after methods complete until save happens
+    # No waiting, no thresholds - immediate action
+    if all_methods_done and not save_called and checkpoint_data and plan_id:
+        print("\n" + "="*80)
+        print("🚨 FORCE-SAVE TRIGGERED: All methods complete, forcing save NOW")
+        print("   No delay, no threshold - immediate save to prevent loops")
+        print("="*80)
+        
+        try:
+            from .models import TesterOutput
+            from datetime import datetime
+            
+            # Get proposal data
+            proposal_files = sorted(STAGE3_5A_OUT_DIR.glob(f"method_proposal_{plan_id}*.json"))
+            methods_proposed = []
+            if proposal_files:
+                proposal_data = json.loads(proposal_files[-1].read_text())
+                methods_proposed = proposal_data.get("methods_proposed", [])
+            
+            # Select best method
+            completed_results = checkpoint_data.get("completed_results", [])
+            if not completed_results:
+                raise ValueError("No completed results in checkpoint")
+            
+            best_result = min(completed_results, key=lambda r: r.get("metrics", {}).get("MAE", float('inf')))
+            selected_method_id = best_result.get("method_id")
+            selected_method = next((m for m in methods_proposed if m.get("method_id") == selected_method_id), None)
+            
+            if not selected_method:
+                selected_method = methods_proposed[0] if methods_proposed else {}
+                selected_method_id = selected_method.get("method_id", "METHOD-1")
+            
+            # Build and save tester output
+            tester_output = {
+                "plan_id": plan_id,
+                "task_category": checkpoint_data.get("task_category", "predictive"),
+                "methods_proposed": methods_proposed,
+                "benchmark_results": checkpoint_data.get("benchmark_results", completed_results),
+                "selected_method_id": selected_method_id,
+                "selected_method": selected_method,
+                "selection_rationale": f"AUTO-SAVED (force-save triggered). {selected_method.get('name', 'Method')} selected with lowest MAE: {best_result.get('metrics', {}).get('MAE', 'N/A')}. This method showed best performance across benchmarks.",
+                "data_split_strategy": checkpoint_data.get("data_split_strategy", ""),
+                "detailed_procedure": selected_method.get("implementation_code", "See selected method for implementation details"),
+                "data_preprocessing_steps": checkpoint_data.get("data_preprocessing_steps", []) or [],
+                "method_comparison_summary": f"Benchmarked {len(methods_proposed)} methods. METHOD-1: MAE={completed_results[0].get('metrics', {}).get('MAE', 'N/A') if len(completed_results) > 0 else 'N/A'}, METHOD-2: MAE={completed_results[1].get('metrics', {}).get('MAE', 'N/A') if len(completed_results) > 1 else 'N/A'}, METHOD-3: MAE={completed_results[2].get('metrics', {}).get('MAE', 'N/A') if len(completed_results) > 2 else 'N/A'}. Best: {selected_method.get('name', 'N/A')}."
+            }
+            
+            TesterOutput.model_validate(tester_output)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Save to stage3_5b_benchmarking (same directory as checkpoints)
+            STAGE3_5B_OUT_DIR.mkdir(parents=True, exist_ok=True)
+            output_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}_{timestamp}.json"
+            output_path.write_text(json.dumps(tester_output, indent=2))
+            
+            print(f"✅ FORCE-SAVED: {output_path.name}")
+            print(f"   Selected: {selected_method.get('name', 'N/A')} ({selected_method_id})")
+            print(f"   MAE: {best_result.get('metrics', {}).get('MAE', 'N/A')}")
+            print(f"   All {len(completed_results)} methods benchmarked")
+            print(f"   Forcing END state to stop loop...")
+            print("="*80 + "\n")
+            
+            return END  # Force exit IMMEDIATELY
+            
+        except Exception as e:
+            print(f"❌ Force-save failed: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"   Attempting fallback: calling external force_save_tester.py script...")
+
+            # FALLBACK: Call external script using subprocess
+            try:
+                import subprocess
+                import sys
+                script_path = PROJECT_ROOT / "force_save_tester.py"
+                if script_path.exists():
+                    print(f"   Running: python {script_path} {plan_id}")
+                    result = subprocess.run(
+                        [sys.executable, str(script_path), plan_id],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    if result.returncode == 0:
+                        print(f"✅ EXTERNAL SCRIPT SUCCESS!")
+                        print(result.stdout)
+                        return END
+                    else:
+                        print(f"❌ External script failed: {result.stderr}")
+                else:
+                    print(f"❌ Script not found: {script_path}")
+            except Exception as script_error:
+                print(f"❌ External script execution failed: {script_error}")
+
+            print("   Manual intervention: python force_save_tester.py {plan_id}")
+            print("   Continuing to next round...\n")
+
+    # LOOP DETECTION: Count consecutive rounds without tool calls
+    consecutive_no_tool = 0
+    for m in reversed(messages):
+        if m.__class__.__name__ == "AIMessage":
+            if hasattr(m, "tool_calls") and m.tool_calls:
+                break  # Found a tool call, stop counting
+            consecutive_no_tool += 1
+        elif m.__class__.__name__ == "HumanMessage":
+            # Skip reminder messages
+            continue
+            
     # If we just got a tool call, go execute it
     if hasattr(last, "tool_calls") and last.tool_calls:
         return "tools"
@@ -617,6 +892,14 @@ def should_continue(state: MessagesState) -> str:
                     recent_tool = getattr(tc.function, "name", None)
             break
 
+    # Add loop warning if approaching failsafe threshold
+    loop_warning = ""
+    if consecutive_no_tool >= 3 and all_methods_done:
+        loop_warning = (
+            f"\n\n⚠️ WARNING: {consecutive_no_tool} consecutive rounds without tool calls! "
+            "CALL save_tester_output() NOW or failsafe will trigger at 5 rounds!"
+        )
+
     reminder = (
         f"No tool call detected. Continue benchmarking and call save_tester_output when done.\n"
         f"run_benchmark_code calls: {benchmarks_run}. "
@@ -627,6 +910,7 @@ def should_continue(state: MessagesState) -> str:
         f"{retry_note}"
         f"{checkpoint_reminder}"
         f"{periodic_checkpoint_reminder}"
+        f"{loop_warning}"
     )
     messages.append(HumanMessage(content=reminder))
     return "agent"
@@ -823,6 +1107,88 @@ def run_stage3_5b(
     print("\n" + "=" * 80)
     print(f"✅ Complete - {round_num} rounds")
     print("=" * 80)
+    
+    # ===========================
+    # POST-EXECUTION SAVE VERIFICATION
+    # ===========================
+    print("\n" + "=" * 80)
+    print("🔍 VERIFYING SAVE...")
+    print("=" * 80)
+
+    # Check if file actually exists - use STAGE3_5B_OUT_DIR (consolidated directory)
+    tester_files = sorted(STAGE3_5B_OUT_DIR.glob(f"tester_{plan_id}*.json"))
+    
+    if tester_files:
+        print(f"✅ Verified: Tester output file exists: {tester_files[-1].name}")
+        return final_state
+    
+    # File doesn't exist - agent hallucinated the save!
+    print("⚠️  WARNING: Agent claimed to save but file doesn't exist!")
+    print("🔧 Attempting to extract tester output from agent messages and force-save...")
+    
+    # Try to extract the tester output JSON from agent messages
+    messages = final_state.get("messages", [])
+    tester_data = None
+    
+    for msg in reversed(messages):
+        content = getattr(msg, "content", "") or ""
+        
+        # Look for JSON in tool call arguments
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            for tc in tool_calls:
+                if isinstance(tc, dict):
+                    name = tc.get("name")
+                    args = tc.get("args", {})
+                else:
+                    name = getattr(tc, "name", None)
+                    args = getattr(tc, "args", {}) or {}
+                
+                if name == "save_tester_output":
+                    output_json = args.get("output_json")
+                    if output_json:
+                        if isinstance(output_json, dict):
+                            tester_data = output_json
+                            print(f"✓ Found tester output in tool call arguments")
+                            break
+                        elif isinstance(output_json, str):
+                            try:
+                                tester_data = json.loads(output_json)
+                                print(f"✓ Found tester output JSON string in tool call")
+                                break
+                            except:
+                                pass
+        
+        if tester_data:
+            break
+    
+    if tester_data:
+        # Force-save the tester output
+        try:
+            from .models import TesterOutput
+            from datetime import datetime
+            
+            # Validate the data
+            tester_output = TesterOutput.model_validate(tester_data)
+            
+            # Save to stage3_5b_benchmarking (same directory as checkpoints)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            STAGE3_5B_OUT_DIR.mkdir(parents=True, exist_ok=True)
+            output_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}_{timestamp}.json"
+            output_path.write_text(json.dumps(tester_data, indent=2))
+            
+            print(f"✅ FORCE-SAVED: {output_path.name}")
+            print(f"   Selected method: {tester_data.get('selected_method_id', 'N/A')}")
+            print(f"   Benchmark results: {len(tester_data.get('benchmark_results', []))}")
+            
+        except Exception as e:
+            print(f"❌ Force-save failed: {e}")
+            print("   Manual intervention required - check agent logs for tester output JSON")
+    else:
+        print("❌ Could not extract tester output from agent messages")
+        print("   The agent may not have generated valid output")
+        print("   Check the reasoning blocks for the tester output structure")
+    
     return final_state
 
 
@@ -853,7 +1219,7 @@ def stage3_5b_node(state: dict) -> dict:
 
     result = run_stage3_5b(plan_id, debug=True, method_proposal=method_proposal)
 
-    # Check for saved tester output
+    # Check for saved tester output in stage3_5b_benchmarking (consolidated directory)
     tester_files = sorted(STAGE3_5B_OUT_DIR.glob(f"tester_{plan_id}*.json"))
     if tester_files:
         latest_file = tester_files[-1]

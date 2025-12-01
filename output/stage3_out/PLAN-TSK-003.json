@@ -1,0 +1,143 @@
+{
+  "plan_id": "PLAN-TSK-003",
+  "selected_task_id": "TSK-003",
+  "goal": "Forecast crop area under cultivation using historical area data",
+  "task_category": "predictive",
+  "created_at": "2025-12-01T18:07:51.673721",
+  "created_by": "stage3_agent",
+  "artifacts": {
+    "intermediate_table": "TSK-003_data.parquet",
+    "intermediate_format": "parquet",
+    "expected_columns": [
+      "Crop",
+      "Season",
+      "Area-2015-16",
+      "Area-2016-17",
+      "Area-2017-18",
+      "Area-2018-19",
+      "Area-2019-20",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Area-2024-25"
+    ],
+    "expected_row_count_range": [
+      80,
+      100
+    ]
+  },
+  "key_normalization": [],
+  "file_instructions": [
+    {
+      "file_id": "FILE-003",
+      "original_name": "All-India-profile_-Crop-wise-Area.csv",
+      "alias": "crop_area",
+      "filters": [],
+      "rename_columns": {},
+      "join_keys": [],
+      "keep_columns": [
+        "Crop",
+        "Season",
+        "Area-2015-16",
+        "Area-2016-17",
+        "Area-2017-18",
+        "Area-2018-19",
+        "Area-2019-20",
+        "Area-2020-21",
+        "Area-2021-22",
+        "Area-2022-23",
+        "Area-2023-24",
+        "Area-2024-25"
+      ],
+      "notes": "All columns verified ≥65% complete"
+    }
+  ],
+  "join_steps": [
+    {
+      "step": 1,
+      "description": "Load base table",
+      "left_table": "crop_area",
+      "right_table": null,
+      "join_type": "base",
+      "join_keys": [],
+      "left_on": [],
+      "right_on": [],
+      "expected_cardinality": "base",
+      "validation": {
+        "check_duplicates_on_keys": [],
+        "expected_unique": false,
+        "check_row_count_stable": true,
+        "check_no_duplicates_introduced": true,
+        "acceptable_coverage": 0.65,
+        "max_cardinality_ratio": null
+      }
+    }
+  ],
+  "feature_engineering": [
+    {
+      "feature_name": "avg_area_prev_5_years",
+      "description": "Average of previous 5 years' area",
+      "transform": "mean",
+      "depends_on": [
+        "Area-2019-20",
+        "Area-2020-21",
+        "Area-2021-22",
+        "Area-2022-23",
+        "Area-2023-24"
+      ],
+      "implementation": "df['avg_area_prev_5_years'] = df[['Area-2019-20', 'Area-2020-21', 'Area-2021-22', 'Area-2022-23', 'Area-2023-24']].mean(axis=1)"
+    },
+    {
+      "feature_name": "growth_rate_2023_24",
+      "description": "Year-over-year growth rate between 2022-23 and 2023-24",
+      "transform": "growth rate",
+      "depends_on": [
+        "Area-2022-23",
+        "Area-2023-24"
+      ],
+      "implementation": "df['growth_rate_2023_24'] = (df['Area-2023-24'] - df['Area-2022-23']) / df['Area-2022-23']"
+    }
+  ],
+  "validation": {
+    "time_split": {
+      "method": "year-based",
+      "train_years": "all years except 2024-25",
+      "test_years": "2024-25",
+      "validation_years": null,
+      "leakage_check": "Ensure test set contains only future years"
+    },
+    "coverage_checks": [
+      {
+        "check": "Target completeness",
+        "threshold": 0.98,
+        "description": "Verify target column (Area-2024-25) has ≥98% non-null values",
+        "action_if_violation": "Impute missing values using mean"
+      }
+    ],
+    "cardinality_checks": [
+      {
+        "check": "Unique crop-season pairs",
+        "expected": "unique",
+        "action_if_violation": "Remove duplicate rows"
+      }
+    ],
+    "additional_checks": [
+      "Data loaded",
+      "No duplicates on join keys"
+    ]
+  },
+  "expected_model_types": [
+    "Regression",
+    "Time Series"
+  ],
+  "evaluation_metrics": [
+    "MAE",
+    "RMSE",
+    "R2"
+  ],
+  "notes": [
+    "Data validation: All columns verified ≥65% complete",
+    "No currency conversion needed"
+  ]
+}

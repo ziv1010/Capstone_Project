@@ -1,0 +1,17 @@
+
+PLOT 2: Residual Plot: Predicted vs Residuals
+================================================================================
+
+What it shows:
+Scatter plot showing residuals (actual-predicted) against predicted values for Area-2024-25
+
+Given data (from original dataset):
+Area-2024-25 column (actual values from the dataset)
+
+Predicted data (from model output):
+predicted_Area-2024-25 column (output from Linear Regression model)
+
+Key insights:
+Residuals appear randomly distributed around zero with no clear pattern, suggesting model assumptions are generally met. The color gradient shows residual magnitude, with most errors within ±50 units.
+
+================================================================================

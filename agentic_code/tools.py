@@ -1089,10 +1089,10 @@ def save_tester_output(output_json: Dict[str, Any]) -> str:
     Returns:
         Confirmation message with save path
     """
-    from .config import STAGE3_5_OUT_DIR
+    from .config import STAGE3_5B_OUT_DIR  # Changed from STAGE3_5_OUT_DIR to consolidate outputs
     from .models import TesterOutput
     from datetime import datetime
-    
+
     # Allow lenient inputs: accept dict or JSON string
     if isinstance(output_json, str):
         try:
@@ -1103,25 +1103,26 @@ def save_tester_output(output_json: Dict[str, Any]) -> str:
         output_data = output_json
     else:
         raise ValueError("output_json must be a dict or JSON string")
-    
+
     # Validate against schema
     try:
         tester_output = TesterOutput.model_validate(output_data)
     except Exception as e:
         raise ValueError(f"Schema validation failed: {e}")
-    
+
     plan_id = tester_output.plan_id
     # Enforce PLAN- prefix if missing
     if not plan_id.startswith("PLAN-") and "PLAN-" not in plan_id:
         if plan_id.startswith("TSK-"):
             plan_id = f"PLAN-{plan_id}"
-            
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    STAGE3_5_OUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = STAGE3_5_OUT_DIR / f"tester_{plan_id}_{timestamp}.json"
+
+    # Save to stage3_5b_benchmarking (consolidated with checkpoints, not legacy stage3_5_tester)
+    STAGE3_5B_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}_{timestamp}.json"
     output_path.write_text(json.dumps(output_data, indent=2))
-    
+
     return f"saved::{output_path.name}"
 
 
@@ -1411,8 +1412,52 @@ def python_sandbox_stage3_5b(code: str) -> str:
     Returns:
         Execution result (stdout + stderr)
     """
-    # Reuse the same implementation as python_sandbox_stage3_5
-    return python_sandbox_stage3_5(code)
+    from .config import DATA_DIR, STAGE3_5B_OUT_DIR
+    
+    def load_dataframe_helper(filename: str, nrows: Optional[int] = None):
+        try:
+            return load_dataframe(filename, nrows=nrows, base_dir=DATA_DIR)
+        except FileNotFoundError:
+            # Try exact match in STAGE3B
+            prepared_path = STAGE3B_OUT_DIR / filename
+            if prepared_path.exists():
+                return load_dataframe(prepared_path)
+            
+            # Robust lookup in STAGE3B_OUT_DIR
+            name = Path(filename).name
+            
+            # 1. If name contains TSK-XXX but not PLAN-, try adding PLAN- (via wildcard)
+            if "TSK-" in name and "PLAN-" not in name:
+                pattern = name.replace("TSK-", "*TSK-")
+                matches = list(STAGE3B_OUT_DIR.glob(pattern))
+                if matches:
+                     return load_dataframe(matches[0])
+            
+            # 2. Try general glob
+            matches = list(STAGE3B_OUT_DIR.glob(f"*{name}*"))
+            if matches:
+                return load_dataframe(matches[0])
+                
+            raise
+
+    globals_dict = {
+        "__name__": "__stage3_5b_sandbox__",
+        "pd": pd,
+        "np": np,
+        "json": json,
+        "Path": Path,
+        "DATA_DIR": DATA_DIR,
+        "STAGE3_5B_OUT_DIR": STAGE3_5B_OUT_DIR,
+        "load_dataframe": load_dataframe_helper,
+    }
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            exec(code, globals_dict, globals_dict)
+    except Exception as e:
+        return f"[ERROR] {e}"
+    return buf.getvalue() or "[No output]"
 
 
 # Stage 3.5a tool list

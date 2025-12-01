@@ -618,6 +618,88 @@ def run_stage3_5a(
     print("\n" + "=" * 80)
     print(f"✅ Complete - {round_num} rounds")
     print("=" * 80)
+    
+    # ===========================
+    # POST-EXECUTION SAVE VERIFICATION
+    # ===========================
+    print("\n" + "=" * 80)
+    print("🔍 VERIFYING SAVE...")
+    print("=" * 80)
+    
+    # Check if file actually exists
+    proposal_files = sorted(STAGE3_5A_OUT_DIR.glob(f"method_proposal_{plan_id}*.json"))
+    
+    if proposal_files:
+        print(f"✅ Verified: Proposal file exists: {proposal_files[-1].name}")
+        return final_state
+    
+    # File doesn't exist - agent hallucinated the save!
+    print("⚠️  WARNING: Agent claimed to save but file doesn't exist!")
+    print("🔧 Attempting to extract proposal from agent messages and force-save...")
+    
+    # Try to extract the proposal JSON from agent messages
+    messages = final_state.get("messages", [])
+    proposal_data = None
+    
+    for msg in reversed(messages):
+        content = getattr(msg, "content", "") or ""
+        
+        # Look for JSON in tool call arguments
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            for tc in tool_calls:
+                if isinstance(tc, dict):
+                    name = tc.get("name")
+                    args = tc.get("args", {})
+                else:
+                    name = getattr(tc, "name", None)
+                    args = getattr(tc, "args", {}) or {}
+                
+                if name == "save_method_proposal_output":
+                    output_json = args.get("output_json")
+                    if output_json:
+                        if isinstance(output_json, dict):
+                            proposal_data = output_json
+                            print(f"✓ Found proposal in tool call arguments")
+                            break
+                        elif isinstance(output_json, str):
+                            try:
+                                proposal_data = json.loads(output_json)
+                                print(f"✓ Found proposal JSON string in tool call")
+                                break
+                            except:
+                                pass
+        
+        if proposal_data:
+            break
+    
+    if proposal_data:
+        # Force-save the proposal
+        try:
+            from .models import MethodProposalOutput
+            from datetime import datetime
+            
+            # Validate the data
+            proposal_output = MethodProposalOutput.model_validate(proposal_data)
+            
+            # Save it
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            STAGE3_5A_OUT_DIR.mkdir(parents=True, exist_ok=True)
+            output_path = STAGE3_5A_OUT_DIR / f"method_proposal_{plan_id}_{timestamp}.json"
+            output_path.write_text(json.dumps(proposal_data, indent=2))
+            
+            print(f"✅ FORCE-SAVED: {output_path.name}")
+            print(f"   Methods: {len(proposal_data.get('methods_proposed', []))}")
+            print(f"   Data split: {proposal_data.get('data_split_strategy', 'N/A')[:60]}...")
+            
+        except Exception as e:
+            print(f"❌ Force-save failed: {e}")
+            print("   Manual intervention required - check agent logs for proposal JSON")
+    else:
+        print("❌ Could not extract proposal from agent messages")
+        print("   The agent may not have generated a valid proposal")
+        print("   Check the reasoning blocks for the proposal structure")
+    
     return final_state
 
 

@@ -133,6 +133,10 @@ The plan JSON has these key sections:
   - file_id: filename
   - alias: short name (e.g., 'export', 'production')
   - filters: list of pandas query strings (e.g., "Crop == 'Rice'")
+    **SMART FILTERING**: If exact match fails, use intelligent alternatives:
+    • Check for 'Total' aggregation rows
+    • Use partial matching: df[col].str.contains('Rice', case=False, na=False)
+    • Inspect unique values first to understand the data
   - keep_columns: columns to keep after loading
   - rename_columns: dict of old_name -> new_name
 
@@ -157,6 +161,64 @@ The plan JSON has these key sections:
   - test_years: testing period
 
 ═══════════════════════════════════════════════════════════════
+SMART FILTERING STRATEGY (DATASET-AGNOSTIC)
+═══════════════════════════════════════════════════════════════
+
+When applying filters from file_instructions, be intelligent and adaptive:
+
+**STEP 1: Inspect before filtering**
+Always check unique values FIRST to understand the data:
+```python
+# Before applying filter "Crop == 'Rice'"
+print(f"Unique values in column: {df['Crop'].unique()}")
+print(f"Row count before filter: {len(df)}")
+```
+
+**STEP 2: Apply filters intelligently**
+
+If exact match filter (e.g., "Crop == 'Rice'") returns 0 rows:
+
+**Option A: Check for aggregation rows**
+Many datasets have 'Total', 'All', 'Combined', or 'Summary' rows:
+```python
+# Instead of exact 'Rice', try:
+if len(filtered_df) == 0:
+    # Check for aggregation row
+    filtered_df = df[df['Crop'].str.upper() == 'TOTAL']
+    print(f"Using Total row: {len(filtered_df)} rows")
+```
+
+**Option B: Partial/fuzzy matching**
+The column might contain variations like 'RICE', 'Rice (Total)', 'BASMATI RICE', etc.:
+```python
+if len(filtered_df) == 0:
+    # Try case-insensitive partial match
+    filtered_df = df[df['Crop'].str.contains('Rice', case=False, na=False)]
+    print(f"Partial match found: {len(filtered_df)} rows")
+```
+
+**Option C: Aggregate multiple matching rows**
+If you find multiple sub-categories (e.g., 'BASMATI RICE', 'BROKEN RICE'):
+```python
+if len(filtered_df) > 1 and 'Total' not in filtered_df['Crop'].values:
+    # Aggregate by summing/averaging numeric columns
+    # Group by year or time dimension if present
+    filtered_df = filtered_df.groupby('Year').sum(numeric_only=True).reset_index()
+    print(f"Aggregated {len(filtered_df)} rows from sub-categories")
+```
+
+**STEP 3: Document the strategy**
+Always record what filtering approach was used in transformations_applied:
+```python
+if used_total_row:
+    transformations_applied.append("Filter: Used 'Total' aggregation row instead of exact match")
+elif used_partial_match:
+    transformations_applied.append(f"Filter: Partial match found {len(filtered_df)} rows containing target value")
+elif aggregated:
+    transformations_applied.append("Filter: Aggregated sub-categories to create summary rows")
+```
+
+═══════════════════════════════════════════════════════════════
 HOW TO PREPARE DATA
 ═══════════════════════════════════════════════════════════════
 
@@ -171,8 +233,32 @@ import numpy as np
 # Load base dataset
 base_df = load_dataframe('filename1.csv')
 
-# Apply filters
-base_df = base_df.query("filter expression")
+# Apply filters with smart matching
+# Example: filter says "Crop == 'Rice'" but data has 'BASMATI RICE', 'Total', etc.
+filter_col = 'Crop'
+filter_value = 'Rice'
+print(f"Unique {filter_col}: {base_df[filter_col].unique()}")
+
+# Try exact match first
+filtered_df = base_df[base_df[filter_col] == filter_value]
+
+# If no match, try intelligent alternatives
+if len(filtered_df) == 0:
+    # Option 1: Check for 'Total' row
+    if 'Total' in base_df[filter_col].values or 'TOTAL' in base_df[filter_col].str.upper().values:
+        filtered_df = base_df[base_df[filter_col].str.upper() == 'TOTAL']
+        print(f"Using Total row: {len(filtered_df)} rows")
+    # Option 2: Partial match
+    elif base_df[filter_col].str.contains(filter_value, case=False, na=False).any():
+        filtered_df = base_df[base_df[filter_col].str.contains(filter_value, case=False, na=False)]
+        print(f"Partial match: {len(filtered_df)} rows")
+        # Option 3: If multiple sub-categories, aggregate them
+        if len(filtered_df) > 1:
+            # Aggregate numeric columns by year or other dimension
+            filtered_df = filtered_df.groupby('Year', as_index=False).sum(numeric_only=True)
+            print(f"Aggregated to: {len(filtered_df)} rows")
+
+base_df = filtered_df
 
 # Keep specific columns
 base_df = base_df[['col1', 'col2', 'col3']]

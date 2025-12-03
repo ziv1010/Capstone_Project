@@ -1,0 +1,66 @@
+{
+  "id": "TSK-001",
+  "category": "predictive",
+  "title": "Predict Bangladesh Rice Export Values Using Domestic Production Data",
+  "problem_statement": "Forecast INR value of rice exports to Bangladesh using historical production data with \u226565% data completeness in all columns. Leverage 2020-2024 production trends to predict 2025 exports.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "2020 - 21-Value (INR)",
+        "Production-2020-21"
+      ],
+      [
+        "2021 - 22-Value (INR)",
+        "Production-2021-22"
+      ]
+    ],
+    "notes": "Temporal join using 1-year lag: production in year X predicts exports in year X+1. Financial years mapped via cleaned year prefixes."
+  },
+  "target": {
+    "name": "2024 - 25-Value (INR)",
+    "granularity": [
+      "HS Code",
+      "Description"
+    ],
+    "horizon": "12 months"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Production-2023-24",
+      "Production-2022-23",
+      "Yield-2023-24",
+      "Yield-2022-23"
+    ],
+    "transform_ideas": [
+      "Lagged production trends (3-year moving average)",
+      "Yield-to-production ratio normalization"
+    ],
+    "handling_missingness": "Forward-fill for <15% missing values in 2024-25 target column"
+  },
+  "validation_plan": "Time-series cross-validation with 80% training (2018-2023) / 20% testing (2024) split",
+  "quality_checks": [
+    "Verify \u226565% non-null in all features/target",
+    "Check production-export correlation (r\u00b2 > 0.6)"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "2023 - 24-Value (USD)",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Currency preference for INR"
+    },
+    {
+      "column_name": "Yield-2024-25",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Future data not available for training"
+    }
+  ],
+  "expected_outputs": [
+    "Regression model predicting INR export values",
+    "Feature importance rankings",
+    "MAE/RMSE metrics for 2024 prediction"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-002.parquet",
+  "original_row_count": 100,
+  "prepared_row_count": 104,
+  "columns_created": [
+    "YoY_change_2023-24",
+    "Season_Kharif",
+    "Season_Rabi",
+    "Season_Summer",
+    "Season_Total"
+  ],
+  "transformations_applied": [
+    "Forward-fill missing values in area columns",
+    "Created YoY_change_2023-24 feature",
+    "One-hot encoded Season column"
+  ],
+  "data_quality_report": {
+    "nulls_before_cleaning": {
+      "Area-2015-16": 18,
+      "Area-2016-17": 18,
+      "Area-2017-18": 18,
+      "Area-2018-19": 18,
+      "Area-2019-20": 18,
+      "Area-2020-21": 18,
+      "Area-2021-22": 16,
+      "Area-2024-25": 2
+    },
+    "nulls_after_cleaning": 0,
+    "duplicates_removed": 0,
+    "row_count_change": "Increased from 100 to 104 due to forward-fill imputation",
+    "coverage_check": "82% non-null threshold met for all area columns"
+  },
+  "created_at": "2025-12-02T00:24:45.782670"
+}

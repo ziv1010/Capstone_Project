@@ -1,0 +1,51 @@
+<think>
+Okay, let's tackle this. The user wants a second proposal that's different from the first one, which was about predicting Bangladesh rice exports using domestic production data. So I need to find another angle.
+
+Looking at the datasets available: there's the export data for rice varieties to Bangladesh, the production estimates, and the crop-wise area data. The first proposal used production data to predict exports. Maybe I can use the area data instead. 
+
+The area data has columns for different seasons and years. The user mentioned that the combination of Crop and Season is a candidate key. Since the first proposal focused on production, maybe using area as a feature could be another approach. 
+
+I need to check if there's a predictive task here. Perhaps predicting future area under cultivation based on past trends. The area data has multiple years from 2015-16 up to 2024-25. The columns for each year's area have varying null fractions, but the user's tool outputs showed that many of them have ≥65% non-null data. 
+
+For example, the "All-India-profile_-Crop-wise-Area.csv" has Area columns from 2015-16 to 2024-25. The problem statement could be predicting the area for the next financial year based on historical data. 
+
+The target would be the most recent area column, like "Area-2024-25", and features could be the previous years' areas. Since the data includes multiple seasons (Kharif, Rabi, etc.), maybe the season is an important feature. 
+
+I need to ensure all columns used have ≥65% non-null data. From the summary, the Area columns from 2015-16 to 2024-25 have null fractions that meet the requirement. 
+
+The join plan might not be necessary here since it's a single dataset. The required file is the area profile. 
+
+Excluded columns would be those with higher null fractions, like "Area-2023-24" if it had issues, but according to the tool output, it's included. 
+
+The validation plan could involve splitting the data into train and test sets based on years. Quality checks would include checking data completeness and model performance metrics. 
+
+So the proposal would be a predictive task to forecast the area under rice cultivation for the next financial year using historical area data and season information. This is different from the first proposal which focused on export values.
+</think>
+
+{
+  "id": "TSK-002",
+  "category": "predictive",
+  "title": "Forecast Domestic Rice Cultivation Area Using Historical Trends",
+  "problem_statement": "Predict the area under rice cultivation for future financial years using historical area data across seasons. All columns verified ≥65% data completeness.",
+  "required_files": ["All-India-profile_-Crop-wise-Area.csv"],
+  "join_plan": {
+    "hypothesized_keys": [["Crop", "Season"]],
+    "notes": "No joins required; single-dataset time series prediction"
+  },
+  "target": {
+    "name": "Area-2024-25",
+    "granularity": ["Crop", "Season"],
+    "horizon": "Next financial year"
+  },
+  "feature_plan": {
+    "candidates": ["Area-2015-16", "Area-2016-17", "Area-2017-18", "Area-2018-19", "Area-2019-20", "Area-2020-21", "Area-2021-22", "Area-2022-23", "Area-2023-24", "Season"],
+    "transform_ideas": ["Lagged area values as features", "Seasonal dummy encoding", "Year-over-year percentage change"],
+    "handling_missingness": "Forward-fill for missing historical area values"
+  },
+  "validation_plan": "Time series cross-validation with 3-year rolling windows",
+  "quality_checks": ["Check feature importance alignment with agricultural seasons", "Validate prediction intervals against historical variance"],
+  "excluded_columns": [
+    {"column_name": "Area-2023-24", "file": "All-India-profile_-Crop-wise-Area.csv", "reason": "Used as most recent feature rather than target"}
+  ],
+  "expected_outputs": ["Area forecast model", "Seasonal trend visualizations", "RMSE and MAPE metrics"]
+}

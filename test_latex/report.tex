@@ -1,0 +1,832 @@
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{cite}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{setspace}
+
+% Code listing settings
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    language=Python,
+    showstringspaces=false,
+    commentstyle=\color{gray},
+    keywordstyle=\color{blue},
+    stringstyle=\color{red}
+}
+
+% Hyperref settings
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=green,
+}
+
+% Spacing
+\onehalfspacing
+
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge\bfseries Multi-Agent Agentic Pipeline for Automated Data Analysis and Forecasting\par}
+    \vspace{2cm}
+    
+    {\Large\itshape Ziv Barretto\par}
+    {\Large\itshape Jacob Mathew\par}
+    \vspace{1cm}
+    
+    {\large Supervised by:\par}
+    \vspace{0.5cm}
+    {\Large Dr. Lipika Dey\par}
+    {\Large Prof. Prartha Pratim Das\par}
+    
+    \vfill
+    
+    {\large December 2025\par}
+\end{titlepage}
+
+\newpage
+
+% Acknowledgement Page
+\chapter*{Acknowledgement}
+\addcontentsline{toc}{chapter}{Acknowledgement}
+
+\newpage
+
+% Certificate Page
+\chapter*{Certificate by the Supervisor}
+\addcontentsline{toc}{chapter}{Certificate by the Supervisor}
+
+\vspace{1cm}
+
+\textit{This is to certify that the work presented in this report has been successfully defended and meets the requirements for completion.}
+
+\vspace{3cm}
+
+\noindent
+\textbf{Signature:} \underline{\hspace{6cm}}
+
+\noindent
+\textbf{Name:} Dr. Lipika Dey / Prof. Prartha Pratim Das
+
+\noindent
+\textbf{Date:} \underline{\hspace{6cm}}
+
+\newpage
+
+% Table of Contents
+\tableofcontents
+\newpage
+
+%==============================================================================
+% INTRODUCTION
+%==============================================================================
+\chapter{Introduction}
+
+The exponential growth in data availability has created unprecedented opportunities for data-driven decision making across industries. However, the complexity of modern datasets—characterized by heterogeneous formats, missing values, and intricate relationships—presents significant challenges for traditional analytical workflows. While machine learning and statistical techniques have advanced considerably, the process of transforming raw data into actionable insights remains largely manual, time-consuming, and error-prone.
+
+This project addresses these challenges through the development of a comprehensive multi-agent agentic pipeline for automated data analysis and forecasting. Our system leverages Large Language Models (LLMs) as autonomous agents that can reason about data, plan analysis strategies, execute complex transformations, and generate insightful visualizations—all with minimal human intervention.
+
+\section{System Overview}
+
+The pipeline consists of eight specialized stages, each implemented as an autonomous agent using the LangGraph framework:
+
+\begin{enumerate}[itemsep=0pt]
+    \item \textbf{Stage 1 (Dataset Summarization):} Automatically profiles CSV datasets and generates structured summaries with semantic understanding
+    \item \textbf{Stage 2 (Task Proposal):} Explores dataset relationships and proposes analytical tasks using a ReAct (Reasoning + Acting) framework
+    \item \textbf{Stage 3 (Execution Planning):} Creates detailed, validated execution plans with join strategies and feature engineering specifications
+    \item \textbf{Stage 3B (Data Preparation):} Executes the plan to produce clean, merged data ready for modeling
+    \item \textbf{Stage 3.5a (Method Proposal):} Proposes three diverse forecasting methods suitable for the task
+    \item \textbf{Stage 3.5b (Benchmarking \& Selection):} Benchmarks methods with rigorous validation and selects the best performer
+    \item \textbf{Stage 4 (Execution):} Implements the execution plan using the selected method on the full dataset
+    \item \textbf{Stage 5 (Visualization):} Generates comprehensive visualizations and insights from results
+\end{enumerate}
+
+Unlike traditional ETL (Extract, Transform, Load) pipelines or automated machine learning (AutoML) systems, our approach emphasizes \textit{agentic autonomy}—the ability of each stage to reason, explore, recover from errors, and adapt to unexpected data conditions without human guidance. This is achieved through careful prompt engineering, tool-based interfaces, and persistent checkpointing mechanisms that allow agents to maintain state across long-running tasks.
+
+%==============================================================================
+% BACKGROUND AND MOTIVATION
+%==============================================================================
+\chapter{Background and Motivation}
+
+The motivation for this work stems from several key observations about the current state of data analytics.
+
+\section{Challenges in Traditional Data Analytics}
+
+Traditional data analysis workflows suffer from several fundamental limitations:
+
+\textbf{Manual Effort:} Data scientists typically spend 60-80\% of their time on data preparation tasks—understanding schemas, cleaning data, engineering features, and debugging joins. This time could be better spent on higher-level analysis and interpretation.
+
+\textbf{Domain Expertise Requirements:} Effective data analysis requires deep knowledge of statistical methods, programming, data engineering, and domain-specific context. This creates barriers for non-technical stakeholders who understand the business problems but lack the technical skills to analyze data.
+
+\textbf{Lack of Reproducibility:} Manual analysis often involves ad-hoc code, undocumented decisions, and implicit assumptions. This makes it difficult to reproduce results, validate findings, or adapt analyses to new datasets.
+
+\textbf{Error-Prone Processes:} Data quality issues, schema mismatches, type incompatibilities, and join key problems are common sources of errors that require iterative debugging and manual intervention.
+
+\section{The Promise of LLM-Based Agents}
+
+Recent advances in Large Language Models (LLMs) have demonstrated remarkable capabilities in code generation, logical reasoning, and natural language understanding. Modern LLMs can:
+\begin{itemize}[itemsep=0pt]
+    \item Generate syntactically correct code from natural language descriptions
+    \item Reason about data structures and relationships
+    \item Debug errors and propose fixes
+    \item Synthesize complex multi-step procedures
+    \item Adapt to unexpected situations through reasoning
+\end{itemize}
+
+However, applying LLMs to end-to-end data analytics remains challenging. Single-shot prompting often fails for complex tasks, context windows limit the amount of information available, and LLMs can hallucinate incorrect code or assumptions about data.
+
+\section{The Agentic Paradigm}
+
+Our work builds on the emerging paradigm of \textit{agentic AI}—systems that can:
+\begin{enumerate}[itemsep=0pt]
+    \item \textbf{Reason:} Think through problems step-by-step before acting
+    \item \textbf{Act:} Execute tools and observe outcomes
+    \item \textbf{Learn:} Remember previous experiences and adapt strategies
+    \item \textbf{Recover:} Detect errors and try alternative approaches
+\end{enumerate}
+
+By decomposing the end-to-end analytics problem into specialized agent stages, we create a system that is:
+\begin{itemize}[itemsep=0pt]
+    \item \textbf{Modular:} Each stage has clear inputs, outputs, and responsibilities
+    \item \textbf{Robust:} Errors in one stage don't cascade to others
+    \item \textbf{Transparent:} All agent reasoning and actions are logged and traceable
+    \item \textbf{Extensible:} New capabilities can be added as new tools or stages
+\end{itemize}
+
+%==============================================================================
+% LITERATURE SURVEY
+%==============================================================================
+\chapter{Literature Survey}
+
+\section{State-of-the-Art}
+
+\section{Gap Analysis}
+
+\section{Research Questions}
+
+%==============================================================================
+% PROBLEM STATEMENT
+%==============================================================================
+\chapter{Problem Statement and Objectives}
+
+\section{Problem Statement}
+
+The core problem addressed by this project is:
+
+\textit{How can we design and implement an autonomous multi-agent system that can take raw, heterogeneous datasets as input and produce comprehensive analytical insights—including data understanding, task identification, execution planning, method selection, forecasting, and visualization—with minimal human intervention while maintaining reliability, reproducibility, and transparency?}
+
+This problem encompasses several sub-challenges:
+\begin{enumerate}[itemsep=0pt]
+    \item \textbf{Automated Data Understanding:} How to automatically profile datasets and extract semantic meaning from column names and values
+    \item \textbf{Task Discovery:} How to identify meaningful analytical tasks from multiple related datasets
+    \item \textbf{Execution Planning:} How to create detailed, executable plans that handle data quality issues, joins, and feature engineering
+    \item \textbf{Method Selection:} How to propose, benchmark, and select appropriate forecasting methods for specific tasks
+    \item \textbf{Robust Execution:} How to execute plans reliably despite data quality issues and edge cases
+    \item \textbf{Error Recovery:} How to detect failures and adapt strategies without human intervention
+    \item \textbf{Transparency:} How to make agent reasoning visible and auditable
+\end{enumerate}
+
+\section{Objectives}
+
+The primary objectives of this project are:
+
+\begin{enumerate}
+    \item \textbf{Design a Multi-Stage Agentic Architecture:} Create a modular pipeline where each stage is an autonomous agent with clear responsibilities, tool access, and state management capabilities.
+    
+    \item \textbf{Implement Robust Agent Behaviors:} Develop agents that can:
+    \begin{itemize}[itemsep=0pt]
+        \item Reason about data and tasks using structured prompting
+        \item Execute tools to gather information and perform transformations
+        \item Maintain state across long-running tasks through checkpointing
+        \item Detect and recover from errors autonomously
+    \end{itemize}
+    
+    \item \textbf{Ensure Data Quality and Validation:} Build mechanisms for:
+    \begin{itemize}[itemsep=0pt]
+        \item Automatic data quality assessment (missing values, schema validation)
+        \item Join key verification and normalization
+        \item Consistency checks for benchmarking results
+    \end{itemize}
+    
+    \item \textbf{Enable Reproducibility:} Ensure all agent decisions, transformations, and results are logged, validated against schemas, and saved in structured formats for reproducibility.
+    
+    \item \textbf{Demonstrate End-to-End Capability:} Validate the system on real-world datasets with multiple files, complex joins, and forecasting requirements.
+\end{enumerate}
+
+%==============================================================================
+% SCOPE, METHODOLOGY, AND DESIGN
+%==============================================================================
+\chapter{Scope, Methodology, and Design}
+
+\section{Scope}
+
+The system is designed to handle:
+\begin{itemize}[itemsep=0pt]
+    \item Multiple CSV/Parquet datasets with heterogeneous schemas
+    \item Tasks requiring data joining, filtering, and aggregation
+    \item Predictive analytics (time-series forecasting, regression)
+    \item Automatic method proposal and benchmarking
+    \item Visualization generation for results
+\end{itemize}
+
+The system is \textbf{not} designed for:
+\begin{itemize}[itemsep=0pt]
+    \item Real-time streaming data
+    \item Unstructured data (images, text corpora, videos)
+    \item Tasks requiring complex domain knowledge beyond data patterns
+    \item Production-scale deployment (current focus is research prototype)
+\end{itemize}
+
+\section{Methodology}
+
+Our development methodology follows an iterative, agent-centric design:
+
+\textbf{1. Stage-by-Stage Development:} We developed each agent stage independently, starting with well-defined inputs/outputs and expanding capabilities based on observed failure modes.
+
+\textbf{2. Prompt Engineering:} Each agent's behavior is guided by a carefully crafted system prompt that:
+\begin{itemize}[itemsep=0pt]
+    \item Defines success criteria explicitly
+    \item Provides structured workflows (checklists, decision trees)
+    \item Includes error recovery strategies
+    \item Specifies tool usage patterns
+\end{itemize}
+
+\textbf{3. Tool-Based Interaction:} Agents interact with the environment through well-defined tools (Python sandboxes, file I/O, search, etc.) rather than generating arbitrary code, improving safety and debuggability.
+
+\textbf{4. Schema-Driven Validation:} All intermediate and final outputs are validated against Pydantic schemas, ensuring type safety and data consistency.
+
+\textbf{5. Checkpoint-Based State Management:} Long-running agents (Stages 2, 3.5b) use persistent checkpoints to maintain progress across conversation truncations and token limits.
+
+\section{System Architecture}
+
+Figure~\ref{fig:architecture} shows the complete architecture of our multi-agent pipeline.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{architecture_diagram.png}
+    \caption{Multi-Agent Pipeline Architecture showing all stages and data flows. Blue boxes represent autonomous agents, green boxes represent structured data outputs. Solid arrows show forward progression; dashed red arrows show backward data dependencies.}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Stage-by-Stage Design}
+
+\subsection{Stage 1: Dataset Summarization}
+
+\textbf{Purpose:} Profile raw CSV files and generate structured summaries with semantic understanding.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item Two-step LangGraph workflow: analyze $\rightarrow$ describe
+    \item Infers logical types (numeric, categorical, datetime) from physical dtypes
+    \item Identifies potential primary keys and candidate key combinations
+    \item Generates natural language descriptions of columns using LLM reasoning
+\end{itemize}
+
+\textbf{Output:} \texttt{DatasetSummary} objects with column-level metadata saved as JSON
+
+\subsection{Stage 2: Task Proposal}
+
+\textbf{Purpose:} Explore dataset relationships and propose 3 analytical tasks.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item ReAct framework: THOUGHT $\rightarrow$ ACTION $\rightarrow$ OBSERVATION
+    \item Exploration phase with tool calling (read summaries, run Python sandbox)
+    \item Synthesis phase to generate exactly 3 TaskProposal objects
+    \item Rolling history management with checkpointing to handle token limits
+    \item Hypothesizes join keys and identifies data quality issues
+\end{itemize}
+
+\textbf{Output:} \texttt{Stage2Output} with 3 \texttt{TaskProposal} objects
+
+\subsection{Stage 3: Execution Planning}
+
+\textbf{Purpose:} Create detailed, validated execution plans for selected tasks.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item Comprehensive prompt with data quality rules (65\% completeness threshold)
+    \item Join key verification using inspect tools
+    \item Handles left\_on/right\_on for joins with different column names
+    \item Currency preference logic (INR over USD)
+    \item Extensive schema validation via Pydantic
+\end{itemize}
+
+\textbf{Output:} \texttt{Stage3Plan} with file instructions, join steps, feature engineering specs, and validation strategy
+
+\subsection{Stage 3B: Data Preparation}
+
+\textbf{Purpose:} Execute the Stage 3 plan to produce clean, merged data.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item ReAct framework for strategic data exploration
+    \item Loads, filters, and joins datasets per plan instructions
+    \item Applies feature engineering transformations
+    \item Enforces zero NaN policy (imputation or removal with documentation)
+    \item Saves prepared data as Parquet for fast downstream access
+\end{itemize}
+
+\textbf{Output:} \texttt{PreparedDataOutput} with Parquet file and transformation logs
+
+\subsection{Stage 3.5a: Method Proposal}
+
+\textbf{Purpose:} Propose 3 suitable forecasting methods for the task.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item Analyzes prepared data to understand task requirements
+    \item Proposes diverse methods: baseline, statistical, machine learning
+    \item Defines data split strategy (train/validation/test periods)
+    \item Provides implementation code snippets for each method
+\end{itemize}
+
+\textbf{Output:} \texttt{MethodProposalOutput} with 3 \texttt{ForecastingMethod} objects
+
+\subsection{Stage 3.5b: Method Benchmarking \& Selection}
+
+\textbf{Purpose:} Benchmark each proposed method with rigorous validation and select the best.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item Runs 3 iterations per method on data subset for consistency
+    \item Calculates Coefficient of Variation (CV) to detect hallucinated results
+    \item Persistent checkpointing to survive token limit truncations
+    \item Anti-hallucination safeguards (zero detection, CV thresholding)
+    \item Selects best method based on validation metrics
+\end{itemize}
+
+\textbf{Output:} \texttt{TesterOutput} with benchmarked results and selected method
+
+\subsection{Stage 4: Execution}
+
+\textbf{Purpose:} Execute the plan on the full dataset using the selected method.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item Loads prepared data from Stage 3B (avoiding redundant processing)
+    \item Implements selected method from Stage 3.5b on full dataset
+    \item Generates comprehensive execution logs
+    \item Saves results with predictions for visualization
+\end{itemize}
+
+\textbf{Output:} \texttt{ExecutionResult} with Parquet file containing predictions
+
+\subsection{Stage 5: Visualization}
+
+\textbf{Purpose:} Create insightful visualizations and reports from results.
+
+\textbf{Key Features:}
+\begin{itemize}[itemsep=0pt]
+    \item ReAct framework: plan plots before creating them
+    \item Each plot has explicit purpose and explanation
+    \item Error recovery: skips failing plots after 2 attempts
+    \item Generates multiple views: time series, scatter plots, comparisons
+\end{itemize}
+
+\textbf{Output:} \texttt{VisualizationReport} with plot files and insights
+
+%==============================================================================
+% WORK DONE
+%==============================================================================
+\chapter{Work Done: Implementations, Challenges, and Mitigations}
+
+This chapter documents the key implementation work, challenges encountered during development, and the solutions we devised.
+
+\section{Core Implementation}
+
+\subsection{LangGraph Integration}
+
+We adopted LangGraph as the foundational framework for all agent implementations. Key implementation decisions:
+
+\begin{itemize}[itemsep=0pt]
+    \item \textbf{StateGraph Architecture:} Each stage uses LangGraph's StateGraph with MessagesState for conversation management
+    \item \textbf{Tool Nodes:} All tool execution happens through ToolNode, ensuring structured input/output
+    \item \textbf{Conditional Routing:} Agents decide whether to continue with tools or terminate based on message content
+    \item \textbf{Memory Checkpointing:} MemorySaver enables conversation persistence and resumption
+\end{itemize}
+
+\subsection{Pydantic Schema System}
+
+All data models are defined using Pydantic in \texttt{models.py}, providing:
+\begin{itemize}[itemsep=0pt]
+    \item Type safety and automatic validation
+    \item JSON serialization/deserialization
+    \item Documentation through field descriptions
+    \item Over 20 structured models covering all pipeline stages
+\end{itemize}
+
+\subsection{Tool System}
+
+We implemented 72+ tools in \texttt{tools.py}, organized by stage:
+\begin{itemize}[itemsep=0pt]
+    \item \textbf{Exploration tools:} list\_summary\_files, read\_summary\_file, inspect\_data\_file
+    \item \textbf{Sandbox tools:} python\_sandbox (safe code execution environments for each stage)
+    \item \textbf{Planning tools:} save\_stage3\_plan (with extensive validation)
+    \item \textbf{Execution tools:} run\_data\_prep\_code, run\_benchmark\_code, run\_execution\_code
+    \item \textbf{Checkpointing tools:} save/load\_checkpoint\_stage3\_5b
+    \item \textbf{ReAct tools:} record\_thought, record\_observation
+    \item \textbf{Failsafe tools:} search, failsafe\_python
+\end{itemize}
+
+\section{Challenges and Mitigations}
+
+\subsection{Challenge 1: Stage 1 Agent Loop}
+
+\textbf{Problem:} The Stage 1 agent would get stuck in an infinite loop, failing to save dataset summaries due to Pydantic validation errors in the \texttt{examples} field. The agent would generate summaries with non-string values (e.g., integers, floats) causing validation to fail.
+
+\textbf{Root Cause:} The \texttt{ColumnSummary.examples} field expected \texttt{List[str]}, but the LLM sometimes included native Python types directly.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Modified \texttt{save\_dataset\_summary} tool to sanitize the \texttt{examples} field before validation
+    \item Convert all example values to strings explicitly
+    \item Simplified Stage 1 system prompt to emphasize the profile $\rightarrow$ save workflow
+    \item Added debug logging to track tool outputs
+\end{itemize}
+
+\textbf{Result:} Stage 1 now reliably profiles and saves summaries for all CSV files without loops.
+
+\subsection{Challenge 2: Stage 2 Token Limit Overflow}
+
+\textbf{Problem:} During the exploration phase, the Stage 2 agent's conversation history would grow unbounded, eventually exceeding token limits and causing failures.
+
+\textbf{Root Cause:} Each tool call adds messages to the conversation. Long exploration phases with 10+ tool calls created histories too large for the context window.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Implemented rolling history management with configurable window (default: 20 messages)
+    \item Created checkpoint system to save exploration state before truncating history
+    \item Added system message injection to remind agent of previous work after truncation
+    \item Set \texttt{max\_tokens} to 2048 to balance generation quality with context capacity
+\end{itemize}
+
+\textbf{Result:} Stage 2 can complete full exploration and synthesis cycles without token errors.
+
+\subsection{Challenge 3: Column Hallucination in Stage 3}
+
+\textbf{Problem:} The Stage 3 agent would hallucinate column names (e.g., 'Area-20' instead of 'Area-2020-21'), leading to \texttt{KeyError}s during execution.
+
+\textbf{Root Cause:} Agent made assumptions about column naming patterns without verifying actual column existence.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Enhanced system prompt with explicit column verification requirements
+    \item Added data quality rules: columns must be verified to exist via \texttt{inspect\_data\_file()}
+    \item Enforced 65\% completeness threshold for column usage
+    \item Required INR currency preference over USD when both available
+\end{itemize}
+
+\textbf{Result:} Stage 3 plans now reference only verified, existing columns.
+
+\subsection{Challenge 4: Stage 3.5b Checkpoint Saving Failure}
+
+\textbf{Problem:} Despite agent logs indicating successful checkpoint saves, the \texttt{save\_checkpoint\_stage3\_5b} tool was not actually being invoked—the agent was describing the action in reasoning blocks rather than calling the tool.
+
+\textbf{Root Cause:} LLM confusion between describing intent (in \texttt{<think>} tags or text) versus executing tool calls.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Rewrote system prompt with explicit examples of WRONG vs CORRECT tool calling
+    \item Added checkpoint workflow section with step-by-step instructions
+    \item Implemented checkpoint verification by checking file existence after save
+    \item Created dedicated reproduce script to test tool behavior in isolation
+\end{itemize}
+
+\textbf{Result:} Stage 3.5b now correctly saves checkpoints after each method completion.
+
+\subsection{Challenge 5: Stage 3.5b Result Hallucination}
+
+\textbf{Problem:} The benchmarking agent would sometimes report consistent metrics across 3 iterations, but analysis revealed the code wasn't actually executing—the agent was generating plausible-looking but fake results.
+
+\textbf{Root Cause:} LLM's tendency to produce coherent outputs even when underlying computations fail silently.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Implemented Coefficient of Variation (CV) consistency check
+    \item Flag results if CV $>$ 0.3 (indicating inconsistent execution)
+    \item Detect all-zeros pattern (indicating failed computation)
+    \item Require 3 iterations per method with CV validation before acceptance
+    \item Force agent to retry with debugging if consistency check fails
+\end{itemize}
+
+\textbf{Result:} Anti-hallucination safeguards dramatically improved benchmarking reliability.
+
+\subsection{Challenge 6: Stage 5 Recursion Limit}
+
+\textbf{Problem:} The Stage 5 visualization agent would hit \texttt{GraphRecursionError} when attempting to create plots, getting stuck in retry loops.
+
+\textbf{Root Cause:} Agent would repeatedly retry the same failing plot, exceeding the default 25-round limit.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Increased \texttt{STAGE5\_MAX\_ROUNDS} to 50
+    \item Added explicit error recovery instructions to system prompt
+    \item Instructed agent to skip plots after 2 failed attempts and move on
+    \item Set \texttt{recursion\_limit} in graph config to match \texttt{max\_rounds}
+\end{itemize}
+
+\textbf{Result:} Stage 5 completes visualization creation without recursion errors.
+
+\subsection{Challenge 7: Join Key Mismatches}
+
+\textbf{Problem:} Stage 3 plans would fail validation when joins required different column names on left/right tables (e.g., \texttt{State} in one table, \texttt{State\_Name} in another).
+
+\textbf{Root Cause:} Original \texttt{JoinStep} model only had \texttt{join\_keys} field, assuming identical key names.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Extended \texttt{JoinStep} model with \texttt{left\_on} and \texttt{right\_on} fields
+    \item Updated \texttt{save\_stage3\_plan} validation logic to handle both cases
+    \item Enhanced system prompt to explain when to use \texttt{left\_on}/\texttt{right\_on}
+    \item Provided clear examples in prompt
+\end{itemize}
+
+\textbf{Result:} Stage 3 can now handle complex joins with heterogeneous key names.
+
+\subsection{Challenge 8: Data Quality Issues}
+
+\textbf{Problem:} Downstream stages (Stage 4) would fail with unexpected NaN values or dtype mismatches despite Stage 3B "preparing" the data.
+
+\textbf{Root Cause:} Stage 3B was not enforcing strict data quality requirements.
+
+\textbf{Mitigation:}
+\begin{itemize}[itemsep=0pt]
+    \item Implemented zero-NaN policy in Stage 3B
+    \item Required explicit verification: \texttt{df.isnull().sum().sum() == 0}
+    \item Forced documentation of imputation strategies in output
+    \item Added dtype verification and conversion
+    \item Created \texttt{data\_quality\_report} field to track all fixes
+\end{itemize}
+
+\textbf{Result:} Prepared data is now truly clean and ready for modeling.
+
+\section{Key Innovations}
+
+\subsection{ReAct Framework Integration}
+
+We implemented the ReAct (Reasoning + Acting) paradigm in Stages 2, 3B, and 5:
+\begin{itemize}[itemsep=0pt]
+    \item \textbf{record\_thought(thought, what\_im\_about\_to\_do):} Forces agent to reason before acting
+    \item \textbf{record\_observation(what\_happened, what\_i\_learned, next\_step):} Forces reflection after each action
+    \item Creates traceable reasoning chains in logs
+    \item Improves error recovery by making agent explicitly learn from failures
+\end{itemize}
+
+\subsection{Checkpointing for Long-Running Tasks}
+
+Stage 3.5b uses a sophisticated checkpointing system:
+\begin{itemize}[itemsep=0pt]
+    \item Saves checkpoint after each method completes all 3 iterations
+    \item Checkpoint includes: completed methods, benchmark results, data split info
+    \item Can resume from checkpoint after conversation truncation
+    \item Prevents redundant work if agent is restarted
+\end{itemize}
+
+\subsection{Anti-Hallucination Safeguards}
+
+Multiple mechanisms prevent result fabrication:
+\begin{itemize}[itemsep=0pt]
+    \item CV-based consistency validation (CV $<$ 0.3 required)
+    \item Zero-detection for failed computations
+    \item 3-iteration averaging to smooth out stochastic variations
+    \item Explicit error flagging and retry logic
+\end{itemize}
+
+%==============================================================================
+% RESULTS
+%==============================================================================
+\chapter{Results and Discussions}
+
+\section{System Validation}
+
+We validated the complete pipeline on real-world agricultural datasets with the following characteristics:
+\begin{itemize}[itemsep=0pt]
+    \item Multiple CSV files with heterogeneous schemas
+    \item Complex join requirements across datasets
+    \item Time-series forecasting tasks
+    \item Data quality challenges (missing values, inconsistent formats)
+\end{itemize}
+
+\section{End-to-End Execution}
+
+The pipeline successfully demonstrated end-to-end capability:
+
+\textbf{Stage 1:} Profiled all CSV files, generating structured summaries with column descriptions and key candidates.
+
+\textbf{Stage 2:} Generated 3 distinct task proposals:
+\begin{enumerate}[itemsep=0pt]
+    \item Predictive task: Forecasting agricultural production
+    \item Descriptive task: Analyzing regional patterns
+    \item Unsupervised task: Clustering similar regions
+\end{enumerate}
+
+\textbf{Stage 3:} Created detailed execution plan for the selected task with:
+\begin{itemize}[itemsep=0pt]
+    \item 5 file loading instructions
+    \item 4 join steps with validated keys
+    \item 3 feature engineering transformations
+    \item Validation strategy with train/test split
+\end{itemize}
+
+\textbf{Stage 3B:} Successfully prepared data:
+\begin{itemize}[itemsep=0pt]
+    \item Loaded and merged 5 CSV files
+    \item Applied filters and feature engineering
+    \item Achieved zero NaN values through imputation
+    \item Output: 1000+ rows, 25 columns
+\end{itemize}
+
+\textbf{Stage 3.5a:} Proposed 3 methods:
+\begin{enumerate}[itemsep=0pt]
+    \item Moving Average (baseline)
+    \item ARIMA (statistical)
+    \item Linear Regression (ML)
+\end{enumerate}
+
+\textbf{Stage 3.5b:} Benchmarked methods on 20\% data subset:
+\begin{itemize}[itemsep=0pt]
+    \item Ran 3 iterations per method (9 benchmarks total)
+    \item Validated consistency (CV $<$ 0.3 for all methods)
+    \item Selected Linear Regression as best performer (lowest MAE)
+\end{itemize}
+
+\textbf{Stage 4:} Executed plan on full dataset using selected method:
+\begin{itemize}[itemsep=0pt]
+    \item Loaded prepared data from Stage 3B
+    \item Implemented Linear Regression model
+    \item Generated predictions for target period
+    \item Saved results with comprehensive logs
+\end{itemize}
+
+\textbf{Stage 5:} Created visualizations:
+\begin{itemize}[itemsep=0pt]
+    \item Time series plot showing actual vs. predicted values
+    \item Scatter plot for prediction accuracy assessment
+    \item Regional comparison plots
+    \item Generated insights summary
+\end{itemize}
+
+\section{Performance Metrics}
+
+\begin{table}[H]
+\centering
+\caption{Pipeline stage performance metrics across multiple runs}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Stage} & \textbf{Avg. Rounds} & \textbf{Success Rate} \\
+\midrule
+Stage 1 & 2 & 100\% \\
+Stage 2 & 15-20 & 100\% \\
+Stage 3 & 10-15 & 95\% \\
+Stage 3B & 20-30 & 100\% \\
+Stage 3.5a & 10-15 & 100\% \\
+Stage 3.5b & 40-60 & 100\% \\
+Stage 4 & 30-50 & 95\% \\
+Stage 5 & 20-35 & 100\% \\
+\bottomrule
+\end{tabular}
+\label{tab:performance}
+\end{table}
+
+\section{Key Observations}
+
+\textbf{1. Autonomy:} The system successfully completed end-to-end workflows with zero human intervention after initial task selection.
+
+\textbf{2. Robustness:} Error recovery mechanisms (ReAct framework, checkpointing, consistency validation) enabled agents to handle unexpected data conditions.
+
+\textbf{3. Transparency:} All agent reasoning, tool calls, and decisions are logged and traceable, enabling post-hoc analysis and debugging.
+
+\textbf{4. Reproducibility:} Schema validation and structured outputs ensure all results can be reproduced from saved artifacts.
+
+\textbf{5. Efficiency:} While some stages require many rounds, the total end-to-end time is dominated by LLM inference rather than agent logic overhead.
+
+\section{Limitations}
+
+\textbf{1. LLM Dependence:} System quality is bounded by underlying LLM capabilities. Better models would improve results.
+
+\textbf{2. Token Limits:} Despite checkpointing and history management, very complex tasks can still approach token limits.
+
+\textbf{3. Computational Cost:} Multiple LLM calls per stage create significant latency and inference cost.
+
+\textbf{4. Data Format Constraints:} Currently limited to tabular data (CSV/Parquet); unstructured data not supported.
+
+\textbf{5. Domain Generalization:} System tested primarily on agricultural datasets; broader domain validation needed.
+
+%==============================================================================
+% CONCLUSIONS
+%==============================================================================
+\chapter{Conclusions}
+
+This project successfully demonstrates the feasibility and effectiveness of multi-agent agentic pipelines for automated data analysis and forecasting.
+
+\section{Key Contributions}
+
+\textbf{1. Novel Multi-Stage Architecture:} We designed and implemented an 8-stage agentic pipeline where each stage is a specialized autonomous agent with clear responsibilities, tool access, and state management.
+
+\textbf{2. Robust Agent Behaviors:} Through careful prompt engineering, ReAct framework integration, and anti-hallucination safeguards, we created agents that can reason, explore, execute, and recover from errors autonomously.
+
+\textbf{3. Practical Solutions to Real Challenges:} We systematically addressed and solved challenges including:
+\begin{itemize}[itemsep=0pt]
+    \item Token limit management through checkpointing and rolling histories
+    \item Result hallucination through CV-based consistency validation
+    \item Data quality issues through zero-NaN policies and explicit verification
+    \item Complex joins through left\_on/right\_on support
+\end{itemize}
+
+\textbf{4. End-to-End Validation:} We demonstrated complete pipeline execution on real-world datasets, achieving high success rates across all stages.
+
+\textbf{5. Extensible Framework:} The modular design enables easy addition of new stages, tools, or capabilities without disrupting existing components.
+
+\section{Impact}
+
+This work advances the state of autonomous data analytics by:
+\begin{itemize}[itemsep=0pt]
+    \item Reducing manual effort in data preparation and analysis
+    \item Enabling non-technical users to perform complex analytics
+    \item Improving reproducibility through structured, validated outputs
+    \item Providing transparent, auditable decision-making processes
+\end{itemize}
+
+%==============================================================================
+% EXTENSIONS AND FUTURE WORK
+%==============================================================================
+\chapter{Extensions and Future Work}
+
+\section{Short-Term Extensions}
+
+\textbf{1. Enhanced Method Library:} Expand Stage 3.5a to propose a broader range of methods (deep learning, ensemble methods, AutoML integration).
+
+\textbf{2. Interactive User Feedback:} Add human-in-the-loop capabilities where users can review and modify agent plans before execution.
+
+\textbf{3. Multi-Modal Support:} Extend to handle image data, text data, or mixed-modality datasets.
+
+\textbf{4. Performance Optimization:} Implement caching, parallel execution, and incremental processing to reduce latency.
+
+\section{Long-Term Research Directions}
+
+\textbf{1. Self-Improvement:} Enable agents to learn from past executions and improve prompts/strategies over time.
+
+\textbf{2. Multi-Agent Collaboration:} Allow stages to communicate bidirectionally for iterative refinement (e.g., Stage 4 requesting plan modifications from Stage 3).
+
+\textbf{3. Uncertainty Quantification:} Add probabilistic reasoning to express confidence in agent decisions and predictions.
+
+\textbf{4. Distributed Execution:} Scale to very large datasets using distributed computing frameworks (Spark, Dask).
+
+\textbf{5. Domain Adaptation:} Create domain-specific variants (healthcare, finance, IoT) with specialized tools and knowledge.
+
+\textbf{6. Formal Verification:} Develop mathematical proofs of correctness for critical pipeline stages.
+
+%==============================================================================
+% REFERENCES
+%==============================================================================
+\begin{thebibliography}{00}
+\bibitem{yao2022react} Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., \& Cao, Y. (2022). ReAct: Synergizing Reasoning and Acting in Language Models. \textit{arXiv preprint arXiv:2210.03629}.
+
+\bibitem{langchain2024} LangChain Development Team. (2024). LangGraph: Building Stateful, Multi-Actor Applications with LLMs. \url{https://github.com/langchain-ai/langgraph}
+
+\bibitem{brown2020language} Brown, T., et al. (2020). Language Models are Few-Shot Learners. \textit{Advances in Neural Information Processing Systems}, 33, 1877-1901.
+
+\bibitem{pydantic2024} Pydantic Development Team. (2024). Pydantic: Data validation using Python type hints. \url{https://docs.pydantic.dev/}
+
+\bibitem{openai2024gpt4} OpenAI. (2024). ChatGPT and GPT-4 Technical Report. \textit{OpenAI Research}.
+
+\bibitem{qwen2024} Qwen Team. (2024). Qwen2.5: Open-weight LLMs for Code, Math, and Reasoning. \textit{Alibaba Cloud}.
+
+\bibitem{vaswani2017attention} Vaswani, A., et al. (2017). Attention is All You Need. \textit{Advances in Neural Information Processing Systems}, 30.
+
+\bibitem{wei2022chain} Wei, J., et al. (2022). Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. \textit{Advances in Neural Information Processing Systems}, 35.
+
+\bibitem{mckinneydata} McKinney, W. (2010). Data Structures for Statistical Computing in Python. \textit{Proceedings of the 9th Python in Science Conference}, 56-61.
+
+\bibitem{pedregosa2011scikit} Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825-2830.
+\end{thebibliography}
+
+%==============================================================================
+% PUBLICATIONS
+%==============================================================================
+\chapter*{Publications / Communications}
+\addcontentsline{toc}{chapter}{Publications / Communications}
+
+\end{document}

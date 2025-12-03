@@ -1,0 +1,57 @@
+{
+  "id": "TSK-003",
+  "category": "predictive",
+  "title": "Predict Bangladesh Rice Export Values Using Domestic Cultivation Area Trends",
+  "problem_statement": "Forecast rice export values to Bangladesh using historical domestic cultivation area data for rice. All columns verified \u226565% data completeness.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-profile_-Crop-wise-Area.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Crop",
+        "Season"
+      ]
+    ],
+    "notes": "Join on 'Rice' crop and financial year alignment (e.g., Area-2020-21 \u2192 2020-21 export values)."
+  },
+  "target": {
+    "name": "2024 - 25-Value (INR)",
+    "granularity": [
+      "HS Code",
+      "Description"
+    ],
+    "horizon": "2024-25 financial year"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24"
+    ],
+    "transform_ideas": [
+      "Year-over-year area change",
+      "Rolling 3-year average area"
+    ],
+    "handling_missingness": "Forward-fill historical area data"
+  },
+  "validation_plan": "Time-series cross-validation using 2018-21 as training, 2022-24 as validation",
+  "quality_checks": [
+    "Check correlation between area and export values",
+    "Validate model performance on 2024-25 data"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "2018 - 19-Value (USD)",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Currency preference for INR"
+    }
+  ],
+  "expected_outputs": [
+    "Regression model metrics (RMSE, R\u00b2)",
+    "Area-export value correlation matrix",
+    "Yearly prediction error plots"
+  ]
+}

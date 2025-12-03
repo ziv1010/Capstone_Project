@@ -1,0 +1,54 @@
+<think>
+Okay, let's tackle this. The user wants a predictive task proposal using the available datasets. First, I need to check the datasets again. The Export-of-Rice-Varieties dataset has INR values for different years, and the All-India-Estimates has production data. The goal is to predict future export values based on production.
+
+Looking at the data availability, the INR columns in the export dataset have varying null fractions. The 2023-24 and 2024-25 have higher nulls, but the earlier years are okay. The production data has complete data from 2020-21 onwards. The join key would be the year, considering a lag between production and export. Since production in a financial year (like 2020-21) would affect the next export year (2021-22), we can map production years to the next export year's start. 
+
+The required files are the export and production datasets. The join plan uses the year as the key, adjusting for the lag. The target is the INR value for the next year. Features would include the production data from the previous year. Need to handle missing data by imputation or removal. Validation would use time-series splits. Exclude USD columns as per preference. Ensure all columns have ≥65% data. The quality checks include data completeness and correlation analysis. Expected outputs are a regression model and metrics.
+</think>
+
+{
+  "id": "TSK-001",
+  "category": "predictive",
+  "title": "Predict Bangladesh Rice Export Values Using Domestic Production Data",
+  "problem_statement": "Forecast INR value of rice exports to Bangladesh using historical production data with ≥65% data completeness in all columns. Leverage 2020-2024 production trends to predict 2025 exports.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [["2020 - 21-Value (INR)", "Production-2020-21"], ["2021 - 22-Value (INR)", "Production-2021-22"]],
+    "notes": "Temporal join using 1-year lag: production in year X predicts exports in year X+1. Financial years mapped via cleaned year prefixes."
+  },
+  "target": {
+    "name": "2024 - 25-Value (INR)",
+    "granularity": ["HS Code", "Description"],
+    "horizon": "12 months"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Production-2023-24",
+      "Production-2022-23",
+      "Yield-2023-24",
+      "Yield-2022-23"
+    ],
+    "transform_ideas": [
+      "Lagged production trends (3-year moving average)",
+      "Yield-to-production ratio normalization"
+    ],
+    "handling_missingness": "Forward-fill for <15% missing values in 2024-25 target column"
+  },
+  "validation_plan": "Time-series cross-validation with 80% training (2018-2023) / 20% testing (2024) split",
+  "quality_checks": [
+    "Verify ≥65% non-null in all features/target",
+    "Check production-export correlation (r² > 0.6)"
+  ],
+  "excluded_columns": [
+    {"column_name": "2023 - 24-Value (USD)", "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv", "reason": "Currency preference for INR"},
+    {"column_name": "Yield-2024-25", "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv", "reason": "Future data not available for training"}
+  ],
+  "expected_outputs": [
+    "Regression model predicting INR export values",
+    "Feature importance rankings",
+    "MAE/RMSE metrics for 2024 prediction"
+  ]
+}

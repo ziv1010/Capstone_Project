@@ -1,0 +1,63 @@
+{
+  "id": "TSK-002",
+  "category": "predictive",
+  "title": "Forecast Domestic Rice Cultivation Area Using Historical Trends",
+  "problem_statement": "Predict the area under rice cultivation for future financial years using historical area data across seasons. All columns verified \u226565% data completeness.",
+  "required_files": [
+    "All-India-profile_-Crop-wise-Area.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Crop",
+        "Season"
+      ]
+    ],
+    "notes": "No joins required; single-dataset time series prediction"
+  },
+  "target": {
+    "name": "Area-2024-25",
+    "granularity": [
+      "Crop",
+      "Season"
+    ],
+    "horizon": "Next financial year"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Area-2015-16",
+      "Area-2016-17",
+      "Area-2017-18",
+      "Area-2018-19",
+      "Area-2019-20",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Season"
+    ],
+    "transform_ideas": [
+      "Lagged area values as features",
+      "Seasonal dummy encoding",
+      "Year-over-year percentage change"
+    ],
+    "handling_missingness": "Forward-fill for missing historical area values"
+  },
+  "validation_plan": "Time series cross-validation with 3-year rolling windows",
+  "quality_checks": [
+    "Check feature importance alignment with agricultural seasons",
+    "Validate prediction intervals against historical variance"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "Area-2023-24",
+      "file": "All-India-profile_-Crop-wise-Area.csv",
+      "reason": "Used as most recent feature rather than target"
+    }
+  ],
+  "expected_outputs": [
+    "Area forecast model",
+    "Seasonal trend visualizations",
+    "RMSE and MAPE metrics"
+  ]
+}

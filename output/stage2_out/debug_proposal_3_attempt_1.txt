@@ -1,0 +1,71 @@
+<think>
+Okay, let's tackle this. The user wants a third proposal that's different from the first two. The first was predicting export values using production data, the second was forecasting cultivation area. Now, I need another angle.
+
+Looking at the datasets, there's the Export-of-Rice-Varieties-to-Bangladesh file with INR and USD values, and the All-India-profile_-Crop-wise-Area with area data. Maybe there's a way to link area data to export values. Wait, the production data has both area and production, but maybe using area as a feature for exports?
+
+Wait, the user's previous proposals used production data for exports and area for production. Maybe a third task could be predicting yield based on area and production? But yield is already in the production dataset. Alternatively, maybe predicting future export values using both area and production data. But that's similar to the first proposal.
+
+Wait, the All-India-profile_-Crop-wise-Area has area data from 2015-16 to 2024-25. The export data has INR values up to 2024-25. Maybe using historical area data to predict future exports. But that's similar to the first task. Hmm.
+
+Another angle: the export data has different rice varieties. Maybe clustering rice varieties based on their export trends? But the user prefers predictive tasks. Alternatively, predicting which rice varieties will have higher exports based on their historical trends. But that's a classification problem. Let's check the data.
+
+The export dataset has 'Description' column with rice types like Basmati, Broken Rice, etc. Maybe predicting the export value of specific rice varieties using their historical data. But the first proposal already uses production data. Wait, maybe using the area data from the profile dataset as features for predicting export values. For example, if the area under rice cultivation increases, how does that affect exports?
+
+But the first proposal already uses production data. Maybe combining area and production data to predict exports. Let's see. The All-India-profile has area data, and the production dataset has production and yield. If we can join area and production data via crop and season, then use those features to predict exports. But the export data is for Bangladesh, so maybe the domestic production and area data can predict the export volume.
+
+So the target would be the INR value from the export dataset, and features would be area and production from the other datasets. The join key would be the crop (Rice) and maybe the financial year. But the export years are in the format '2018 - 19', while the production years are '2020-21' etc. Need to align the years properly. The previous code tried to map production years to export years with a lag. Maybe using the area data from the profile dataset as a feature, along with production data, to predict the export values.
+
+So the proposal would be a predictive task using area and production data to forecast rice exports to Bangladesh. The required files would be the export dataset and the profile dataset. The join key would be the crop (Rice) and the financial year. The target is the INR value, and features include area and production. Need to check if the columns have sufficient data completeness.
+
+Check the area dataset's columns: Area-2015-16 to Area-2024-25, all with ≥65% non-null. The export dataset's INR values also have ≥65% non-null. So combining these, the features would be the area data for Rice, and the target is the export INR. The join would be on the financial year, mapping the area data's year to the export's year. For example, area in 2020-21 would predict exports in 2020-21. But need to ensure the years align. The export years are in the format '2018 - 19', which after cleaning becomes '2018', but the production years are '2020-21'. So maybe the area data for 2020-21 would be used to predict the export value for 2020-21. However, the export data's years are in the format '2018 - 19', which after cleaning becomes '2018', but the actual financial year is 2018-19. So the area data's year '2020-21' would correspond to the export year '2020 - 21', which after cleaning is '2020'. Wait, but the export data's columns are named like '2018 - 19-Value (INR)', so the cleaned year is '2018', but the actual financial year is 2018-19. So to align, the area data's year '2020-21' would correspond to the export year '2020 - 21', which is cleaned to '2020'. But the area data's year is '2020-21', which is the same as the export's financial year. So the join would be on the financial year. Therefore, the proposal would use the area data for each financial year to predict the corresponding export value. The features would be the area values for each year, and the target is the export INR for that year. The required files are the export dataset and the profile dataset. The join key would be the financial year, but since the datasets have different column names for years, it's a bit tricky. The export dataset's years are in the column names, while the profile dataset has columns for each year. So the join would be on the year part extracted from the column names. For example, for the export column '2020 - 21-Value (INR)', the year is '2020-21', which matches the area column 'Area-2020-21'. Therefore, the join key is the financial year. The hypothesized keys would be the financial year, but since the datasets don't have a common column for the year, it's handled by aligning the column names. So the join plan would involve aligning the financial years from the column names. The target is the INR value, and the features are the area data for each year. The handling of missingness would be to impute or drop rows with missing data, as the data completeness is ≥65%. The validation plan would be to split the data by year and use cross-validation. The quality checks would include checking the correlation between area and export values, and ensuring the model's performance on recent years. Excluded columns would be the USD values in the export dataset, as per the currency preference. So the final proposal is a predictive task using area data to predict rice exports to Bangladesh.
+</think>
+
+{
+  "id": "TSK-003",
+  "category": "predictive",
+  "title": "Predict Bangladesh Rice Export Values Using Domestic Cultivation Area Trends",
+  "problem_statement": "Forecast rice export values to Bangladesh using historical domestic cultivation area data for rice. All columns verified ≥65% data completeness.",
+  "required_files": [
+    "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "All-India-profile_-Crop-wise-Area.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [["Crop", "Season"]],
+    "notes": "Join on 'Rice' crop and financial year alignment (e.g., Area-2020-21 → 2020-21 export values)."
+  },
+  "target": {
+    "name": "2024 - 25-Value (INR)",
+    "granularity": ["HS Code", "Description"],
+    "horizon": "2024-25 financial year"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24"
+    ],
+    "transform_ideas": [
+      "Year-over-year area change",
+      "Rolling 3-year average area"
+    ],
+    "handling_missingness": "Forward-fill historical area data"
+  },
+  "validation_plan": "Time-series cross-validation using 2018-21 as training, 2022-24 as validation",
+  "quality_checks": [
+    "Check correlation between area and export values",
+    "Validate model performance on 2024-25 data"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "2018 - 19-Value (USD)",
+      "file": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "reason": "Currency preference for INR"
+    }
+  ],
+  "expected_outputs": [
+    "Regression model metrics (RMSE, R²)",
+    "Area-export value correlation matrix",
+    "Yearly prediction error plots"
+  ]
+}

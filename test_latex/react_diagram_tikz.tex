@@ -1,0 +1,131 @@
+% Professional ReAct Framework Diagram using TikZ
+% Standalone LaTeX document that can be compiled to PDF, then converted to PNG
+\documentclass[tikz,border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,shadows,calc}
+
+% Define colors matching the codebase theme
+\definecolor{thoughtblue}{RGB}{25, 118, 210}
+\definecolor{actiongreen}{RGB}{56, 142, 60}
+\definecolor{observeorange}{RGB}{245, 124, 0}
+\definecolor{decisionpurple}{RGB}{123, 31, 162}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+
+\begin{document}
+
+\begin{tikzpicture}[
+    % Define styles
+    phase/.style={
+        rectangle,
+        rounded corners=6pt,
+        minimum width=3.5cm,
+        minimum height=2.5cm,
+        text width=3.2cm,
+        align=center,
+        font=\sffamily\small,
+        drop shadow,
+        line width=1.2pt
+    },
+    thought/.style={phase, fill=thoughtblue!10, draw=thoughtblue},
+    action/.style={phase, fill=actiongreen!10, draw=actiongreen},
+    observe/.style={phase, fill=observeorange!10, draw=observeorange},
+    decision/.style={phase, fill=decisionpurple!10, draw=decisionpurple},
+    arrow/.style={->, >=stealth, line width=1.5pt},
+    label/.style={font=\sffamily\scriptsize, midway, fill=white, inner sep=2pt},
+    tool/.style={font=\ttfamily\scriptsize},
+    title/.style={font=\sffamily\bfseries},
+    subtitle/.style={font=\sffamily\scriptsize}
+]
+
+% Center label
+\node[font=\sffamily\Large\bfseries, text=gray] at (0,0) {ReAct Cycle};
+
+% THOUGHT node (top)
+\node[thought] (thought) at (0, 4.5) {
+    \textbf{1. Reasoning Phase}\\[2pt]
+    {\subtitle Analyze \& Plan}\\[6pt]
+    {\tool record\_thought(}\\
+    {\tool \quad thought,}\\
+    {\tool \quad what\_im\_about\_to\_do}\\
+    {\tool )}
+};
+
+% ACTION node (right)
+\node[action] (action) at (4.5, 0) {
+    \textbf{2. Acting Phase}\\[2pt]
+    {\subtitle Execute Tools}\\[6pt]
+    {\tool • inspect\_data\_file()}\\
+    {\tool • run\_prep\_code()}\\
+    {\tool • save\_checkpoint()}
+};
+
+% OBSERVATION node (bottom)
+\node[observe] (observe) at (0, -4.5) {
+    \textbf{3. Observation Phase}\\[2pt]
+    {\subtitle Reflect \& Learn}\\[6pt]
+    {\tool record\_observation(}\\
+    {\tool \quad what\_happened,}\\
+    {\tool \quad what\_i\_learned,}\\
+    {\tool \quad next\_step}\\
+    {\tool )}
+};
+
+% DECISION node (left)
+\node[decision] (dec) at (-4.5, 0) {
+    \textbf{4. Decision Phase}\\[2pt]
+    {\subtitle Determine Next Step}\\[6pt]
+    {\subtitle Continue exploring?}\\
+    {\subtitle Goal achieved?}\\
+    {\subtitle Error to handle?}
+};
+
+% Arrows forming the cycle
+\draw[arrow, thoughtblue] (thought) -| node[label] {Plan} (action);
+\draw[arrow, actiongreen] (action) |- node[label] {Execute} (observe);
+\draw[arrow, observeorange] (observe) -| node[label] {Reflect} (dec);
+\draw[arrow, decisionpurple, dashed] (dec) |- node[label, above] {Iterate} (thought);
+
+% Additional arrows
+\draw[arrow, decisionpurple, dashed] (dec) -- node[label, below] {\textit{Complete}} +(-2,0);
+
+% Example trace box (bottom right)
+\node[
+    rectangle,
+    draw=black!30,
+    fill=lightgray,
+    rounded corners=4pt,
+    text width=4cm,
+    align=left,
+    font=\sffamily\tiny,
+    below right
+] at (1.5, -7) {
+    \textbf{Example: Stage 3B Data Prep}\\[2pt]
+    \textcolor{thoughtblue}{●} Need to load Stage 3 plan\\
+    \textcolor{actiongreen}{●} load\_stage3\_plan\_for\_prep()\\
+    \textcolor{observeorange}{●} Plan loaded: 5 files to merge\\
+    \textcolor{decisionpurple}{●} Next: Inspect join columns\\[2pt]
+    \textcolor{thoughtblue}{●} Verify join keys exist\\
+    \textcolor{actiongreen}{●} inspect\_data\_file(...)\\
+    \textcolor{observeorange}{●} Keys confirmed in both files\\
+    \textcolor{decisionpurple}{●} Next: Execute merge...
+};
+
+% Applied in stages label (bottom left)
+\node[
+    rectangle,
+    fill=white,
+    draw=black!20,
+    rounded corners=3pt,
+    text width=3.8cm,
+    align=center,
+    font=\sffamily\scriptsize,
+    below left
+] at (-1.5, -7) {
+    \textit{Applied in Stages 2, 3B, and 5\\
+    for strategic exploration\\
+    and error recovery}
+};
+
+\end{tikzpicture}
+
+\end{document}

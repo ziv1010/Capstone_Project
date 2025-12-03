@@ -1,0 +1,50 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "task_category": "predictive",
+  "methods_proposed": [
+    {
+      "method_id": "METHOD-1",
+      "name": "Naive Baseline Forecast",
+      "description": "Uses the last observed area value as the prediction for the next period",
+      "implementation_code": "import pandas as pd\nfrom sklearn.metrics import mean_absolute_error\n\n# Load data\ndf = load_dataframe('prepared_PLAN-TSK-002.parquet')\n\n# Identify target column\ntarget_col = [col for col in df.columns if 'Area' in col and '2024-25' in col][0]\n\n# Split data by financial year\ndf['Year'] = df[target_col].str.split('-').str[0]  # Extract year from column name\ntrain_df = df[df['Year'] <= '2021']\nval_df = df[(df['Year'] >= '2022') & (df['Year'] <= '2023')]\n\n# Naive forecast using previous year's value\ntrain_values = train_df[target_col].values\nval_values = val_df[target_col].values\n\n# Predict using last observed value\nnaive_forecast = train_values[-1]\n\n# Calculate metrics\nmae = mean_absolute_error(val_values, [naive_forecast]*len(val_values))\nprint(f'Naive Forecast MAE: {mae}')",
+      "libraries_required": [
+        "pandas",
+        "sklearn"
+      ]
+    },
+    {
+      "method_id": "METHOD-2",
+      "name": "Linear Regression with Seasonal Features",
+      "description": "Linear regression model using YoY change and seasonal dummy variables",
+      "implementation_code": "import pandas as pd\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_squared_error\n\n# Load data\ndf = load_dataframe('prepared_PLAN-TSK-002.parquet')\n\n# Identify target and features\ntarget_col = [col for col in df.columns if 'Area' in col and '2024-25' in col][0]\nfeature_cols = ['YoY_change_2023-24', 'Season_Kharif', 'Season_Rabi', 'Season_Summer']\n\n# Split data\ndf['Year'] = df[target_col].str.split('-').str[0]\ntrain_df = df[df['Year'] <= '2021']\nval_df = df[(df['Year'] >= '2022') & (df['Year'] <= '2023')]\n\n# Train model\nmodel = LinearRegression()\nmodel.fit(train_df[feature_cols], train_df[target_col])\n\n# Predict and evaluate\nval_pred = model.predict(val_df[feature_cols])\nrmse = mean_squared_error(val_df[target_col], val_pred, squared=False)\nprint(f'Linear Regression RMSE: {rmse}')",
+      "libraries_required": [
+        "pandas",
+        "sklearn"
+      ]
+    },
+    {
+      "method_id": "METHOD-3",
+      "name": "Random Forest with Feature Engineering",
+      "description": "Ensemble model using all available features including historical area values",
+      "implementation_code": "import pandas as pd\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_percentage_error\n\n# Load data\ndf = load_dataframe('prepared_PLAN-TSK-002.parquet')\n\n# Identify target\ntarget_col = [col for col in df.columns if 'Area' in col and '2024-25' in col][0]\n\n# Create lag features\nfor i in range(1, 4):\n    df[f'Area_Lag_{i}'] = df[target_col].shift(i)\n\n# Split data\ndf['Year'] = df[target_col].str.split('-').str[0]\ntrain_df = df[df['Year'] <= '2021']\nval_df = df[(df['Year'] >= '2022') & (df['Year'] <= '2023')]\n\n# Train model\nmodel = RandomForestRegressor(n_estimators=100, random_state=42)\nmodel.fit(train_df.drop(columns=[target_col, 'Year']), train_df[target_col])\n\n# Predict and evaluate\nval_pred = model.predict(val_df.drop(columns=[target_col, 'Year']))\nmape = mean_absolute_percentage_error(val_df[target_col], val_pred)\nprint(f'Random Forest MAPE: {mape}')",
+      "libraries_required": [
+        "pandas",
+        "sklearn"
+      ]
+    }
+  ],
+  "data_split_strategy": "Train: 2015-2021 (6 years), Validation: 2022-2023 (2 years), Test: 2023-2024 (1 year)",
+  "date_column": "Year (derived from target column name)",
+  "target_column": "Area-2024-25",
+  "train_period": "2015-2021",
+  "validation_period": "2022-2023",
+  "test_period": "2023-2024",
+  "data_preprocessing_steps": [
+    "Load prepared_PLAN-TSK-002.parquet using load_dataframe()",
+    "Identify target column as the latest Area-YYYY-MM column",
+    "Extract year from target column name for temporal splitting",
+    "Split data into train (\u22642021), validation (2022-2023), test (2023-2024)",
+    "Create lag features for Random Forest model",
+    "Ensure no missing values in target column"
+  ]
+}

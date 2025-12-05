@@ -1,0 +1,403 @@
+{
+  "dataset_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25",
+  "timestamp": "2025-12-04T02:03:47.175795",
+  "summary": {
+    "dataset_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25",
+    "path": "/scratch/ziv_baretto/llmserve/data/Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+    "approx_n_rows": 0,
+    "columns": [
+      {
+        "name": "HS Code",
+        "physical_dtype": "object",
+        "logical_type": "text",
+        "description": "HS Code",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "10064000",
+          "10063020",
+          "10061010",
+          "10061090",
+          "10063090"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "Description",
+        "physical_dtype": "object",
+        "logical_type": "text",
+        "description": "Description",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "BROKEN RICE",
+          "BASMATI RICE",
+          "RICE IN HUSK OF SEED QLTY",
+          "OTHR RICE IN HUSK",
+          "RICE EXCPTG PARBOILED (EXCL BASMATI RICE)"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2018 - 19-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2018   19 Quantity",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "5.78",
+          "2.28",
+          "4.23",
+          "0.7",
+          "385.02"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2018 - 19-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2018   19 Value (INR)",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "93879.8",
+          "206428.48",
+          "661071.29",
+          "85817.65",
+          "10304788.47"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2018 - 19-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2018   19 Value (USD)",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "1412.71",
+          "2961.17",
+          "9445.18",
+          "1186.75",
+          "152707.99"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2019 - 20-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2019   20 Quantity",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "0.13",
+          "2.37",
+          "3.85",
+          "0.08",
+          "2.77"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2019 - 20-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2019   20 Value (INR)",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "2950.51",
+          "198775.15",
+          "590893.17",
+          "12765.29",
+          "81734.92"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2019 - 20-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2019   20 Value (USD)",
+        "nullable": true,
+        "null_fraction": 0.125,
+        "unique_fraction": 1.0,
+        "examples": [
+          "40.83",
+          "2800.32",
+          "8309.23",
+          "178.95",
+          "1164.58"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2020 - 21-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2020   21 Quantity",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "8.11",
+          "3.44",
+          "5.0",
+          "0.09",
+          "93.89"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2020 - 21-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2020   21 Value (INR)",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "132478.35",
+          "257464.54",
+          "807452.28",
+          "16720.16",
+          "2527526.48"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2020 - 21-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2020   21 Value (USD)",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "1819.38",
+          "3492.03",
+          "10829.89",
+          "227.54",
+          "34715.42"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2021 - 22-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2021   22 Quantity",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "15.81",
+          "5.6",
+          "4.3",
+          "0.63",
+          "117.69"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2021 - 22-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2021   22 Value (INR)",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "287288.98",
+          "451426.53",
+          "669925.3",
+          "15020.0",
+          "3158607.47"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2021 - 22-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2021   22 Value (USD)",
+        "nullable": false,
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "examples": [
+          "3873.44",
+          "6048.15",
+          "9088.67",
+          "204.18",
+          "42486.87"
+        ],
+        "is_potential_key": true
+      },
+      {
+        "name": "2022 - 23-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2022   23 Quantity",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "6.28",
+          "3.66",
+          "0.0",
+          "111.48",
+          "725.3"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2022 - 23-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2022   23 Value (INR)",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "597687.02",
+          "581421.73",
+          "1.51",
+          "2517228.91",
+          "21781192.0"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2022 - 23-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2022   23 Value (USD)",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "7419.55",
+          "7373.64",
+          "0.02",
+          "30987.44",
+          "267576.33"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2023 - 24-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2023   24 Quantity",
+        "nullable": true,
+        "null_fraction": 0.625,
+        "unique_fraction": 1.0,
+        "examples": [
+          "6.32",
+          "3.95",
+          "10.28"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2023 - 24-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2023   24 Value (INR)",
+        "nullable": true,
+        "null_fraction": 0.625,
+        "unique_fraction": 1.0,
+        "examples": [
+          "634508.97",
+          "677520.08",
+          "1312029.06"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2023 - 24-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2023   24 Value (USD)",
+        "nullable": true,
+        "null_fraction": 0.625,
+        "unique_fraction": 1.0,
+        "examples": [
+          "7678.43",
+          "8189.88",
+          "15868.31"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2024 - 25-Quantity",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2024   25 Quantity",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "1.72",
+          "2.6",
+          "0.06",
+          "56.51",
+          "750.62"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2024 - 25-Value (INR)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2024   25 Value (INR)",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "173189.16",
+          "481168.99",
+          "13859.22",
+          "2072824.22",
+          "28373214.53"
+        ],
+        "is_potential_key": false
+      },
+      {
+        "name": "2024 - 25-Value (USD)",
+        "physical_dtype": "float64",
+        "logical_type": "float",
+        "description": "2024   25 Value (USD)",
+        "nullable": true,
+        "null_fraction": 0.25,
+        "unique_fraction": 1.0,
+        "examples": [
+          "2051.46",
+          "5749.4",
+          "165.37",
+          "24053.2",
+          "328851.11"
+        ],
+        "is_potential_key": false
+      }
+    ],
+    "candidate_primary_keys": [
+      [
+        "HS Code",
+        "Description"
+      ]
+    ],
+    "notes": "Dataset tracks rice exports to Bangladesh from 2018-19 to 2024-25 with quantity and value metrics. Key issues: 2023-24 data has 62.5% nulls across all fields, suggesting incomplete reporting. 2018-2021 data has better completeness (0-12.5% nulls). HS Code and Description columns are fully populated and 100% unique, forming a strong composite key. Recommend focusing analysis on 2018-2021 period for reliable trends. Suggested Stage 2 tasks: analyze price trends in INR/USD, compare variety performance, and investigate reasons for 2023-24 data gaps."
+  }
+}

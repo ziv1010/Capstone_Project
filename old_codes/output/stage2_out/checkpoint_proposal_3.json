@@ -1,0 +1,65 @@
+{
+  "id": "TSK-003",
+  "category": "predictive",
+  "title": "Forecast Seasonal Yield Variability for Major Food Grains in India",
+  "problem_statement": "This task aims to predict seasonal yield variability for major food grains in India using historical yield data across seasons. Yield is a critical indicator of agricultural productivity and is influenced by factors like weather, soil, and farming practices. All columns verified \u226565% data completeness.",
+  "required_files": [
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Crop",
+        "Season"
+      ]
+    ],
+    "notes": "The dataset contains a composite key of [Crop, Season] which can be used to uniquely identify yield records for each crop-season combination."
+  },
+  "target": {
+    "name": "Yield-2024-25",
+    "granularity": [
+      "Crop",
+      "Season"
+    ],
+    "horizon": "2024-25"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24",
+      "Crop",
+      "Season"
+    ],
+    "transform_ideas": [
+      "Normalize yield values by crop type",
+      "Create lag features for previous seasons",
+      "Encode season as a categorical variable"
+    ],
+    "handling_missingness": "Impute missing values using forward-fill or mean imputation based on crop type."
+  },
+  "validation_plan": "Use time-based cross-validation to evaluate model performance, splitting data by year to avoid data leakage. Validate using RMSE and R\u00b2 metrics.",
+  "quality_checks": [
+    "Ensure all yield values are positive",
+    "Check for data consistency across seasons",
+    "Validate that imputed values align with historical trends"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "Area-2020-21",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Not directly relevant to yield prediction"
+    },
+    {
+      "column_name": "Production-2020-21",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Not directly relevant to yield prediction"
+    }
+  ],
+  "expected_outputs": [
+    "Yield prediction model",
+    "Seasonal yield variability plots",
+    "Model performance metrics (RMSE, R\u00b2)"
+  ]
+}

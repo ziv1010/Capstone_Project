@@ -1,0 +1,64 @@
+{
+  "id": "TSK-001",
+  "category": "predictive",
+  "title": "Predict Food Grain Production Trends Using Area and Yield Data",
+  "problem_statement": "Forecast annual food grain production across India using area and yield estimates from 2015-2024. All columns verified \u226565% data completeness with 2022-2024 data fully populated. Focus on INR-based metrics where applicable.",
+  "required_files": [
+    "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+    "All-India-profile_-Crop-wise-Area.csv"
+  ],
+  "join_plan": {
+    "hypothesized_keys": [
+      [
+        "Crop",
+        "Season"
+      ]
+    ],
+    "notes": "Both datasets share [Crop, Season] composite key. Area metrics align across files for temporal analysis."
+  },
+  "target": {
+    "name": "Production-2024-25",
+    "granularity": [
+      "Crop",
+      "Season"
+    ],
+    "horizon": "annual"
+  },
+  "feature_plan": {
+    "candidates": [
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23"
+    ],
+    "transform_ideas": [
+      "Calculate 3-year rolling averages for area and yield",
+      "Create seasonal growth rate features"
+    ],
+    "handling_missingness": "Use median imputation for 2020-21/2021-22 gaps with forward-fill validation"
+  },
+  "validation_plan": "Time-series cross-validation with 80% training (2015-2022) and 20% testing (2023-2024). Validate against actual 2023-24 production values.",
+  "quality_checks": [
+    "Verify \u226565% completeness in all feature columns",
+    "Check for season-specific crop production seasonality patterns"
+  ],
+  "excluded_columns": [
+    {
+      "column_name": "Value (USD)",
+      "file": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+      "reason": "Preference for INR-based metrics"
+    },
+    {
+      "column_name": "2023-24",
+      "file": "All-India-profile_-Crop-wise-Area.csv",
+      "reason": "High null fraction (62.5%) in export dataset"
+    }
+  ],
+  "expected_outputs": [
+    "production_forecast_model.pkl",
+    "seasonal_trend_plots.png",
+    "RMSE_MAE_metrics.csv"
+  ]
+}

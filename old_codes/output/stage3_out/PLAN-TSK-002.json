@@ -1,0 +1,163 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "selected_task_id": "TSK-002",
+  "goal": "Forecast quarterly rice export values to Bangladesh using historical 2018-2021 data",
+  "task_category": "predictive",
+  "created_at": "2025-12-04T02:59:56.162264",
+  "created_by": "stage3_agent",
+  "artifacts": {
+    "intermediate_table": "TSK-002_data.parquet",
+    "intermediate_format": "parquet",
+    "expected_columns": [
+      "hs_code",
+      "description",
+      "value_2018_19_inr",
+      "value_2019_20_inr",
+      "value_2020_21_inr",
+      "value_2021_22_inr",
+      "value_2024_25_inr"
+    ],
+    "expected_row_count_range": [
+      6,
+      8
+    ]
+  },
+  "key_normalization": [],
+  "file_instructions": [
+    {
+      "file_id": "FILE-002",
+      "original_name": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+      "alias": "rice_exports",
+      "filters": [
+        "df[['value_2023_24_inr', 'value_2024_25_inr']].notna().all(axis=1)"
+      ],
+      "rename_columns": {
+        "HS Code": "hs_code",
+        "Description": "description",
+        "2018 - 19-Value (INR)": "value_2018_19_inr",
+        "2019 - 20-Value (INR)": "value_2019_20_inr",
+        "2020 - 21-Value (INR)": "value_2020_21_inr",
+        "2021 - 22-Value (INR)": "value_2021_22_inr",
+        "2024 - 25-Value (INR)": "value_2024_25_inr"
+      },
+      "join_keys": [],
+      "keep_columns": [
+        "hs_code",
+        "description",
+        "value_2018_19_inr",
+        "value_2019_20_inr",
+        "value_2020_21_inr",
+        "value_2021_22_inr",
+        "value_2024_25_inr"
+      ],
+      "notes": null
+    }
+  ],
+  "join_steps": [
+    {
+      "step": 1,
+      "description": "Load base table",
+      "left_table": "rice_exports",
+      "right_table": null,
+      "join_type": "base",
+      "join_keys": [
+        "hs_code",
+        "description"
+      ],
+      "left_on": [],
+      "right_on": [],
+      "expected_cardinality": "base",
+      "validation": {
+        "check_duplicates_on_keys": [],
+        "expected_unique": false,
+        "check_row_count_stable": false,
+        "check_no_duplicates_introduced": false,
+        "acceptable_coverage": null,
+        "max_cardinality_ratio": null
+      }
+    }
+  ],
+  "feature_engineering": [
+    {
+      "feature_name": "value_growth_2018_2019",
+      "description": "Year-over-year value growth rate",
+      "transform": "growth rate",
+      "depends_on": [
+        "value_2018_19_inr",
+        "value_2019_20_inr"
+      ],
+      "implementation": "df['value_growth_2018_2019'] = (df['value_2019_20_inr'] / df['value_2018_19_inr'] - 1)"
+    },
+    {
+      "feature_name": "value_growth_2019_2020",
+      "description": "Year-over-year value growth rate",
+      "transform": "growth rate",
+      "depends_on": [
+        "value_2019_20_inr",
+        "value_2020_21_inr"
+      ],
+      "implementation": "df['value_growth_2019_2020'] = (df['value_2020_21_inr'] / df['value_2019_20_inr'] - 1)"
+    },
+    {
+      "feature_name": "value_growth_2020_2021",
+      "description": "Year-over-year value growth rate",
+      "transform": "growth rate",
+      "depends_on": [
+        "value_2020_21_inr",
+        "value_2021_22_inr"
+      ],
+      "implementation": "df['value_growth_2020_2021'] = (df['value_2021_22_inr'] / df['value_2020_21_inr'] - 1)"
+    },
+    {
+      "feature_name": "quantity_value_ratio_2018_19",
+      "description": "Quantity-to-value ratio normalization",
+      "transform": "ratio",
+      "depends_on": [
+        "2018 - 19-Quantity",
+        "value_2018_19_inr"
+      ],
+      "implementation": "df['quantity_value_ratio_2018_19'] = df['2018 - 19-Quantity'] / df['value_2018_19_inr']"
+    }
+  ],
+  "validation": {
+    "time_split": {
+      "method": "year-based",
+      "train_years": "2018-2021",
+      "test_years": "2022-23",
+      "validation_years": "2024-25",
+      "leakage_check": "Drop 2023-24 records with >35% nulls"
+    },
+    "coverage_checks": [
+      {
+        "check": "Data completeness",
+        "threshold": 0.65,
+        "description": "Verify ≥65% non-null in all feature columns",
+        "action_if_violation": "Drop records with excessive nulls"
+      }
+    ],
+    "cardinality_checks": [
+      {
+        "check": "Unique HS Code pairs",
+        "expected": "unique",
+        "action_if_violation": "Merge duplicate HS Code entries"
+      }
+    ],
+    "additional_checks": [
+      "Data loaded",
+      "No duplicates on join keys"
+    ]
+  },
+  "expected_model_types": [
+    "Time Series",
+    "Regression"
+  ],
+  "evaluation_metrics": [
+    "RMSE",
+    "MAPE"
+  ],
+  "notes": [
+    "Data validation: All columns verified ≥65% complete",
+    "Currency: Using INR as per preference",
+    "Dropped 2023-24 records due to 62.5% nulls"
+  ]
+}

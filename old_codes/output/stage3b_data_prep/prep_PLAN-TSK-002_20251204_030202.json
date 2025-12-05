@@ -1,0 +1,28 @@
+{
+  "plan_id": "PLAN-TSK-002",
+  "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/output/stage3b_data_prep/prepared_PLAN-TSK-002.parquet",
+  "original_row_count": 8,
+  "prepared_row_count": 3,
+  "columns_created": [
+    "value_growth_2018_2019",
+    "value_growth_2019_2020",
+    "value_growth_2020_2021",
+    "quantity_value_ratio_2018_19"
+  ],
+  "transformations_applied": [
+    "Filter for non-null 2023-24 and 2024-25 values",
+    "Column renaming",
+    "Column selection",
+    "Growth rate calculations",
+    "Quantity-to-value ratio calculation",
+    "NaN imputation with 0"
+  ],
+  "data_quality_report": {
+    "nulls_before": 14,
+    "nulls_after": 0,
+    "duplicate_rows": 0,
+    "row_count": 3,
+    "missing_value_strategy": "Dropped rows with nulls in 2023-24/2024-25 values, imputed remaining NaNs with 0"
+  },
+  "created_at": "2025-12-04T03:02:02.933117"
+}

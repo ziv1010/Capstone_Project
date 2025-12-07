@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T12:48:46.799736",
+    "checksum": "db0e341f7863fce9",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-003",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-003.parquet",
+    "original_row_count": 41,
+    "final_row_count": 41,
+    "columns_created": [
+      "Crop",
+      "Season",
+      "Yield-2020-21",
+      "Yield-2021-22",
+      "Yield-2022-23",
+      "Yield-2023-24",
+      "Yield-2024-25",
+      "avg_yield_3yr",
+      "yield_trend"
+    ],
+    "transformations_applied": [
+      "1. Median imputation for numeric columns\n2. Mode imputation for categorical columns\n3. Created avg_yield_3yr feature\n4. Created yield_trend feature with division-by-zero handling"
+    ],
+    "data_quality_report": {
+      "total_rows": 41,
+      "total_columns": 9,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "All 22 initial nulls imputed. 1 final null from percentage change calculation handled by fillna(0). Final dataset has 41 rows, 9 columns, 0 nulls."
+  }
+}

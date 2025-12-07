@@ -337,6 +337,7 @@ def _create_fallback_execution(plan_id: str) -> ExecutionResult:
     import numpy as np
     import sys
     from io import StringIO
+    from functools import partial
 
     try:
         # Load prepared data
@@ -347,14 +348,25 @@ def _create_fallback_execution(plan_id: str) -> ExecutionResult:
         df = pd.read_parquet(prepared_path)
 
         # Get target column from plan
-        plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
-        plan = DataPassingManager.load_artifact(plan_path)
-        target_col = plan.get('target_column')
+        plan_path = STAGE3_OUT_DIR / f"PLAN-{plan_id.replace('PLAN-', '')}.json"
+        
+        # Try both ID formats (PLAN-TSK-001 or TSK-001)
+        if not plan_path.exists():
+             plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
+             
+        if plan_path.exists():
+            plan = DataPassingManager.load_artifact(plan_path)
+            target_col = plan.get('target_column')
+        else:
+            logger.warning(f"Plan file not found for {plan_id}, trying to infer target")
+            plan = {}
+            target_col = None
 
         if not target_col or target_col not in df.columns:
             # Find a numeric column
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             target_col = numeric_cols[-1] if numeric_cols else df.columns[-1]
+            logger.warning(f"Using inferred target column: {target_col}")
 
         # ================================================================
         # PRIORITY 1: Try to execute winning method from Stage 3.5B
@@ -428,6 +440,50 @@ def _create_fallback_execution(plan_id: str) -> ExecutionResult:
                         pass
 
                     # Execute the winning method code
+                    # First, check if features required by code exist
+                    required_features = tester.get('feature_columns', [])
+                    if not required_features and 'features =' in winning_code:
+                         # Try to extract from code
+                        import re
+                        match = re.search(r"features\s*=\s*\['([^']+)',\s*'([^']+)'", winning_code)
+                        # This is a naive check, but better than nothing
+                    
+                    # Verify features exist in dataframe
+                    missing_cols = []
+                    if required_features:
+                        for col in required_features:
+                            if col not in df.columns:
+                                missing_cols.append(col)
+                    
+                    if missing_cols:
+                        logger.warning(f"Missing feature columns for winning method: {missing_cols}")
+                        logger.info("Attempting to re-engineer features from plan...")
+                        
+                        # Try to reproduce features from plan
+                        if plan and 'feature_engineering' in plan:
+                            for fe in plan['feature_engineering']:
+                                if fe.get('name') in missing_cols:
+                                    try:
+                                        exec(fe.get('implementation_code'), {'df': df, 'pd': pd, 'np': np})
+                                        logger.info(f"Re-engineered feature: {fe.get('name')}")
+                                    except Exception as e:
+                                        logger.warning(f"Failed to feature: {e}")
+                        
+                        # Update train_df/test_df with new columns
+                        if strategy_type != 'temporal_column':
+                            train_end = int(len(df) * train_size_pct)
+                            val_end = int(len(df) * (train_size_pct + val_size_pct))
+                            train_df = df.iloc[:train_end].copy()
+                            test_df = df.iloc[val_end:].copy()
+                        else:
+                            train_df = df.copy()
+                            test_df = df.copy()
+                            
+                        namespace['train_df'] = train_df
+                        namespace['test_df'] = test_df
+                        namespace['df'] = df
+
+
                     exec(winning_code, namespace)
 
                     # Get the prediction function name

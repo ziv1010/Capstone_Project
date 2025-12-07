@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-07T12:13:00.593143",
-    "checksum": "13e73baac06f9adc",
+    "timestamp": "2025-12-07T13:24:32.003674",
+    "checksum": "8812514dc9d5a21e",
     "version": "1.0"
   },
   "data": {
@@ -138,6 +138,29 @@
         "feasibility_notes": "Custom task created from user query: Predict rice export quantity to Bangladesh using production and area data",
         "forecast_horizon": 30,
         "forecast_granularity": "sequential"
+      },
+      {
+        "id": "TSK-4072",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2022-23",
+        "problem_statement": "based on all the data we have can you make predictions of rice production and export for the next 5 years?",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Area-2022-23",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Year"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: based on all the data we have can you make predictions of rice production and export for the next 5 years?",
+        "forecast_horizon": 30,
+        "forecast_granularity": "daily"
       }
     ]
   }

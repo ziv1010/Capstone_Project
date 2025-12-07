@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T13:51:07.168266",
+    "checksum": "17f58f1bed518358",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-4072",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Values",
+        "description": "Comparison of actual and predicted rice area values with 1:1 reference line",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/residuals_histogram.png",
+        "plot_type": "histogram",
+        "title": "Residual Distribution",
+        "description": "Histogram showing distribution of prediction errors (residuals)",
+        "columns_used": [
+          "residuals"
+        ],
+        "filename": "residuals_histogram.png"
+      }
+    ],
+    "insights": [
+      "Model has high average error (MAE=12.27, MAPE=39.57%)",
+      "R-squared of -inf indicates poor fit",
+      "Residuals show consistent negative bias",
+      "Only 4 data points limit model reliability"
+    ],
+    "summary": "Naive forecast model shows poor performance with 39.57% average error and cannot reliably predict rice production/export for the next 5 years. The model systematically overpredicts and has no explanatory power (R-squared=-inf).",
+    "task_answer": "The naive forecast model shows poor performance with 39.57% average error and cannot reliably predict rice production/export for the next 5 years. The model systematically overpredicts and has no explanatory power (R-squared=-inf)."
+  }
+}

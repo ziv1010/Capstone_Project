@@ -489,6 +489,66 @@ logger = setup_logging()
 
 
 # ============================================================================
+# LANGSMITH / LANGCHAIN TRACING
+# ============================================================================
+
+def _is_truthy(value: Any) -> bool:
+    """Normalize truthy env values."""
+    return str(value).lower() in {"1", "true", "yes", "y", "on"}
+
+
+def configure_langsmith_tracing(default_project: str = "conversational-pipeline") -> Dict[str, Any]:
+    """
+    Normalize LangSmith/LangChain tracing env vars and enable tracing if requested.
+
+    Supports both LANGSMITH_* and LANGCHAIN_* prefixes so users can copy-paste
+    from LangSmith docs without changing code.
+    """
+    env = os.environ
+    tracing_requested = _is_truthy(env.get("LANGSMITH_TRACING")) or _is_truthy(env.get("LANGCHAIN_TRACING_V2"))
+
+    status = {
+        "enabled": False,
+        "project": env.get("LANGCHAIN_PROJECT"),
+        "endpoint": env.get("LANGCHAIN_ENDPOINT"),
+        "api_key_present": bool(env.get("LANGCHAIN_API_KEY") or env.get("LANGSMITH_API_KEY")),
+    }
+
+    if not tracing_requested:
+        return status
+
+    env.setdefault("LANGCHAIN_TRACING_V2", "true")
+
+    endpoint = env.get("LANGCHAIN_ENDPOINT") or env.get("LANGSMITH_ENDPOINT") or "https://api.smith.langchain.com"
+    env["LANGCHAIN_ENDPOINT"] = endpoint
+
+    api_key = env.get("LANGCHAIN_API_KEY") or env.get("LANGSMITH_API_KEY")
+    if api_key:
+        env["LANGCHAIN_API_KEY"] = api_key
+
+    project = env.get("LANGCHAIN_PROJECT") or env.get("LANGSMITH_PROJECT") or default_project
+    env["LANGCHAIN_PROJECT"] = project
+
+    status.update({
+        "enabled": True,
+        "project": project,
+        "endpoint": endpoint,
+        "api_key_present": bool(api_key),
+    })
+
+    logger.info(f"LangSmith tracing enabled (project='{project}', endpoint='{endpoint}')")
+    if not api_key:
+        logger.warning("LangSmith tracing requested but no API key found. "
+                       "Set LANGSMITH_API_KEY or LANGCHAIN_API_KEY to send traces.")
+
+    return status
+
+
+LANGSMITH_TRACING_STATUS = configure_langsmith_tracing()
+LANGSMITH_TRACING_ENABLED = LANGSMITH_TRACING_STATUS["enabled"]
+
+
+# ============================================================================
 # EXPORTS
 # ============================================================================
 
@@ -510,4 +570,6 @@ __all__ = [
     "DataPassingManager", "StageTransition", "JSONSanitizer",
     # Utilities
     "logger", "setup_logging", "DEBUG",
+    # Tracing
+    "LANGSMITH_TRACING_STATUS", "LANGSMITH_TRACING_ENABLED", "configure_langsmith_tracing",
 ]

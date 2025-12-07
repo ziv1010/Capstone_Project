@@ -1,0 +1,88 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T13:39:38.856116",
+    "checksum": "7e404ac88341b086",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-4072",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Naive Forecast",
+        "category": "baseline",
+        "description": "Uses the most recent year's area as prediction",
+        "implementation_code": "def predict_naive(train_df, test_df, target_col, **params):\n    import pandas as pd\n    # Get last available year column before target\n    year_cols = [c for c in train_df.columns if c.startswith('Area-') and c != target_col]\n    last_year = sorted(year_cols)[-1]\n    predictions = train_df[last_year].values\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple implementation",
+          "Serves as good baseline"
+        ],
+        "expected_weaknesses": [
+          "Ignores all historical patterns"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Holt's Linear Trend",
+        "category": "statistical/traditional",
+        "description": "Exponential smoothing with trend component",
+        "implementation_code": "def predict_holt(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from statsmodels.tsa.holtwinters import Holt\n    predictions = []\n    # For each row, fit Holt's model to its time series\n    for _, row in train_df.iterrows():\n        ts = row[[c for c in train_df.columns if c.startswith('Area-')]].values\n        model = Holt(ts).fit()\n        forecast = model.forecast(1)[0]\n        predictions.append(forecast)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "statsmodels"
+        ],
+        "hyperparameters": {
+          "smoothing_level": 0.2,
+          "smoothing_trend": 0.1
+        },
+        "expected_strengths": [
+          "Captures linear trends",
+          "Interpretable parameters"
+        ],
+        "expected_weaknesses": [
+          "Assumes linear trend",
+          "No seasonality handling"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest with Features",
+        "category": "ml",
+        "description": "Uses engineered features for prediction",
+        "implementation_code": "def predict_rf(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from sklearn.ensemble import RandomForestRegressor\n    # Use engineered features\n    feature_cols = ['lag_area_1yr', 'rolling_area_3yr', 'export_value_total']\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    model = RandomForestRegressor(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n    X_test = test_df[feature_cols].fillna(0)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "sklearn"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "max_depth": 5
+        },
+        "expected_strengths": [
+          "Handles non-linear patterns",
+          "Uses engineered features"
+        ],
+        "expected_weaknesses": [
+          "Requires feature engineering",
+          "Less interpretable"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": "Year",
+      "target_column": "Area-2022-23",
+      "train_period": "Years 2020-2021",
+      "validation_period": "Year 2022",
+      "test_period": "Year 2023"
+    },
+    "date_column": "Year",
+    "target_column": "Area-2022-23"
+  }
+}

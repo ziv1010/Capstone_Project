@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from code.config import (
     PROJECT_ROOT, DATA_DIR, OUTPUT_ROOT,
     PRIMARY_LLM_CONFIG, SECONDARY_LLM_CONFIG,
-    STAGE_MAX_ROUNDS, logger
+    STAGE_MAX_ROUNDS, logger, LANGSMITH_TRACING_STATUS
 )
 from code.master_orchestrator import (
     ConversationalOrchestrator,
@@ -89,6 +89,14 @@ def print_config():
     print(f"\nStage Max Rounds:")
     for stage, rounds in STAGE_MAX_ROUNDS.items():
         print(f"  {stage}: {rounds}")
+    tracing = LANGSMITH_TRACING_STATUS
+    print(f"\nLangSmith Tracing: {'enabled' if tracing['enabled'] else 'disabled'}")
+    if tracing['enabled']:
+        print(f"  Project: {tracing.get('project')}")
+        print(f"  Endpoint: {tracing.get('endpoint')}")
+        print(f"  API Key Present: {tracing.get('api_key_present')}")
+    else:
+        print("  Enable with LANGSMITH_TRACING=true and set LANGSMITH_API_KEY / LANGSMITH_PROJECT.")
 
 
 def print_status():

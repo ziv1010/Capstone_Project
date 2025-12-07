@@ -1,0 +1,99 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T13:54:02.554174",
+    "checksum": "8c73de5358eac40e",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "selected_task_id": "TSK-001",
+    "goal": "Forecast annual rice production using historical production and yield data from 2020-2024",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "filters": [
+          "Season != 'Total'",
+          "Crop == 'Rice'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [
+      {
+        "name": "lag_1",
+        "description": "Lag of 1 year in yield",
+        "source_columns": [
+          "Yield-2023-24"
+        ],
+        "implementation_code": "df['lag_1'] = df['Yield-2023-24'].shift(1)",
+        "dtype": null
+      },
+      {
+        "name": "rolling_mean_2y",
+        "description": "2-year rolling mean of yield",
+        "source_columns": [
+          "Yield-2022-23",
+          "Yield-2023-24"
+        ],
+        "implementation_code": "df['rolling_mean_2y'] = df[['Yield-2022-23', 'Yield-2023-24']].mean(axis=1)",
+        "dtype": null
+      },
+      {
+        "name": "year",
+        "description": "Extract year from column names",
+        "source_columns": [
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "implementation_code": "df['year'] = df.index + 2020",
+        "dtype": null
+      }
+    ],
+    "target_column": "Production-2024-25",
+    "date_column": "year",
+    "validation_strategy": "temporal",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "expected_model_types": [
+      "ARIMA",
+      "RandomForestRegressor",
+      "GradientBoostingRegressor"
+    ],
+    "evaluation_metrics": [
+      "MAE",
+      "RMSE",
+      "R2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-07T13:54:02.553829"
+  }
+}

@@ -109,6 +109,16 @@ When inspecting data files, pay attention to:
 - All available numeric columns (INCLUDE THEM ALL as features)
 - The data may have rows that summarize other rows - understand and filter appropriately
 
+## CRITICAL: Wide-Format Temporal Data
+If you see columns like "Production-2020-21", "Production-2021-22", "Area-2023-24":
+- This is WIDE-FORMAT temporal data (years in column names)
+- You MUST melt/pivot to LONG format: one row per year
+- Extract the year from column names (e.g., "Production-2020-21" → Year="2020-21", Feature="Production")
+- Do this in feature_engineering step with implementation_code
+- Example melt code: `df.melt(id_vars=['Crop'], var_name='Year_Metric', value_name='Value')`
+- After melting, you'll have more rows (which is GOOD for forecasting!)
+- DO NOT OVERTHINK THIS - wide format is common, just melt and proceed
+
 ## Plan Requirements
 Your plan MUST include:
 - plan_id: "PLAN-{task_id}" format
@@ -128,7 +138,14 @@ Your plan MUST include:
 - date_column: For temporal tasks
 - validation_strategy: temporal or random
 - expected_model_types: What models to try
-- evaluation_metrics: How to measure success
+- evaluation_metrics: Task-appropriate metrics from the proposal (NOT hardcoded)
+
+## CRITICAL: Forecast Configuration (from Proposal)
+For forecasting tasks, EXTRACT from the selected proposal and include in your plan:
+- forecast_horizon: How many steps ahead to forecast (from proposal)
+- forecast_granularity: Time unit (year/month/day - from proposal)
+- forecast_type: single_step/multi_step/recursive (from proposal)
+- evaluation_metrics: Use the metrics specified in the proposal (NOT hardcoded defaults)
 
 ## Quality Validation Rules
 - All columns must have ≥65% non-null values
@@ -194,13 +211,30 @@ def create_stage3_agent():
 
         if state.messages:
             last_message = state.messages[-1]
-            
+
             # Check if the last message is a ToolMessage indicating successful plan save
             if hasattr(last_message, 'content') and isinstance(last_message.content, str):
                 if "✅ Execution plan saved successfully" in last_message.content:
                     logger.info("Plan saved successfully - ending agent loop")
                     return "end"
-            
+
+            # Early loop detection: check if agent is repeating the same tool calls
+            if state.iteration > 10:
+                # Get recent tool calls
+                recent_tools = []
+                for msg in state.messages[-10:]:
+                    if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                        for tc in msg.tool_calls:
+                            recent_tools.append(tc.get('name', ''))
+
+                # If inspecting data more than 5 times in last 10 iterations, we're stuck
+                if recent_tools.count('inspect_data_file_stage3') > 5:
+                    logger.warning(f"Loop detected: inspecting data {recent_tools.count('inspect_data_file_stage3')} times in last 10 iterations")
+                    # Force agent to create plan on next iteration
+                    if state.iteration > 15:
+                        logger.error("Agent stuck in analysis loop - forcing completion")
+                        return "end"
+
             # Check if last message is AI with tool calls
             if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
                 return "tools"
@@ -221,18 +255,93 @@ def create_stage3_agent():
     return builder.compile(checkpointer=MemorySaver())
 
 
-def run_stage3(task_id: str, pipeline_state: PipelineState = None) -> Stage3Plan:
+def run_stage3(task_id: str, pipeline_state: PipelineState = None, max_retries: int = 3) -> Stage3Plan:
     """
-    Run Stage 3: Execution Planning.
+    Run Stage 3: Execution Planning with automatic retry on failure.
 
     Creates a detailed plan for executing the specified task.
-    """
-    logger.info(f"Starting Stage 3: Execution Planning for {task_id}")
+    If planning fails, the agent will see the error and retry up to max_retries times.
 
+    Args:
+        task_id: Task ID to plan
+        pipeline_state: Pipeline state (optional)
+        max_retries: Maximum retry attempts (default: 3)
+
+    Returns:
+        Stage3Plan with execution details or raises exception after max retries
+    """
+    logger.info(f"Starting Stage 3: Execution Planning for {task_id} (max_retries={max_retries})")
+
+    for attempt in range(max_retries):
+        attempt_num = attempt + 1
+        logger.info(f"Stage 3 Attempt {attempt_num}/{max_retries}")
+
+        try:
+            result = _attempt_stage3_execution(task_id, pipeline_state, attempt_num)
+
+            # If we got a successful result, return it
+            logger.info(f"Stage 3 succeeded on attempt {attempt_num}")
+            return result
+
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Stage 3 attempt {attempt_num} exception: {e}\n{error_trace}")
+
+            if attempt_num < max_retries:
+                logger.warning(f"Retrying after exception...")
+                continue
+            else:
+                logger.error(f"Stage 3 failed after {max_retries} attempts")
+                raise RuntimeError(f"Stage 3 failed after {max_retries} attempts: {e}") from e
+
+    # Fallback (should never reach here)
+    raise RuntimeError("Stage 3 failed unexpectedly - fallthrough in retry logic")
+
+
+def _attempt_stage3_execution(task_id: str, pipeline_state: PipelineState = None, attempt_num: int = 1) -> Stage3Plan:
+    """
+    Single attempt at Stage 3 execution.
+
+    The agent sees errors from previous attempts and can debug/fix them.
+    """
     graph = create_stage3_agent()
+
+    # Check if there are previous execution attempts with errors
+    plan_path = STAGE3_OUT_DIR / f"PLAN-{task_id}.json"
+    previous_errors = []
+    if attempt_num > 1:
+        # Try to get errors from logs or check if plan exists but is incomplete
+        import traceback
+        error_context = """
+## PREVIOUS ATTEMPT FAILED
+
+The previous attempt hit the recursion limit or encountered an error.
+Common issues:
+- Getting stuck in analysis loops without taking action
+- Not saving the plan after creating it
+- Misunderstanding wide-format data (columns like Production-2020-21, Production-2021-22)
+- Over-analyzing instead of creating the plan
+
+CRITICAL FIXES FOR THIS ATTEMPT:
+1. If you see year-based columns (e.g., Production-2020-21), treat them as temporal data
+2. After inspecting data and validating columns, CREATE THE PLAN immediately
+3. Don't endlessly analyze - make reasonable assumptions and proceed
+4. SAVE the plan using save_stage3_plan as soon as it's ready
+"""
+        previous_errors = [error_context]
+
+    error_context = ""
+    if previous_errors:
+        error_context = f"""
+{chr(10).join(previous_errors)}
+
+YOU MUST FIX THE ISSUES AND COMPLETE THE PLAN IN THIS ATTEMPT.
+"""
 
     initial_message = HumanMessage(content=f"""
 Create an execution plan for task: {task_id}
+{error_context}
 
 Follow these steps:
 1. Load the task proposal for {task_id}
@@ -245,29 +354,24 @@ Follow these steps:
 
 The plan ID should be: PLAN-{task_id}
 
-Be thorough - downstream stages depend on this plan being complete and accurate.
+Be thorough but EFFICIENT - downstream stages depend on this plan being complete and accurate.
+DO NOT get stuck in analysis loops - after inspecting data, CREATE and SAVE the plan.
 """)
 
-    config = {"configurable": {"thread_id": f"stage3_{task_id}"}}
+    config = {"configurable": {"thread_id": f"stage3_{task_id}_attempt{attempt_num}"}}
     initial_state = Stage3State(messages=[initial_message], task_id=task_id)
 
-    try:
-        final_state = graph.invoke(initial_state, config)
+    final_state = graph.invoke(initial_state, config)
 
-        # Load plan from disk
-        plan_path = STAGE3_OUT_DIR / f"PLAN-{task_id}.json"
-        if plan_path.exists():
-            data = DataPassingManager.load_artifact(plan_path)
-            plan = Stage3Plan(**data)
-            logger.info(f"Stage 3 complete: Plan saved to {plan_path}")
-            return plan
-        else:
-            logger.error("Plan not saved to disk")
-            raise RuntimeError("Execution plan was not saved")
-
-    except Exception as e:
-        logger.error(f"Stage 3 failed: {e}")
-        raise
+    # Load plan from disk
+    if plan_path.exists():
+        data = DataPassingManager.load_artifact(plan_path)
+        plan = Stage3Plan(**data)
+        logger.info(f"Stage 3 complete: Plan saved to {plan_path}")
+        return plan
+    else:
+        logger.error("Plan not saved to disk")
+        raise RuntimeError("Execution plan was not saved - agent may have hit iteration limit")
 
 
 # ============================================================================

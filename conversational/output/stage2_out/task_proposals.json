@@ -1,10 +1,8 @@
 {
   "_meta": {
-    "timestamp": "2025-12-08T01:17:44.532023",
-    "checksum": "691e1d1a133fc028",
-    "version": "1.0",
-    "stage": "stage2",
-    "type": "task_proposals"
+    "timestamp": "2025-12-08T03:50:01.983851",
+    "checksum": "45f97d7033c084de",
+    "version": "1.0"
   },
   "data": {
     "proposals": [
@@ -148,6 +146,174 @@
         "join_plan": null,
         "feasibility_score": 0.6,
         "filters": []
+      },
+      {
+        "id": "TSK-1155",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Production",
+        "problem_statement": "using all the historical data you have can you make prediction on the production of rice for the next 5 years",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Production",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Year"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: using all the historical data you have can you make prediction on the production of rice for the next 5 years",
+        "forecast_horizon": 30,
+        "forecast_granularity": "daily"
+      },
+      {
+        "id": "TSK-3849",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2022-23",
+        "problem_statement": "make me an area wise prediction for rice for the next 5 years",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Area-2022-23",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Year"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: make me an area wise prediction for rice for the next 5 years",
+        "forecast_horizon": 30,
+        "forecast_granularity": "daily"
+      },
+      {
+        "id": "TSK-4273",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2024-25",
+        "problem_statement": "make me an area wise prediction for rice for the next 3 years",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Area-2024-25",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Year"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: make me an area wise prediction for rice for the next 3 years",
+        "forecast_horizon": 3,
+        "forecast_granularity": "year",
+        "forecast_type": "multi_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-4711",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2024-25",
+        "problem_statement": "predict rice area values over the next 5 years",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Area-2024-25",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "index"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: predict rice area values over the next 5 years",
+        "forecast_horizon": 5,
+        "forecast_granularity": "year",
+        "forecast_type": "recursive",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2",
+          "smape",
+          "mase"
+        ]
+      },
+      {
+        "id": "TSK-5369",
+        "category": "forecasting",
+        "title": "Custom Forecasting: tsk-4711",
+        "problem_statement": "run tsk-4711",
+        "required_datasets": [
+          "tsk-4711"
+        ],
+        "target_column": "tsk-4711",
+        "target_dataset": "tsk-4711",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: run tsk-4711",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-6001",
+        "category": "forecasting",
+        "title": "Custom Forecasting: target",
+        "problem_statement": "run tsk-4711",
+        "required_datasets": [
+          "tsk-4711_dataset.csv"
+        ],
+        "target_column": "target",
+        "target_dataset": "tsk-4711_dataset.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "date"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: run tsk-4711",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
       }
     ]
   }

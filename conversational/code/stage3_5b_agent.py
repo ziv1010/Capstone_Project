@@ -59,13 +59,20 @@ STAGE35B_SYSTEM_PROMPT = f"""You are a Method Benchmarking Agent responsible for
 
 ## Your Role
 1. **FIRST**: Call get_actual_columns() to verify columns
-2. Load method proposals from Stage 3.5A
+2. Load method proposals from Stage 3.5A AND the execution plan to get forecast configuration
 3. Detect Data Format (Long vs Wide) based on proposal
 4. Run each method {BENCHMARK_ITERATIONS} times for consistency
-5. Calculate metrics (MAE, RMSE, MAPE)
+5. Calculate metrics using the plan's evaluation_metrics (NOT hardcoded MAE/RMSE/MAPE)
 6. Validate results aren't hallucinated (check consistency)
 7. Select the best method based on average performance
 8. Save comprehensive benchmark results
+
+## CRITICAL: Dynamic Metrics (NOT Hardcoded)
+- Get evaluation_metrics from the execution plan (plan.evaluation_metrics)
+- DO NOT assume only MAE/RMSE/MAPE - the plan specifies task-appropriate metrics
+- For classification: accuracy, precision, recall, f1, etc.
+- For forecasting: mae, rmse, mape, r2, and possibly smape, mase for multi-step
+- Calculate ALL metrics specified in the plan
 
 ## Consistency Validation (CRITICAL)
 You MUST run each method {BENCHMARK_ITERATIONS} times to check consistency:

@@ -1,0 +1,91 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T02:38:20.899620",
+    "checksum": "47a7cc24c528493b",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1155",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Naive Forecast",
+        "category": "baseline",
+        "description": "Predicts the last observed production value as the forecast",
+        "implementation_code": "def predict_naive(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    import numpy as np\n\n    # Get last observed value from training data\n    last_value = train_df[target_col].iloc[-1]\n\n    # Create predictions\n    predictions = pd.DataFrame({\n        'predicted': [last_value] * len(test_df)\n    }, index=test_df.index)\n\n    return predictions",
+        "required_libraries": [
+          "pandas",
+          "numpy"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple implementation",
+          "Serves as strong baseline"
+        ],
+        "expected_weaknesses": [
+          "Ignores all historical patterns",
+          "No error handling"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Linear Regression with Lags",
+        "category": "statistical/traditional",
+        "description": "Uses lagged production values and seasonal features to predict future production",
+        "implementation_code": "def predict_linear_lags(train_df, test_df, target_col, **params):\n    import pandas as pd\n    import numpy as np\n    from sklearn.linear_model import LinearRegression\n\n    # Define features\n    feature_cols = ['lag_1', 'lag_2', 'rolling_mean_2', 'Season_Rabi', 'Season_Summer']\n\n    # Prepare data\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n\n    # Train model\n    model = LinearRegression()\n    model.fit(X_train, y_train)\n\n    # Predict\n    predictions = model.predict(X_test)\n\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "numpy",
+          "sklearn.linear_model"
+        ],
+        "hyperparameters": {
+          "model__fit_intercept": true
+        },
+        "expected_strengths": [
+          "Interpretable coefficients",
+          "Handles engineered features"
+        ],
+        "expected_weaknesses": [
+          "Assumes linear relationships",
+          "May underfit complex patterns"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest with Lags",
+        "category": "ml",
+        "description": "Uses random forest to model non-linear relationships between lagged features and production",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, **params):\n    import pandas as pd\n    import numpy as np\n    from sklearn.ensemble import RandomForestRegressor\n\n    # Define features\n    feature_cols = ['lag_1', 'lag_2', 'rolling_mean_2', 'Season_Rabi', 'Season_Summer']\n\n    # Prepare data\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n\n    # Train model\n    model = RandomForestRegressor(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n\n    # Predict\n    predictions = model.predict(X_test)\n\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "numpy",
+          "sklearn.ensemble"
+        ],
+        "hyperparameters": {
+          "model__n_estimators": 100,
+          "model__random_state": 42
+        },
+        "expected_strengths": [
+          "Captures non-linear patterns",
+          "Handles feature interactions"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Requires more data"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_row",
+      "date_column": "Year",
+      "target_column": "Production",
+      "train_period": "Years 2020-2023",
+      "validation_period": "Year 2024",
+      "test_period": "Year 2025"
+    },
+    "date_column": "Year",
+    "target_column": "Production"
+  }
+}

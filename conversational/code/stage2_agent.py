@@ -221,6 +221,26 @@ These use categorical columns as analysis dimensions:
 - feasibility_score: 0-1 based on data quality
 - **filters**: Only include if filtering out aggregate rows (like Season='Total')
 
+## CRITICAL: Task-Specific Configuration (NOT Hardcoded)
+**For FORECASTING tasks**, extract and include:
+- forecast_horizon: Number of time steps to forecast (e.g., 1 for next year, 5 for next 5 years)
+  - Extract from problem statement (e.g., "next 5 years" → horizon=5)
+- forecast_granularity: Time unit (e.g., "year", "month", "day", "quarter")
+- forecast_type: "single_step" (predict 1 step ahead), "multi_step" (predict multiple steps), or "recursive" (iteratively forecast)
+- evaluation_metrics: Choose appropriate metrics:
+  - Short horizon (1-2 steps): ["mae", "rmse", "mape", "r2"]
+  - Long horizon (3+ steps): ["mae", "rmse", "mape", "r2", "smape", "mase"]
+
+**For CLASSIFICATION tasks**, include:
+- evaluation_metrics: ["accuracy", "precision", "recall", "f1", "auc_roc"] (binary)
+  or ["accuracy", "macro_f1", "weighted_f1"] (multi-class)
+
+**For REGRESSION tasks**, include:
+- evaluation_metrics: ["mae", "rmse", "r2", "mape"]
+
+**For CLUSTERING tasks**, include:
+- evaluation_metrics: ["silhouette", "davies_bouldin", "calinski_harabasz"]
+
 ## Available Tools
 - list_dataset_summaries: See what datasets exist
 - read_dataset_summary: Get dataset details (includes semantic info)

@@ -186,8 +186,15 @@ class TaskProposal(BaseModel):
     feasibility_notes: Optional[str] = None
 
     # For forecasting tasks
-    forecast_horizon: Optional[int] = None
-    forecast_granularity: Optional[str] = None
+    forecast_horizon: Optional[int] = Field(default=1, description="Number of time steps to forecast (e.g., 1 year, 5 years)")
+    forecast_granularity: Optional[str] = Field(default=None, description="Time unit (year, month, day, etc.)")
+    forecast_type: Optional[str] = Field(default="single_step", description="single_step, multi_step, or recursive")
+
+    # Dynamic metrics based on task type
+    evaluation_metrics: List[str] = Field(
+        default_factory=lambda: ["mae", "rmse", "r2"],
+        description="Metrics appropriate for this task type"
+    )
 
 
 class Stage2Output(BaseModel):
@@ -252,9 +259,19 @@ class Stage3Plan(BaseModel):
     train_end_date: Optional[str] = None
     validation_end_date: Optional[str] = None
 
+    # Forecasting-specific configuration
+    forecast_horizon: Optional[int] = Field(default=1, description="Number of steps to forecast")
+    forecast_granularity: Optional[str] = Field(default=None, description="Time unit for forecasting")
+    forecast_type: Optional[str] = Field(default="single_step", description="single_step, multi_step, or recursive")
+
     # Model expectations
     expected_model_types: List[str] = Field(default_factory=list)
-    evaluation_metrics: List[str] = Field(default_factory=list)
+
+    # Dynamic evaluation metrics (not hardcoded)
+    evaluation_metrics: List[str] = Field(
+        default_factory=lambda: ["mae", "rmse", "r2"],
+        description="Task-appropriate metrics determined by Stage 2"
+    )
 
     # Output specification
     output_columns: List[str] = Field(default_factory=list)

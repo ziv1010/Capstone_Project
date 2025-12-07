@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T02:54:29.325086",
+    "checksum": "e38dee0145345733",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1155",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Production",
+        "description": "Comparison of actual and predicted rice production values",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/residuals_histogram.png",
+        "plot_type": "histogram",
+        "title": "Residual Distribution",
+        "description": "Distribution of prediction residuals (errors)",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "residuals_histogram.png"
+      }
+    ],
+    "insights": [
+      "Model achieves 98.3% R-squared but has 16.34% MAPE. Predictions show consistent underestimation (positive bias). Only 3 prediction samples available for evaluation."
+    ],
+    "summary": "High accuracy model with significant prediction error. Requires more data validation for long-term forecasting reliability.",
+    "task_answer": "The model can forecast rice production with high accuracy (R²=0.983) but has a 16.34% average error. Predictions tend to be conservative (underestimates). With only 3 samples evaluated, more data is needed to validate reliability for 5-year forecasts."
+  }
+}

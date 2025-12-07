@@ -325,6 +325,8 @@ def create_custom_task_from_query(
     """
     Create a custom task proposal based on user's query.
 
+    AUTOMATICALLY parses forecast configuration from the query (e.g., "next 5 years").
+
     Args:
         query: User's forecasting query
         dataset: Dataset filename to use
@@ -332,12 +334,20 @@ def create_custom_task_from_query(
         date_column: Date column for temporal analysis (optional)
 
     Returns:
-        Generated task proposal
+        Generated task proposal with proper forecast configuration
     """
     try:
+        from code.config import parse_forecast_config_from_query, get_task_appropriate_metrics
+
         # Generate task ID
         import time
         task_id = f"TSK-{int(time.time()) % 10000:04d}"
+
+        # AUTOMATICALLY parse forecast configuration from query
+        forecast_config = parse_forecast_config_from_query(query)
+
+        # Get appropriate metrics
+        metrics = get_task_appropriate_metrics("forecasting", query)
 
         proposal = {
             "id": task_id,
@@ -357,8 +367,14 @@ def create_custom_task_from_query(
             },
             "feasibility_score": 0.7,
             "feasibility_notes": f"Custom task created from user query: {query}",
-            "forecast_horizon": 30,
-            "forecast_granularity": "daily" if date_column else "sequential"
+
+            # DYNAMIC forecast configuration (parsed from query!)
+            "forecast_horizon": forecast_config["forecast_horizon"],
+            "forecast_granularity": forecast_config["forecast_granularity"],
+            "forecast_type": forecast_config["forecast_type"],
+
+            # DYNAMIC metrics (task-appropriate!)
+            "evaluation_metrics": metrics
         }
 
         result = [
@@ -367,7 +383,12 @@ def create_custom_task_from_query(
             f"Target: {target_column} from {dataset}",
             f"Category: forecasting",
             "",
-            "Proposal:",
+            "AUTOMATICALLY EXTRACTED FROM YOUR QUERY:",
+            f"  Forecast Horizon: {forecast_config['forecast_horizon']} {forecast_config['forecast_granularity']}(s)",
+            f"  Forecast Type: {forecast_config['forecast_type']}",
+            f"  Evaluation Metrics: {', '.join(metrics)}",
+            "",
+            "Full Proposal:",
             json.dumps(proposal, indent=2),
             "",
             f"To execute this task, use: 'run task {task_id}'"

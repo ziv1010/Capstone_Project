@@ -77,6 +77,25 @@ a different data split. CHECK THE DATA SPLIT STRATEGY CAREFULLY.
 - verify_execution: Verify outputs are correct
 - list_stage4_results: List existing results
 
+## CRITICAL: File Path Variables (DO NOT HARDCODE PATHS)
+When using execute_python_code, these variables are available in the namespace:
+- STAGE3B_OUT_DIR: Where prepared data files are located
+- STAGE4_OUT_DIR: Where to save execution results
+- DATA_DIR: Raw data directory
+
+**NEVER hardcode paths like '/scratch/.../stage3b_out/' or '/scratch/.../data/'**
+**ALWAYS use the provided variables: STAGE3B_OUT_DIR, STAGE4_OUT_DIR, DATA_DIR**
+
+Example (CORRECT):
+```python
+df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_PLAN-TSK-001.parquet')
+```
+
+Example (WRONG - DO NOT DO THIS):
+```python
+df = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_out/prepared_PLAN-TSK-001.parquet')
+```
+
 ## Execution Workflow
 1. Load execution context for the plan
 2. **CRITICAL**: Call get_selected_method_code to get:
@@ -116,8 +135,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# Load prepared data
-STAGE3B_OUT_DIR = Path('{STAGE3B_OUT_DIR}')
+# Load prepared data using PROVIDED VARIABLES (DO NOT HARDCODE PATHS)
+# CRITICAL: Use STAGE3B_OUT_DIR variable (already available in execute_python_code namespace)
 df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_{{plan_id}}.parquet')
 
 # Get column info from execution context

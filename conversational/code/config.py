@@ -86,7 +86,7 @@ CONVERSATION_LLM_CONFIG = {
 STAGE_MAX_ROUNDS = {
     "stage1": 1,      # Direct execution
     "stage2": 15,     # Exploration steps
-    "stage3": 30,     # Planning rounds
+    "stage3": 50,     # Planning rounds (increased from 30 to handle complex scenarios)
     "stage3b": 100,   # Data preparation
     "stage3_5a": 35,  # Method proposal
     "stage3_5b": 120, # Benchmarking (3 methods x 3 iterations each)
@@ -104,6 +104,109 @@ MIN_UNIQUE_FRACTION = 0.01   # Minimum 1% unique values
 # Benchmarking parameters
 BENCHMARK_ITERATIONS = 3
 MAX_CV_THRESHOLD = 0.3  # Maximum coefficient of variation for valid results
+
+# ============================================================================
+# DYNAMIC METRICS CONFIGURATION
+# ============================================================================
+
+def get_task_appropriate_metrics(task_category: str, task_description: str = "") -> list:
+    """
+    Determine appropriate evaluation metrics based on task category and description.
+
+    This function is NOT hardcoded - it intelligently selects metrics based on the task.
+
+    Args:
+        task_category: The task category (forecasting, classification, etc.)
+        task_description: Additional context about the task
+
+    Returns:
+        List of metric names appropriate for the task
+    """
+    task_lower = task_description.lower()
+
+    # Forecasting tasks
+    if task_category == "forecasting" or "forecast" in task_lower or "predict" in task_lower:
+        metrics = ["mae", "rmse", "mape", "r2"]
+
+        # Multi-step forecasting may need additional metrics
+        if any(word in task_lower for word in ["multi-step", "recursive", "years ahead", "next 5"]):
+            metrics.extend(["smape", "mase"])  # Symmetric MAPE, Mean Absolute Scaled Error
+
+        return metrics
+
+    # Classification tasks
+    elif task_category == "classification" or "classify" in task_lower or "class" in task_lower:
+        metrics = ["accuracy", "precision", "recall", "f1"]
+
+        # Binary classification
+        if "binary" in task_lower or "two class" in task_lower:
+            metrics.extend(["auc_roc", "auc_pr"])
+
+        # Multi-class
+        else:
+            metrics.extend(["macro_f1", "weighted_f1"])
+
+        return metrics
+
+    # Regression tasks (continuous prediction)
+    elif task_category == "regression" or "regression" in task_lower:
+        return ["mae", "rmse", "r2", "mape"]
+
+    # Clustering tasks
+    elif task_category == "clustering" or "cluster" in task_lower:
+        return ["silhouette", "davies_bouldin", "calinski_harabasz"]
+
+    # Anomaly detection
+    elif task_category == "anomaly_detection" or "anomaly" in task_lower or "outlier" in task_lower:
+        return ["precision", "recall", "f1", "auc_roc"]
+
+    # Default for unknown tasks
+    else:
+        return ["mae", "rmse", "r2"]
+
+
+def parse_forecast_config_from_query(query: str) -> dict:
+    """
+    Parse natural language query to extract forecast configuration.
+
+    Examples:
+    - "next 5 years" → horizon=5, granularity="year"
+    - "next 3 months" → horizon=3, granularity="month"
+    - "10 days ahead" → horizon=10, granularity="day"
+
+    Args:
+        query: User's natural language query
+
+    Returns:
+        Dict with forecast_horizon, forecast_granularity, forecast_type
+    """
+    import re
+
+    query_lower = query.lower()
+
+    # Extract horizon (number)
+    horizon_match = re.search(r'(?:next|for|forecast)\s+(\d+)\s+(year|month|day|week|quarter)', query_lower)
+    if horizon_match:
+        horizon = int(horizon_match.group(1))
+        granularity = horizon_match.group(2)
+    else:
+        # Default to 1 year
+        horizon = 1
+        granularity = "year"
+
+    # Determine forecast type based on horizon
+    if horizon == 1:
+        forecast_type = "single_step"
+    elif horizon <= 3:
+        forecast_type = "multi_step"
+    else:
+        forecast_type = "recursive"  # Long horizon needs recursive forecasting
+
+    return {
+        "forecast_horizon": horizon,
+        "forecast_granularity": granularity,
+        "forecast_type": forecast_type
+    }
 
 # Retry parameters
 MAX_RETRIES = 3  # Maximum number of retries for failed stages

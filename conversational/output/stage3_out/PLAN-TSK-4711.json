@@ -1,0 +1,133 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T03:56:35.036650",
+    "checksum": "b153407cbc99ceaf",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-4711",
+    "selected_task_id": "TSK-4711",
+    "goal": "Predict rice area values over the next 5 years",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "filters": [
+          "Crop == 'Rice'",
+          "Season != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [
+      {
+        "name": "melt_temporal_data",
+        "description": "Convert wide-format year columns to long format",
+        "source_columns": [
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "implementation_code": "df = df.melt(id_vars=['Crop', 'Season'], var_name='Year_Metric', value_name='Value')",
+        "dtype": null
+      },
+      {
+        "name": "extract_year",
+        "description": "Extract year from melted column names",
+        "source_columns": [
+          "Year_Metric"
+        ],
+        "implementation_code": "df['Year'] = df['Year_Metric'].str.split('-').str[1].str.split('&').str[0]",
+        "dtype": null
+      },
+      {
+        "name": "create_lag_1",
+        "description": "Create 1-year lag feature",
+        "source_columns": [
+          "Value"
+        ],
+        "implementation_code": "df['lag_1'] = df['Value'].shift(1)",
+        "dtype": null
+      },
+      {
+        "name": "create_lag_2",
+        "description": "Create 2-year lag feature",
+        "source_columns": [
+          "Value"
+        ],
+        "implementation_code": "df['lag_2'] = df['Value'].shift(2)",
+        "dtype": null
+      },
+      {
+        "name": "create_lag_3",
+        "description": "Create 3-year lag feature",
+        "source_columns": [
+          "Value"
+        ],
+        "implementation_code": "df['lag_3'] = df['Value'].shift(3)",
+        "dtype": null
+      }
+    ],
+    "target_column": "Area-2024-25",
+    "date_column": "Year",
+    "validation_strategy": "temporal with 70% train, 15% validation, 15% test",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 5,
+    "forecast_granularity": "year",
+    "forecast_type": "recursive",
+    "expected_model_types": [
+      "ARIMA",
+      "SARIMA",
+      "Prophet",
+      "RandomForestRegressor"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2",
+      "smape",
+      "mase"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-08T03:56:35.036381"
+  }
+}

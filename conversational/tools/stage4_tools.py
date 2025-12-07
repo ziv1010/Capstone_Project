@@ -320,11 +320,20 @@ def execute_python_code(code: str, description: str = "") -> str:
     """
     Execute Python code for model training and prediction.
 
-    Available: pd, np, sklearn, statsmodels, DATA_DIR, load_dataframe()
-    Stage-specific dirs: STAGE3B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE
+    Available in namespace:
+    - Libraries: pd, np, sklearn, statsmodels
+    - Path variables: STAGE3B_OUT_DIR, STAGE4_OUT_DIR, DATA_DIR, STAGE4_WORKSPACE
+    - Helper function: load_dataframe()
 
-    CRITICAL: This tool MUST NOT silently swallow errors. If execution fails,
-    it returns detailed error information including full traceback.
+    CRITICAL PATH USAGE:
+    - ALWAYS use STAGE3B_OUT_DIR variable (NOT hardcoded '/scratch/.../stage3b_out/')
+    - ALWAYS use DATA_DIR variable (NOT hardcoded '/scratch/.../data/')
+    - Example: df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_PLAN-TSK-001.parquet')
+    - DO NOT hardcode absolute paths - they will fail due to directory name mismatches
+
+    CRITICAL ERROR HANDLING:
+    - This tool MUST NOT silently swallow errors
+    - If execution fails, returns detailed error information including full traceback
 
     Args:
         code: Python code to execute

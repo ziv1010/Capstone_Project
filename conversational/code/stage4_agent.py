@@ -170,9 +170,12 @@ print(f"R²: {r2:.4f}")
 ```
 
 ## Error Handling
-- If the selected method fails, try to fix and retry
-- If still failing, fall back to a simple baseline
-- Always produce some output even if suboptimal
+- If execution fails, provide detailed error messages
+- Do NOT use fallback methods - fail fast with clear diagnostics
+- Log all errors to help debug issues
+
+CRITICAL: If the winning method fails to execute, STOP and report the error.
+Do NOT create fallback predictions. The user needs to see the real error.
 
 IMPORTANT: The results_df must be saved as parquet for Stage 5 visualization.
 """
@@ -234,35 +237,128 @@ def create_stage4_agent():
     return builder.compile(checkpointer=MemorySaver())
 
 
-def run_stage4(plan_id: str, pipeline_state: PipelineState = None) -> ExecutionResult:
+def run_stage4(plan_id: str, pipeline_state: PipelineState = None, max_retries: int = 3) -> ExecutionResult:
     """
-    Run Stage 4: Execution.
+    Run Stage 4: Execution with automatic retry on failure.
 
     Executes the selected method and generates predictions.
-    """
-    logger.info(f"Starting Stage 4: Execution for {plan_id}")
+    If execution fails, the agent will see the error and retry up to max_retries times.
 
+    Args:
+        plan_id: Plan ID to execute
+        pipeline_state: Pipeline state (optional)
+        max_retries: Maximum retry attempts (default: 3)
+
+    Returns:
+        ExecutionResult with predictions or detailed error information
+    """
+    logger.info(f"Starting Stage 4: Execution for {plan_id} (max_retries={max_retries})")
+
+    for attempt in range(max_retries):
+        attempt_num = attempt + 1
+        logger.info(f"Stage 4 Attempt {attempt_num}/{max_retries}")
+
+        try:
+            result = _attempt_stage4_execution(plan_id, pipeline_state, attempt_num)
+
+            # If we got a successful result, return it
+            if result.status == ExecutionStatus.SUCCESS:
+                logger.info(f"Stage 4 succeeded on attempt {attempt_num}")
+                return result
+
+            # If we got a failure, check if we should retry
+            if attempt_num < max_retries:
+                logger.warning(f"Stage 4 attempt {attempt_num} failed, retrying... Error: {result.summary}")
+                continue
+            else:
+                logger.error(f"Stage 4 failed after {max_retries} attempts")
+                return result
+
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Stage 4 attempt {attempt_num} exception: {e}\n{error_trace}")
+
+            if attempt_num < max_retries:
+                logger.warning(f"Retrying after exception...")
+                continue
+            else:
+                return ExecutionResult(
+                    plan_id=plan_id,
+                    status=ExecutionStatus.FAILURE,
+                    summary=f"Execution failed after {max_retries} attempts with exception: {e}",
+                    errors=[str(e), error_trace]
+                )
+
+    # Fallback (should never reach here)
+    return ExecutionResult(
+        plan_id=plan_id,
+        status=ExecutionStatus.FAILURE,
+        summary="Execution failed unexpectedly",
+        errors=["Unexpected fallthrough in retry logic"]
+    )
+
+
+def _attempt_stage4_execution(plan_id: str, pipeline_state: PipelineState = None, attempt_num: int = 1) -> ExecutionResult:
+    """
+    Single attempt at Stage 4 execution.
+
+    The agent sees errors from previous attempts and can debug/fix them.
+    """
     graph = create_stage4_agent()
 
+    # Check if there are previous execution attempts with errors
+    result_path = STAGE4_OUT_DIR / f"execution_result_{plan_id}.json"
+    previous_errors = []
+    if result_path.exists() and attempt_num > 1:
+        try:
+            prev_result = DataPassingManager.load_artifact(result_path)
+            if prev_result.get('errors'):
+                previous_errors = prev_result.get('errors', [])
+        except:
+            pass
+
+    error_context = ""
+    if previous_errors:
+        error_context = f"""
+## PREVIOUS ATTEMPT FAILED WITH ERRORS:
+{chr(10).join(previous_errors[:3])}  # Show first 3 errors
+
+You MUST analyze these errors and FIX the issue in this attempt.
+Common fixes:
+- If KeyError: Check column names are correct using load_prepared_data
+- If NameError: Ensure all functions are defined before calling
+- If shape mismatch: Verify data split creates correct DataFrame shapes
+- If method execution failed: Check the winning method code syntax and required columns
+"""
+
     initial_message = HumanMessage(content=f"""
-Execute forecasting for plan: {plan_id}
+Execute forecasting for plan: {plan_id} (Attempt {attempt_num})
+{error_context}
 
 Steps:
 1. Load execution context (plan, data info, selected method)
 2. Get the selected method's implementation code from Stage 3.5B
-3. Load the prepared data
-4. Split data according to plan's validation strategy
+3. Load the prepared data and VERIFY column names
+4. Split data according to EXACT strategy from Stage 3.5B (use get_selected_method_code)
 5. Execute the selected method
 6. Calculate final metrics (MAE, RMSE, MAPE, R²)
-7. Create results DataFrame with actual and predicted values
-8. Save predictions parquet and execution result JSON using save_predictions tool
-9. Verify outputs are correct
+7. VERIFY metrics match Stage 3.5B benchmarks (within 10%)
+8. Create results DataFrame with actual and predicted values
+9. Save predictions parquet and execution result JSON using save_predictions tool
+10. Verify outputs are correct
 
 The results should include:
-- Date/index column for time series plots
+- Date/index column for time series plots (if applicable)
 - 'actual' column with true values
 - 'predicted' column with model predictions
 - Original relevant columns for context
+
+CRITICAL REQUIREMENTS:
+- Use the EXACT same data split strategy as Stage 3.5B
+- Your MAE should match the benchmark MAE from Stage 3.5B (±10%)
+- If you get an error, ANALYZE it and FIX it - don't just try again blindly
+- Use execute_python_code tool which provides detailed error diagnostics
 
 IMPORTANT: You MUST use save_predictions tool to save the results.
 
@@ -271,369 +367,84 @@ Save outputs:
 - Metadata: {STAGE4_OUT_DIR}/execution_result_{plan_id}.json
 """)
 
-    config = {"configurable": {"thread_id": f"stage4_{plan_id}"}}
+    config = {"configurable": {"thread_id": f"stage4_{plan_id}_attempt{attempt_num}"}}
     initial_state = Stage4State(messages=[initial_message], plan_id=plan_id)
 
-    try:
-        final_state = graph.invoke(initial_state, config)
+    final_state = graph.invoke(initial_state, config)
 
-        # Load execution result from disk
-        result_path = STAGE4_OUT_DIR / f"execution_result_{plan_id}.json"
-        if result_path.exists():
-            data = DataPassingManager.load_artifact(result_path)
-            output = ExecutionResult(**data)
-            logger.info(f"Stage 4 complete: {output.status}")
-            return output
-        else:
-            # Check if predictions exist
-            predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
-            if predictions_path.exists():
-                output = ExecutionResult(
-                    plan_id=plan_id,
-                    status=ExecutionStatus.SUCCESS,
-                    outputs={"predictions": str(predictions_path)},
-                    summary="Execution completed"
-                )
-                # Save execution result
-                DataPassingManager.save_artifact(
-                    data=output.model_dump(),
-                    output_dir=STAGE4_OUT_DIR,
-                    filename=f"execution_result_{plan_id}.json",
-                    metadata={"stage": "stage4", "type": "execution_result"}
-                )
-                return output
+    # Load execution result from disk
+    predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
 
-            # Fallback: create default predictions
-            logger.warning("Agent failed to create predictions, creating fallback")
-            output = _create_fallback_execution(plan_id)
-            return output
+    if result_path.exists():
+        data = DataPassingManager.load_artifact(result_path)
+        output = ExecutionResult(**data)
+        logger.info(f"Stage 4 attempt {attempt_num} result: {output.status}")
 
-    except Exception as e:
-        logger.error(f"Stage 4 failed: {e}")
-        # Try fallback
-        try:
-            logger.warning("Creating fallback execution after exception")
-            output = _create_fallback_execution(plan_id)
-            return output
-        except Exception as fallback_error:
-            logger.error(f"Fallback also failed: {fallback_error}")
+        # Validate that predictions file exists
+        if not predictions_path.exists():
+            error_msg = f"Execution result exists but predictions file missing: {predictions_path}"
+            logger.error(error_msg)
+            # Return failure so retry logic can try again
             return ExecutionResult(
                 plan_id=plan_id,
                 status=ExecutionStatus.FAILURE,
-                summary=f"Execution failed: {e}",
-                errors=[str(e)]
+                summary=error_msg,
+                errors=[error_msg]
             )
 
+        # Validate metrics are reasonable (not NaN, Inf, etc.)
+        if output.metrics:
+            mae = output.metrics.get('mae')
+            if mae is None or mae != mae or mae == float('inf'):  # Check for NaN or Inf
+                error_msg = f"Invalid MAE metric: {mae}"
+                logger.error(error_msg)
+                return ExecutionResult(
+                    plan_id=plan_id,
+                    status=ExecutionStatus.FAILURE,
+                    summary=error_msg,
+                    errors=[error_msg, "Metrics validation failed"]
+                )
 
-def _create_fallback_execution(plan_id: str) -> ExecutionResult:
-    """
-    Create execution using winning method code from Stage 3.5B.
-    Only falls back to naive prediction if method execution fails.
+        return output
+    else:
+        # Agent failed to create execution result - raise error for retry
+        error_details = []
+        error_details.append(f"Agent failed to create execution result file on attempt {attempt_num}")
+        error_details.append(f"Expected path: {result_path}")
 
-    CRITICAL: Uses the EXACT same data split strategy as Stage 3.5B
-    to ensure metric consistency.
-    """
-    import pandas as pd
-    import numpy as np
-    import sys
-    from io import StringIO
-    from functools import partial
-
-    try:
-        # Load prepared data
-        prepared_path = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
-        if not prepared_path.exists():
-            raise FileNotFoundError(f"Prepared data not found: {prepared_path}")
-
-        df = pd.read_parquet(prepared_path)
-
-        # Get target column from plan
-        plan_path = STAGE3_OUT_DIR / f"PLAN-{plan_id.replace('PLAN-', '')}.json"
-        
-        # Try both ID formats (PLAN-TSK-001 or TSK-001)
-        if not plan_path.exists():
-             plan_path = STAGE3_OUT_DIR / f"{plan_id}.json"
-             
-        if plan_path.exists():
-            plan = DataPassingManager.load_artifact(plan_path)
-            target_col = plan.get('target_column')
+        if predictions_path.exists():
+            error_details.append("Note: Predictions file exists but result file is missing")
+            error_details.append("This suggests the agent created predictions but failed to save metadata")
         else:
-            logger.warning(f"Plan file not found for {plan_id}, trying to infer target")
-            plan = {}
-            target_col = None
+            error_details.append("Predictions file also missing - agent likely failed during execution")
 
-        if not target_col or target_col not in df.columns:
-            # Find a numeric column
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            target_col = numeric_cols[-1] if numeric_cols else df.columns[-1]
-            logger.warning(f"Using inferred target column: {target_col}")
+        # Check what files the agent did create
+        stage4_files = list(STAGE4_OUT_DIR.glob(f"*{plan_id}*"))
+        if stage4_files:
+            error_details.append(f"Files found in STAGE4_OUT_DIR: {[f.name for f in stage4_files]}")
+        else:
+            error_details.append("No output files found - agent may not have started execution")
 
-        # ================================================================
-        # PRIORITY 1: Try to execute winning method from Stage 3.5B
-        # ================================================================
-        tester_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}.json"
-        if tester_path.exists():
-            try:
-                tester = DataPassingManager.load_artifact(tester_path)
-                winning_code = tester.get('winning_method_code')
+        # Check if we can get more info from the agent's final state
+        if hasattr(final_state, 'messages') and final_state.messages:
+            last_message = final_state.messages[-1]
+            if hasattr(last_message, 'content'):
+                error_details.append(f"Last agent message: {last_message.content[:500]}")
 
-                if winning_code:
-                    logger.info(f"Attempting to execute winning method {tester.get('selected_method_id')}")
+        error_msg = "\n".join(error_details)
+        logger.error(error_msg)
 
-                    # ============================================================
-                    # CRITICAL: Use the EXACT same split strategy as Stage 3.5B
-                    # ============================================================
-                    split_strategy = tester.get('data_split_strategy', {})
-                    strategy_type = split_strategy.get('strategy_type', 'temporal')
-                    train_size_pct = split_strategy.get('train_size', 0.7)
-                    val_size_pct = split_strategy.get('validation_size', 0.15)
-                    test_size_pct = split_strategy.get('test_size', 0.15)
-                    date_col = tester.get('date_column') or split_strategy.get('date_column')
-
-                    # Apply the exact same split as Stage 3.5B
-                    if strategy_type == 'temporal_column':
-                        # Wide format - use column-based split (all rows, different columns)
-                        logger.info("Using temporal_column (wide format) split strategy")
-                        train_df = df.copy()
-                        test_df = df.copy()
-                    elif date_col and date_col in df.columns:
-                        # Temporal split based on date column
-                        logger.info(f"Using temporal split on {date_col}")
-                        df = df.sort_values(date_col)
-                        train_end_idx = int(len(df) * train_size_pct)
-                        val_end_idx = int(len(df) * (train_size_pct + val_size_pct))
-                        train_df = df.iloc[:train_end_idx].copy()
-                        test_df = df.iloc[val_end_idx:].copy()
-                    else:
-                        # Default row-based split
-                        logger.info(f"Using row-based split: train={train_size_pct}, val={val_size_pct}, test={test_size_pct}")
-                        train_end_idx = int(len(df) * train_size_pct)
-                        val_end_idx = int(len(df) * (train_size_pct + val_size_pct))
-                        train_df = df.iloc[:train_end_idx].copy()
-                        test_df = df.iloc[val_end_idx:].copy()
-
-                    # Override target_col from tester if available
-                    if tester.get('target_column') and tester.get('target_column') in df.columns:
-                        target_col = tester.get('target_column')
-
-                    # Setup execution namespace
-                    namespace = {
-                        'pd': pd,
-                        'np': np,
-                        'train_df': train_df,
-                        'test_df': test_df,
-                        'target_col': target_col,
-                        'date_col': date_col,
-                        'df': df,  # Full dataframe for wide format methods
-                    }
-
-                    # Add ML imports
-                    try:
-                        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-                        from sklearn.linear_model import LinearRegression, Ridge, Lasso
-                        namespace['RandomForestRegressor'] = RandomForestRegressor
-                        namespace['GradientBoostingRegressor'] = GradientBoostingRegressor
-                        namespace['LinearRegression'] = LinearRegression
-                        namespace['Ridge'] = Ridge
-                        namespace['Lasso'] = Lasso
-                    except ImportError:
-                        pass
-
-                    # Execute the winning method code
-                    # First, check if features required by code exist
-                    required_features = tester.get('feature_columns', [])
-                    if not required_features and 'features =' in winning_code:
-                         # Try to extract from code
-                        import re
-                        match = re.search(r"features\s*=\s*\['([^']+)',\s*'([^']+)'", winning_code)
-                        # This is a naive check, but better than nothing
-                    
-                    # Verify features exist in dataframe
-                    missing_cols = []
-                    if required_features:
-                        for col in required_features:
-                            if col not in df.columns:
-                                missing_cols.append(col)
-                    
-                    if missing_cols:
-                        logger.warning(f"Missing feature columns for winning method: {missing_cols}")
-                        logger.info("Attempting to re-engineer features from plan...")
-                        
-                        # Try to reproduce features from plan
-                        if plan and 'feature_engineering' in plan:
-                            for fe in plan['feature_engineering']:
-                                if fe.get('name') in missing_cols:
-                                    try:
-                                        exec(fe.get('implementation_code'), {'df': df, 'pd': pd, 'np': np})
-                                        logger.info(f"Re-engineered feature: {fe.get('name')}")
-                                    except Exception as e:
-                                        logger.warning(f"Failed to feature: {e}")
-                        
-                        # Update train_df/test_df with new columns
-                        if strategy_type != 'temporal_column':
-                            train_end = int(len(df) * train_size_pct)
-                            val_end = int(len(df) * (train_size_pct + val_size_pct))
-                            train_df = df.iloc[:train_end].copy()
-                            test_df = df.iloc[val_end:].copy()
-                        else:
-                            train_df = df.copy()
-                            test_df = df.copy()
-                            
-                        namespace['train_df'] = train_df
-                        namespace['test_df'] = test_df
-                        namespace['df'] = df
-
-
-                    exec(winning_code, namespace)
-
-                    # Get the prediction function name
-                    func_name = None
-                    for name, obj in namespace.items():
-                        if callable(obj) and name.startswith('predict_'):
-                            func_name = name
-                            break
-
-                    if func_name:
-                        predict_func = namespace[func_name]
-                        predictions_df = predict_func(train_df, test_df, target_col, date_col)
-
-                        # Create results DataFrame
-                        results_df = test_df.copy()
-                        results_df['actual'] = results_df[target_col]
-                        if isinstance(predictions_df, pd.DataFrame) and 'predicted' in predictions_df.columns:
-                            results_df['predicted'] = predictions_df['predicted'].values
-                        else:
-                            results_df['predicted'] = np.array(predictions_df).flatten()
-
-                        # Calculate metrics
-                        actual = results_df['actual'].values
-                        predicted = results_df['predicted'].values
-
-                        mae = np.mean(np.abs(actual - predicted))
-                        rmse = np.sqrt(np.mean((actual - predicted) ** 2))
-                        mask = actual != 0
-                        mape = np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100 if mask.sum() > 0 else 0.0
-                        r2 = 1 - (np.sum((actual - predicted)**2) / np.sum((actual - np.mean(actual))**2)) if len(actual) > 1 else 0.0
-
-                        # Compare with benchmark metrics
-                        benchmark_metrics = tester.get('benchmark_metrics', {})
-                        if benchmark_metrics:
-                            benchmark_mae = benchmark_metrics.get('mae')
-                            if benchmark_mae:
-                                diff_pct = abs(mae - benchmark_mae) / benchmark_mae * 100 if benchmark_mae > 0 else 0
-                                if diff_pct > 10:
-                                    logger.warning(f"Metric difference from benchmark: MAE {mae:.4f} vs {benchmark_mae:.4f} ({diff_pct:.1f}% diff)")
-                                else:
-                                    logger.info(f"Metrics match benchmark: MAE {mae:.4f} vs {benchmark_mae:.4f} ({diff_pct:.1f}% diff)")
-
-                        # Save predictions
-                        predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
-                        results_df.to_parquet(predictions_path, index=False)
-
-                        # Create and save execution result
-                        result = ExecutionResult(
-                            plan_id=plan_id,
-                            status=ExecutionStatus.SUCCESS,
-                            outputs={"predictions": str(predictions_path)},
-                            metrics={"mae": mae, "rmse": rmse, "mape": mape, "r2": r2},
-                            summary=f"Executed {tester.get('selected_method_name', 'winning method')} (MAE: {mae:.4f})"
-                        )
-
-                        DataPassingManager.save_artifact(
-                            data=result.model_dump(),
-                            output_dir=STAGE4_OUT_DIR,
-                            filename=f"execution_result_{plan_id}.json",
-                            metadata={
-                                "stage": "stage4",
-                                "type": "execution_result",
-                                "method": tester.get('selected_method_id'),
-                                "benchmark_mae": benchmark_metrics.get('mae'),
-                            }
-                        )
-
-                        logger.info(f"Winning method execution succeeded with MAE: {mae:.4f}")
-                        return result
-                    else:
-                        logger.warning("Could not find prediction function in winning method code")
-
-            except Exception as method_error:
-                logger.warning(f"Winning method execution failed: {method_error}, falling back to naive prediction")
-                import traceback
-                logger.debug(traceback.format_exc())
-
-        # ================================================================
-        # PRIORITY 2: Fallback to naive prediction
-        # ================================================================
-        logger.warning("Using naive prediction fallback")
-
-        # Use same split strategy for consistency
-        split_strategy = {}
-        if tester_path.exists():
-            try:
-                tester = DataPassingManager.load_artifact(tester_path)
-                split_strategy = tester.get('data_split_strategy', {})
-            except:
-                pass
-
-        train_size_pct = split_strategy.get('train_size', 0.7)
-        val_size_pct = split_strategy.get('validation_size', 0.15)
-
-        # Create train/test split
-        train_end_idx = int(len(df) * train_size_pct)
-        val_end_idx = int(len(df) * (train_size_pct + val_size_pct))
-        train_df = df.iloc[:train_end_idx]
-        test_df = df.iloc[val_end_idx:]
-
-        # Simple naive prediction
-        last_value = train_df[target_col].iloc[-1]
-
-        results_df = test_df.copy()
-        results_df['actual'] = results_df[target_col]
-        results_df['predicted'] = last_value
-
-        # Calculate metrics
-        actual = results_df['actual'].values
-        predicted = results_df['predicted'].values
-
-        mae = np.mean(np.abs(actual - predicted))
-        rmse = np.sqrt(np.mean((actual - predicted) ** 2))
-        mask = actual != 0
-        mape = np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100 if mask.sum() > 0 else 0.0
-        r2 = 1 - (np.sum((actual - predicted)**2) / np.sum((actual - np.mean(actual))**2)) if len(actual) > 1 else 0.0
-
-        # Save predictions
-        predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
-        results_df.to_parquet(predictions_path, index=False)
-
-        # Create and save execution result
-        result = ExecutionResult(
-            plan_id=plan_id,
-            status=ExecutionStatus.SUCCESS,
-            outputs={"predictions": str(predictions_path)},
-            metrics={"mae": mae, "rmse": rmse, "mape": mape, "r2": r2},
-            summary=f"Fallback execution with naive prediction (MAE: {mae:.4f})"
+        # NO FALLBACK - raise error so retry mechanism can try again
+        logger.error(f"Agent failed to save execution result. Attempt {attempt_num} must be retried.")
+        raise RuntimeError(
+            f"Stage 4 attempt {attempt_num} failed: Agent did not save execution result. "
+            f"This may be due to max_tokens error or other agent failure. "
+            f"Details: {error_msg}"
         )
 
-        DataPassingManager.save_artifact(
-            data=result.model_dump(),
-            output_dir=STAGE4_OUT_DIR,
-            filename=f"execution_result_{plan_id}.json",
-            metadata={"stage": "stage4", "type": "execution_result", "fallback": True}
-        )
 
-        logger.info(f"Fallback execution saved to {predictions_path}")
-        return result
-
-    except Exception as e:
-        logger.error(f"Fallback execution failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return ExecutionResult(
-            plan_id=plan_id,
-            status=ExecutionStatus.FAILURE,
-            summary=f"Fallback execution failed: {e}",
-            errors=[str(e)]
-        )
+# Removed _create_fallback_execution - no longer using fallback logic
+# All execution must go through the LLM agent which has proper error handling
 
 
 # ============================================================================

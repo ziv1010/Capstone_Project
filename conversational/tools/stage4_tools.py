@@ -323,12 +323,15 @@ def execute_python_code(code: str, description: str = "") -> str:
     Available: pd, np, sklearn, statsmodels, DATA_DIR, load_dataframe()
     Stage-specific dirs: STAGE3B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE
 
+    CRITICAL: This tool MUST NOT silently swallow errors. If execution fails,
+    it returns detailed error information including full traceback.
+
     Args:
         code: Python code to execute
         description: What the code does
 
     Returns:
-        Execution output
+        Execution output with detailed error information if failed
     """
     import sys
     from io import StringIO
@@ -386,6 +389,7 @@ def execute_python_code(code: str, description: str = "") -> str:
 
     start_time = time.time()
     success = True
+    error_details = []
 
     try:
         exec(code, namespace)
@@ -396,7 +400,58 @@ def execute_python_code(code: str, description: str = "") -> str:
     except Exception as e:
         success = False
         import traceback
-        output = f"Error: {e}\n{traceback.format_exc()}"
+        full_trace = traceback.format_exc()
+
+        # Provide detailed error analysis
+        error_details.append(f"ERROR TYPE: {type(e).__name__}")
+        error_details.append(f"ERROR MESSAGE: {str(e)}")
+        error_details.append("")
+        error_details.append("FULL TRACEBACK:")
+        error_details.append(full_trace)
+        error_details.append("")
+
+        # Check for common issues
+        if "KeyError" in str(type(e)):
+            error_details.append("DIAGNOSIS: Column or key not found in DataFrame")
+            error_details.append("  - Check that the column name matches exactly (case-sensitive)")
+            error_details.append("  - Use df.columns to see available columns")
+        elif "NameError" in str(type(e)):
+            error_details.append("DIAGNOSIS: Variable or function not defined")
+            error_details.append("  - Check that all required functions are defined")
+            error_details.append("  - Verify variable names are correct")
+        elif "AttributeError" in str(type(e)):
+            error_details.append("DIAGNOSIS: Method or attribute does not exist")
+            error_details.append("  - Check that the object type is correct")
+            error_details.append("  - Verify method names and signatures")
+        elif "IndexError" in str(type(e)):
+            error_details.append("DIAGNOSIS: Index out of range")
+            error_details.append("  - Check data split indices")
+            error_details.append("  - Verify DataFrame has enough rows")
+        elif "ValueError" in str(type(e)) and "shape" in str(e).lower():
+            error_details.append("DIAGNOSIS: Shape mismatch in arrays/DataFrames")
+            error_details.append("  - Check that predictions match test set size")
+            error_details.append("  - Verify data split created correct shapes")
+
+        # Add namespace info for debugging
+        error_details.append("")
+        error_details.append("AVAILABLE VARIABLES IN NAMESPACE:")
+        for k, v in namespace.items():
+            if not k.startswith('__'):
+                try:
+                    if isinstance(v, pd.DataFrame):
+                        error_details.append(f"  {k}: DataFrame {v.shape}")
+                    elif isinstance(v, pd.Series):
+                        error_details.append(f"  {k}: Series length={len(v)}")
+                    elif isinstance(v, (list, tuple)):
+                        error_details.append(f"  {k}: {type(v).__name__} length={len(v)}")
+                    elif callable(v):
+                        error_details.append(f"  {k}: function")
+                    else:
+                        error_details.append(f"  {k}: {type(v).__name__}")
+                except:
+                    pass
+
+        output = "\n".join(error_details)
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
@@ -404,6 +459,7 @@ def execute_python_code(code: str, description: str = "") -> str:
     exec_time = time.time() - start_time
 
     result = [
+        f"Description: {description}" if description else "",
         f"Execution time: {exec_time:.2f}s",
         f"Status: {'SUCCESS' if success else 'FAILED'}",
         "",

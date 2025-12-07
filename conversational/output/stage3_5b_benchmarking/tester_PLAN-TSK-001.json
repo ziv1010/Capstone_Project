@@ -1,0 +1,63 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T01:38:41.313553",
+    "checksum": "c180635e44682ef9",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "iterations": 3,
+        "valid": true,
+        "avg_mae": 17.53658536585366,
+        "avg_rmse": 35.525737767180004,
+        "avg_mape": 7.737789578366855
+      },
+      {
+        "method_id": "M2",
+        "iterations": 3,
+        "valid": true,
+        "avg_mae": 56.7385316559984,
+        "avg_rmse": 90.30037143280572,
+        "avg_mape": 309.1920784707708
+      },
+      {
+        "method_id": "M3",
+        "iterations": 3,
+        "valid": true,
+        "avg_mae": 135.5018836991872,
+        "avg_rmse": 241.38829546113124,
+        "avg_mape": 1723.0147941738514
+      }
+    ],
+    "selected_method_id": "M1",
+    "selected_method_name": "Naive Forecast",
+    "selection_rationale": "M1 had the lowest average MAE (17.54) compared to M2 (56.74) and M3 (135.50). The MAPE of 7.74% also indicates high accuracy for M1.",
+    "method_comparison_summary": "M1 outperformed both M2 and M3 by a significant margin. M2 showed 223.5% higher MAE than M1, and M3 showed 672.7% higher MAE. The MAPE values further confirm M1's superior accuracy.",
+    "winning_method_code": "def predict_naive(train_df, test_df, target_col, **params):\n    import pandas as pd\n    # Use last available production year as prediction\n    predictions = test_df['Production-2023-24'].copy()\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+    "winning_method_hyperparameters": {},
+    "winning_method_libraries": [
+      "pandas"
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": null,
+      "target_column": "Production-2024-25",
+      "train_period": "Years 2020-2023",
+      "validation_period": "Year 2023-24",
+      "test_period": "Year 2024-25"
+    },
+    "target_column": "Production-2024-25",
+    "date_column": null,
+    "feature_columns": [],
+    "benchmark_metrics": {
+      "mae": 17.53658536585366,
+      "rmse": 35.525737767180004,
+      "mape": 7.737789578366855
+    }
+  }
+}

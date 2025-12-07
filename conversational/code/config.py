@@ -19,7 +19,7 @@ from datetime import datetime
 # PROJECT PATHS
 # ============================================================================
 
-PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/scratch/ziv_baretto/conversational_agent/Test_Capstone/conversational"))
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/scratch/ziv_baretto/llmserve/final_code/conversational"))
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_ROOT = PROJECT_ROOT / "output"
 

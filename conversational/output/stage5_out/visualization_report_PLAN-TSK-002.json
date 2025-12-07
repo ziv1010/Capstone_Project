@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T12:38:47.479240",
+    "checksum": "841c386d7105bca1",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Values",
+        "description": "Comparison of actual rice export quantities vs model predictions with ideal prediction line",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/residuals_histogram.png",
+        "plot_type": "histogram",
+        "title": "Residual Distribution",
+        "description": "Histogram showing distribution of prediction errors (actual - predicted)",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "residuals_histogram.png"
+      }
+    ],
+    "insights": [
+      "- Model has extremely high prediction error (MAPE: 19664.55%)",
+      "- Negative R-squared (-0.1292) indicates worse-than-average performance",
+      "- Residuals show large variance (329.64) with positive bias",
+      "- Only 5 data points limit statistical significance"
+    ],
+    "summary": "The Random Forest model cannot reliably predict rice export quantities to Bangladesh with the current data and features. Predictions have an average error of 171.68 units and a massive percentage error of 19,664.55%.",
+    "task_answer": "The Random Forest model cannot reliably predict rice export quantities to Bangladesh with the current data and features. Predictions have an average error of 171.68 units and a massive percentage error of 19,664.55%."
+  }
+}

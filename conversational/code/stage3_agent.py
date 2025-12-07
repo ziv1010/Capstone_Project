@@ -169,6 +169,14 @@ def create_stage3_agent():
 
         if state.messages:
             last_message = state.messages[-1]
+            
+            # Check if the last message is a ToolMessage indicating successful plan save
+            if hasattr(last_message, 'content') and isinstance(last_message.content, str):
+                if "✅ Execution plan saved successfully" in last_message.content:
+                    logger.info("Plan saved successfully - ending agent loop")
+                    return "end"
+            
+            # Check if last message is AI with tool calls
             if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
                 return "tools"
 

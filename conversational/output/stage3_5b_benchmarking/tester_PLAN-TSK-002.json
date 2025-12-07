@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-07T12:33:15.482141",
+    "checksum": "74890ffb1078e450",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "avg_mae": 214.6971428571428,
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "avg_mae": 177.33853786707527,
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "avg_mae": 16.229958333333204,
+        "valid": true
+      }
+    ],
+    "selected_method_id": "M3",
+    "selected_method_name": "Random Forest Regressor",
+    "selection_rationale": "M3 achieved the lowest average MAE (16.23) compared to M2 (177.34) and M1 (214.70), demonstrating significantly better predictive performance.",
+    "winning_method_code": "def predict_random_forest(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from sklearn.ensemble import RandomForestRegressor\n\n    features = ['Production-2023-24', 'Area-2023-24', 'lag_1_year', 'rolling_avg_3y']\n    X_train = train_df[features].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[features].fillna(0)\n\n    model = RandomForestRegressor(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+    "winning_method_hyperparameters": {
+      "n_estimators": 100,
+      "random_state": 42
+    },
+    "winning_method_libraries": [
+      "pandas",
+      "sklearn.ensemble"
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": null,
+      "target_column": "2024 - 25-Quantity",
+      "train_period": "All available years except target",
+      "validation_period": "Previous year's data",
+      "test_period": "2024-25"
+    },
+    "target_column": "2024 - 25-Quantity",
+    "date_column": null,
+    "feature_columns": [],
+    "benchmark_metrics": {
+      "mae": 16.229958333333204,
+      "rmse": null,
+      "mape": null
+    }
+  }
+}

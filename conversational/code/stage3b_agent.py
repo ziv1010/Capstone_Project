@@ -266,11 +266,26 @@ The output should be saved as: prepared_{plan_id}.parquet
                 )
                 return output
             else:
-                raise RuntimeError("Prepared data was not saved")
+                # NO FALLBACK - raise an error so the pipeline can retry
+                logger.error("Agent failed to save prepared data. Stage must be retried.")
+                raise RuntimeError(
+                    "Stage 3B failed: Agent did not save prepared data. "
+                    "This may be due to max_tokens error or other agent failure. "
+                    "The stage should be retried."
+                )
 
     except Exception as e:
-        logger.error(f"Stage 3B failed: {e}")
-        raise
+        # Check if it's a max_tokens error
+        error_msg = str(e).lower()
+        if 'max_tokens' in error_msg or 'token' in error_msg:
+            logger.error(f"Stage 3B failed with token error: {e}")
+            raise RuntimeError(
+                f"Stage 3B failed due to max_tokens error: {e}. "
+                "This stage needs to be retried."
+            )
+        else:
+            logger.error(f"Stage 3B failed: {e}")
+            raise
 
 
 # ============================================================================
@@ -280,7 +295,10 @@ The output should be saved as: prepared_{plan_id}.parquet
 def stage3b_node(state: PipelineState) -> PipelineState:
     """
     Stage 3B node for the master pipeline graph.
+    Includes automatic retry logic for transient failures.
     """
+    from code.config import MAX_RETRIES, RETRY_STAGES
+
     state.mark_stage_started("stage3b")
 
     plan_id = f"PLAN-{state.selected_task_id}" if state.selected_task_id else None
@@ -288,13 +306,58 @@ def stage3b_node(state: PipelineState) -> PipelineState:
         state.mark_stage_failed("stage3b", "No plan ID available")
         return state
 
-    try:
-        output = run_stage3b(plan_id, state)
-        state.stage3b_output = output
-        state.mark_stage_completed("stage3b", output)
-    except Exception as e:
-        state.mark_stage_failed("stage3b", str(e))
+    # Retry logic for resilient execution
+    max_retries = MAX_RETRIES if "stage3b" in RETRY_STAGES else 1
+    last_error = None
 
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Stage 3B attempt {attempt}/{max_retries}")
+            output = run_stage3b(plan_id, state)
+            state.stage3b_output = output
+            state.mark_stage_completed("stage3b", output)
+            logger.info(f"✅ Stage 3B succeeded on attempt {attempt}")
+            return state
+        except Exception as e:
+            last_error = e
+            error_msg = str(e).lower()
+
+            # Check if it's a retryable error
+            is_retryable = (
+                'max_tokens' in error_msg or
+                'token' in error_msg or
+                'did not save' in error_msg or
+                'merge' in error_msg or  # MergeError from pandas
+                'keyerror' in error_msg  # Column name issues
+            )
+
+            if is_retryable and attempt < max_retries:
+                logger.warning(
+                    f"⚠️  Stage 3B attempt {attempt} failed with retryable error: {e}. "
+                    f"Retrying... ({attempt}/{max_retries})"
+                )
+                # Clean up any partial outputs before retry
+                parquet_path = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
+                meta_path = STAGE3B_OUT_DIR / f"prepared_{plan_id}_meta.json"
+                if parquet_path.exists():
+                    logger.info(f"Removing partial output: {parquet_path}")
+                    parquet_path.unlink()
+                if meta_path.exists():
+                    logger.info(f"Removing partial metadata: {meta_path}")
+                    meta_path.unlink()
+                continue
+            else:
+                # Non-retryable error or max retries reached
+                if attempt >= max_retries:
+                    logger.error(
+                        f"❌ Stage 3B failed after {max_retries} attempts. "
+                        f"Last error: {e}"
+                    )
+                state.mark_stage_failed("stage3b", str(last_error))
+                return state
+
+    # Should not reach here, but handle it
+    state.mark_stage_failed("stage3b", str(last_error))
     return state
 
 

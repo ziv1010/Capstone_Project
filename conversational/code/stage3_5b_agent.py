@@ -280,27 +280,34 @@ def run_stage3_5b(plan_id: str, pipeline_state: PipelineState = None) -> TesterO
     graph = create_stage3_5b_agent()
 
     initial_message = HumanMessage(content=f"""
-Benchmark forecasting methods for plan: {plan_id}
+Benchmark methods for plan: {plan_id}
 
 Steps:
-1. Load method proposals from Stage 3.5A
-2. Check for existing checkpoint (resume if available)
-3. For each of the 3 methods (M1, M2, M3):
+1. Call get_actual_columns() FIRST to verify column names
+2. Load method proposals from Stage 3.5A AND execution plan to get evaluation_metrics
+3. Check for existing checkpoint (resume if available)
+4. For each of the 3 methods (M1, M2, M3):
    a. Run {BENCHMARK_ITERATIONS} iterations
-   b. Calculate metrics each time
+   b. Calculate ALL metrics from the plan's evaluation_metrics (NOT just MAE/RMSE/MAPE)
    c. Validate consistency (CV < {MAX_CV_THRESHOLD})
    d. Save checkpoint after completing the method
-4. Compare all valid methods
-5. Select the best method (lowest average MAE)
-6. Save tester output using save_tester_output tool
+5. Compare all valid methods using the PRIMARY metric from the plan
+6. Select the best method based on the plan's evaluation criteria
+7. Save tester output using save_tester_output tool
 
 The prepared data is at: {STAGE3B_OUT_DIR}/prepared_{plan_id}.parquet
 
-IMPORTANT: You MUST call save_tester_output with a valid JSON containing:
+IMPORTANT:
+- Use the evaluation_metrics from the execution plan (DO NOT assume MAE/RMSE/MAPE)
+- For classification: might be accuracy, f1, precision, recall
+- For forecasting: might be MAE, RMSE, MAPE, R2
+- Calculate ALL metrics specified in the plan
+
+You MUST call save_tester_output with a valid JSON containing:
 - plan_id: "{plan_id}"
-- methods_tested: list of method results
+- methods_tested: list of method results with ALL metrics
 - selected_method_id: the best method ID (e.g., "M1")
-- selection_rationale: why this method was selected
+- selection_rationale: why this method was selected (based on plan metrics)
 
 Save output as: tester_{plan_id}.json
 

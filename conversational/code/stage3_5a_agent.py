@@ -51,7 +51,7 @@ STAGE35A_SYSTEM_PROMPT = """You are a Method Proposal Agent responsible for prop
 
 ## CRITICAL: Task-Appropriate Algorithms
 You must propose algorithms that MATCH the task category (FORECASTING, REGRESSION, CLASSIFICATION, or CLUSTERING).
-Choose the best algorithms based on DATA CHARACTERISTICS, not from a fixed list.
+Choose the best algorithms based on DATA CHARACTERISTICS and TASK TYPE, not from a fixed list.
 
 ## CRITICAL: Prevent Column Hallucination
 ❌ DO NOT assume column names exist (e.g., 'Year', 'date', 'time')
@@ -64,22 +64,30 @@ Analyze the data and task, then propose EXACTLY 3 algorithms appropriate for the
 2. **M2 - Traditional/Statistical**: A classic, interpretable algorithm
 3. **M3 - Advanced ML**: A more complex machine learning approach
 
-## Algorithm Selection Criteria (DO NOT hardcode - ANALYZE the data)
+## Algorithm Selection Criteria (DO NOT hardcode - ANALYZE the data and task type)
 
 Consider these factors when choosing algorithms:
+- **Task Type** (MOST IMPORTANT):
+  - FORECASTING: Time series methods (Naive, ARIMA, Prophet, LSTM, etc.)
+  - REGRESSION: Regression models (Linear, Ridge, Random Forest Regressor, XGBoost, etc.)
+  - CLASSIFICATION: Classification models (Logistic, Decision Tree Classifier, Random Forest Classifier, SVM, etc.)
+  - CLUSTERING: Clustering methods (K-Means, DBSCAN, Hierarchical, etc.)
 - **Data Size**: Small datasets → simpler models; Large datasets → can use complex models
 - **Feature Types**: Numeric, categorical, mixed → affects algorithm choice
-- **Target Type**: Continuous, discrete, ordinal → determines algorithm family
+- **Target Type**: Continuous, discrete, ordinal, binary, multi-class → determines algorithm family
 - **Patterns**: Linear vs non-linear relationships in the data
 - **Seasonality/Trends**: For time series, analyze temporal patterns
+- **Class Balance**: For classification, check if classes are balanced
 - **Interpretability Needs**: Some tasks need explainable models
 - **Computational Constraints**: Consider training/inference time
 
 ## Selection Process
-1. Analyze the DATA first (size, types, patterns)
-2. Consider the TASK requirements (prediction accuracy vs interpretability)
-3. Choose algorithms that FIT the data characteristics
-4. Ensure M1 < M2 < M3 in complexity progression
+1. Load the plan to get the TASK CATEGORY (forecasting/regression/classification/clustering)
+2. Analyze the DATA (size, types, patterns, balance)
+3. Consider the TASK requirements (accuracy vs interpretability, single-step vs multi-step)
+4. Choose algorithms that FIT both the task type and data characteristics
+5. Ensure M1 < M2 < M3 in complexity progression
+6. Select appropriate metrics for the task type (from the execution plan)
 
 ## Your Goals
 1. **FIRST**: Call get_actual_columns() to see what columns exist
@@ -167,12 +175,41 @@ You must also specify:
 8. Save the method proposal
 9. Call finish_method_proposal() to end the stage
 
-## Method Selection Guidelines
-- For SHORT time series (<100 points): Prefer simple methods
-- For SEASONAL data: Include methods that handle seasonality
-- For TRENDING data: Include methods that capture trends
-- Match algorithms to the TASK CATEGORY (forecasting/regression/classification/clustering)
-- Always include a simple baseline for comparison
+## Method Selection Guidelines by Task Type
+
+### For FORECASTING Tasks:
+- SHORT time series (<100 points): Naive, Moving Average, Simple Exponential Smoothing
+- SEASONAL data: SARIMA, Prophet, Seasonal Decomposition
+- TRENDING data: ARIMA, Holt-Winters, LSTM
+- Always start with Naive/Last-Value as baseline (M1)
+
+### For REGRESSION Tasks:
+- LINEAR relationships: Linear Regression, Ridge, Lasso
+- NON-LINEAR: Polynomial, Random Forest Regressor, XGBoost
+- SMALL data: Linear models with regularization
+- LARGE data: Tree-based ensembles, Neural Networks
+- Always start with Simple Linear Regression as baseline (M1)
+
+### For CLASSIFICATION Tasks:
+- BINARY: Logistic Regression, SVM, Random Forest
+- MULTI-CLASS: Softmax, Decision Trees, XGBoost
+- IMBALANCED: Use class weights, SMOTE, or ensemble methods
+- LINEAR separability: Logistic Regression, Linear SVM
+- NON-LINEAR: Kernel SVM, Random Forest, Neural Networks
+- Always start with Majority Class or Logistic Regression as baseline (M1)
+
+### For CLUSTERING Tasks:
+- KNOWN K: K-Means, K-Medoids
+- UNKNOWN K: DBSCAN, Hierarchical with elbow method
+- HIGH-DIMENSIONAL: PCA + K-Means, Spectral Clustering
+- Always start with K-Means as baseline (M1)
+
+## Metrics Selection (CRITICAL)
+DO NOT hardcode metrics - use the metrics specified in the execution plan:
+- FORECASTING: MAE, RMSE, MAPE, R², SMAPE, MASE
+- REGRESSION: MAE, RMSE, R², MSE
+- CLASSIFICATION: Accuracy, Precision, Recall, F1-Score, AUC-ROC
+- CLUSTERING: Silhouette Score, Davies-Bouldin Index, Calinski-Harabasz
 
 IMPORTANT: The implementation code must be complete and run without errors.
 The benchmarking stage will execute this code exactly as written.
@@ -252,32 +289,36 @@ def run_stage3_5a(plan_id: str, pipeline_state: PipelineState = None) -> MethodP
     graph = create_stage3_5a_agent()
 
     initial_message = HumanMessage(content=f"""
-Propose forecasting methods for plan: {plan_id}
+Propose the 3 BEST methods for plan: {plan_id}
 
 Steps:
-1. Load the plan and data information
-2. Analyze time series characteristics
-3. Get method templates for reference
-4. Propose EXACTLY 3 methods:
-   - M1: Simple baseline (e.g., moving average, naive)
-   - M2: Statistical method (e.g., ARIMA, exponential smoothing)
-   - M3: Machine learning (e.g., random forest with lag features)
-5. Write COMPLETE implementation code for each
-6. Define data split strategy (prefer temporal split)
-7. Save the method proposal using save_method_proposal tool
+1. Call get_actual_columns() FIRST to see available columns
+2. Load the plan and data information to get the TASK CATEGORY
+3. Analyze data characteristics (size, types, patterns, balance)
+4. Get method templates for reference
+5. Based on the TASK TYPE, propose EXACTLY 3 appropriate methods:
+   - M1: Simple baseline appropriate for the task type
+   - M2: Traditional/Statistical method appropriate for the task type
+   - M3: Advanced ML method appropriate for the task type
+6. Write COMPLETE implementation code for each method
+7. Select evaluation metrics from the execution plan (DO NOT hardcode)
+8. Define data split strategy (temporal for time series, stratified for classification, random for regression)
+9. Save the method proposal using save_method_proposal tool
 
 Each method's code must:
 - Be a complete, runnable function
-- Accept train_df, test_df, target_col, date_col parameters
-- Return a DataFrame with 'predicted' column
+- Match the task category (forecasting/regression/classification/clustering)
+- Accept appropriate parameters (train_df, test_df, target_col, date_col, **params)
+- Return a DataFrame with 'predicted' column (or cluster labels for clustering)
 
 IMPORTANT: You MUST call save_method_proposal with a valid JSON object.
 The JSON must have these fields:
 - plan_id: "{plan_id}"
-- methods_proposed: list of 3 method objects
+- methods_proposed: list of 3 method objects (appropriate for the task type)
 - data_split_strategy: object with split info
 - date_column: column name (or null)
 - target_column: column name
+- evaluation_metrics: list of metrics from the execution plan
 
 Save output as: method_proposal_{plan_id}.json
 """)

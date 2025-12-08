@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T13:57:04.627617",
+    "checksum": "01df11b551868400",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Last Value Forecasting",
+        "category": "baseline",
+        "description": "Uses the most recent available value as prediction",
+        "implementation_code": "def predict_last_value(train_df, test_df, target_col, **params):\n    import pandas as pd\n    last_value = train_df[target_col].iloc[0]\n    return pd.DataFrame({'predicted': [last_value] * len(test_df)}, index=test_df.index)",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple implementation",
+          "Serves as strong baseline for time series"
+        ],
+        "expected_weaknesses": [
+          "Ignores all other features",
+          "No trend/seasonality handling"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Linear Regression",
+        "category": "statistical",
+        "description": "Linear model using all available features",
+        "implementation_code": "def predict_linear_regression(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from sklearn.linear_model import LinearRegression\n    X_train = train_df.drop(columns=[target_col, 'Crop', 'Season']).fillna(0)\n    y_train = train_df[target_col]\n    model = LinearRegression().fit(X_train, y_train)\n    X_test = test_df.drop(columns=[target_col, 'Crop', 'Season']).fillna(0)\n    return pd.DataFrame({'predicted': model.predict(X_test)}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "sklearn.linear_model"
+        ],
+        "hyperparameters": {
+          "fit_intercept": true
+        },
+        "expected_strengths": [
+          "Interpretable coefficients",
+          "Handles linear relationships"
+        ],
+        "expected_weaknesses": [
+          "Assumes linearity",
+          "May miss complex patterns"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest Regressor",
+        "category": "ml",
+        "description": "Ensemble method for non-linear patterns",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from sklearn.ensemble import RandomForestRegressor\n    X_train = train_df.drop(columns=[target_col, 'Crop', 'Season']).fillna(0)\n    y_train = train_df[target_col]\n    model = RandomForestRegressor(n_estimators=100, random_state=42).fit(X_train, y_train)\n    X_test = test_df.drop(columns=[target_col, 'Crop', 'Season']).fillna(0)\n    return pd.DataFrame({'predicted': model.predict(X_test)}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "sklearn.ensemble"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "random_state": 42
+        },
+        "expected_strengths": [
+          "Handles non-linear relationships",
+          "Robust to overfitting"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Higher computational cost"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": "Year",
+      "target_column": "2024 - 25-Quantity",
+      "train_period": "Years 2020-2023",
+      "validation_period": "Year 2023-24",
+      "test_period": "Year 2024-25"
+    },
+    "evaluation_metrics": [
+      "RMSE",
+      "MAE"
+    ],
+    "date_column": "Year",
+    "target_column": "2024 - 25-Quantity"
+  }
+}

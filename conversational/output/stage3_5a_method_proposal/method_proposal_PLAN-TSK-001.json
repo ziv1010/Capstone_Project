@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T14:10:04.683704",
+    "checksum": "49517bfd5ceaa5eb",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Last-Year-Value Baseline",
+        "category": "baseline",
+        "description": "Uses the last available year's production value as the forecast",
+        "implementation_code": "def predict_last_year(train_df, test_df, target_col, **params):\n    import pandas as pd\n    # Use the last available year's production as prediction\n    last_year_col = 'Production-2023-24'\n    predictions = pd.DataFrame({\n        'predicted': test_df[last_year_col].values\n    }, index=test_df.index)\n    return predictions",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple and fast",
+          "Establishes baseline performance"
+        ],
+        "expected_weaknesses": [
+          "Ignores all historical patterns",
+          "No error correction"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Linear Regression with Lag Features",
+        "category": "statistical/traditional",
+        "description": "Uses lagged features from the previous year to predict production",
+        "implementation_code": "def predict_linear_regression(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from sklearn.linear_model import LinearRegression\n    # Use lagged features from previous year\n    feature_cols = [\n        'Area-2023-24',\n        'Production-2023-24',\n        'Yield-2023-24'\n    ]\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n    \n    model = LinearRegression()\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "sklearn.linear_model"
+        ],
+        "hyperparameters": {
+          "fit_intercept": true
+        },
+        "expected_strengths": [
+          "Interpretable coefficients",
+          "Captures linear relationships"
+        ],
+        "expected_weaknesses": [
+          "Assumes linearity",
+          "May miss complex patterns"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "XGBoost with Multi-Year Features",
+        "category": "ml",
+        "description": "Uses multiple years of historical data to predict production",
+        "implementation_code": "def predict_xgboost(train_df, test_df, target_col, **params):\n    import pandas as pd\n    from xgboost import XGBRegressor\n    # Use multiple years as features\n    feature_cols = [\n        'Area-2020-21', 'Area-2021-22', 'Area-2022-23', 'Area-2023-24',\n        'Production-2020-21', 'Production-2021-22', 'Production-2022-23',\n        'Yield-2020-21', 'Yield-2021-22', 'Yield-2022-23', 'Yield-2023-24'\n    ]\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n    \n    model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "xgboost"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "learning_rate": 0.1,
+          "random_state": 42
+        },
+        "expected_strengths": [
+          "Handles non-linear relationships",
+          "Robust to feature interactions"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Requires more data"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": "Year",
+      "target_column": "Production-2024-25",
+      "train_period": "Years 2020-2022",
+      "validation_period": "Year 2023",
+      "test_period": "Year 2024"
+    },
+    "evaluation_metrics": [
+      "MAE",
+      "RMSE",
+      "MAPE"
+    ],
+    "date_column": "Year",
+    "target_column": "Production-2024-25"
+  }
+}

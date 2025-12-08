@@ -1,0 +1,144 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T13:44:38.817135",
+    "checksum": "17f599f2666423e0",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "selected_task_id": "TSK-002",
+    "goal": "Predict rice export quantities to Bangladesh using production data",
+    "task_category": "regression",
+    "file_instructions": [
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
+        ],
+        "filters": [
+          "Crop == 'Rice'",
+          "Season != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      },
+      {
+        "filename": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "filepath": "",
+        "columns_to_use": [
+          "Description",
+          "2018 - 19-Quantity",
+          "2018 - 19-Value (INR)",
+          "2018 - 19-Value (USD)",
+          "2019 - 20-Quantity",
+          "2019 - 20-Value (INR)",
+          "2019 - 20-Value (USD)",
+          "2020 - 21-Quantity",
+          "2020 - 21-Value (INR)",
+          "2020 - 21-Value (USD)",
+          "2021 - 22-Quantity",
+          "2021 - 22-Value (INR)",
+          "2021 - 22-Value (USD)",
+          "2022 - 23-Quantity",
+          "2022 - 23-Value (INR)",
+          "2022 - 23-Value (USD)",
+          "2024 - 25-Quantity",
+          "2024 - 25-Value (INR)",
+          "2024 - 25-Value (USD)"
+        ],
+        "filters": [
+          "Description == 'RICE EXCPTG PARBOILED'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [
+      {
+        "left_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "right_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "left_on": "Crop",
+        "right_on": "Description",
+        "how": "inner",
+        "validation_rule": null
+      }
+    ],
+    "feature_engineering": [
+      {
+        "name": "melt_production",
+        "description": "Convert wide-format production columns to long format",
+        "source_columns": [
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25"
+        ],
+        "implementation_code": "df_melted = df.melt(id_vars=['Crop'], value_vars=['Production-2020-21', 'Production-2021-22', 'Production-2022-23', 'Production-2023-24', 'Production-2024-25'], var_name='Year', value_name='Production')",
+        "dtype": null
+      },
+      {
+        "name": "melt_export",
+        "description": "Convert wide-format export quantity columns to long format",
+        "source_columns": [
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2024 - 25-Quantity"
+        ],
+        "implementation_code": "df_export_melted = df.melt(id_vars=['Description'], value_vars=['2018 - 19-Quantity', '2019 - 20-Quantity', '2020 - 21-Quantity', '2021 - 22-Quantity', '2022 - 23-Quantity', '2024 - 25-Quantity'], var_name='Year', value_name='Export_Quantity')",
+        "dtype": null
+      },
+      {
+        "name": "create_lag_features",
+        "description": "Create lag features for time series modeling",
+        "source_columns": [
+          "Production",
+          "Export_Quantity"
+        ],
+        "implementation_code": "df['Lag_1'] = df.groupby('Crop')['Production'].shift(1)\ndf['Lag_2'] = df.groupby('Crop')['Production'].shift(2)\ndf['Rolling_Mean_2'] = df.groupby('Crop')['Production'].rolling(2).mean().reset_index(level=0, drop=True)",
+        "dtype": null
+      }
+    ],
+    "target_column": "2024 - 25-Quantity",
+    "date_column": "Year",
+    "validation_strategy": "temporal",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 1,
+    "forecast_granularity": null,
+    "forecast_type": "single_step",
+    "expected_model_types": [
+      "RandomForestRegressor",
+      "XGBoostRegressor"
+    ],
+    "evaluation_metrics": [
+      "RMSE",
+      "MAE"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-08T13:44:38.816678"
+  }
+}

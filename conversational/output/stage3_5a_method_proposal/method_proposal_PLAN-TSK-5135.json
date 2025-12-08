@@ -1,0 +1,95 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T18:21:19.101117",
+    "checksum": "2754cba1c073cdff",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-5135",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Naive Forecast",
+        "category": "baseline",
+        "description": "Use last observed value as forecast",
+        "implementation_code": "def predict_naive(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    # Get last available year in training data\n    last_train_year = sorted([col for col in train_df.columns if col.startswith('Area-')], reverse=True)[0]\n    # Get target year to predict\n    target_year = sorted([col for col in test_df.columns if col.startswith('Area-')], reverse=True)[0]\n    # Use last value as prediction\n    predictions = train_df[last_train_year].values\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple baseline",
+          "Handles small datasets"
+        ],
+        "expected_weaknesses": [
+          "Ignores trends/seasonality"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "SARIMA",
+        "category": "statistical/traditional",
+        "description": "Seasonal ARIMA for time series forecasting",
+        "implementation_code": "def predict_sarima(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    from statsmodels.tsa.statespace.sarimax import SARIMAX\n    # Melt training data to time series\n    train_long = train_df.melt(id_vars=['Crop', 'Season'], value_vars=[col for col in train_df.columns if col.startswith('Area-')], var_name='Year', value_name='Area')\n    train_long['Year'] = pd.to_datetime(train_long['Year'].str.replace('-', '-06-30'), format='%Y-%m-30')\n    # Fit SARIMA model\n    model = SARIMAX(train_long['Area'], order=(1,1,1), seasonal_order=(1,1,1,1))\n    results = model.fit(disp=False)\n    # Forecast next 3 years\n    forecast = results.get_forecast(steps=3)\n    predictions = forecast.predicted_mean.values\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "statsmodels"
+        ],
+        "hyperparameters": {
+          "order": "(1,1,1)",
+          "seasonal_order": "(1,1,1,1)"
+        },
+        "expected_strengths": [
+          "Captures seasonality",
+          "Handles trends"
+        ],
+        "expected_weaknesses": [
+          "Requires stationarity"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "LSTM Network",
+        "category": "ml",
+        "description": "Long Short-Term Memory neural network for time series",
+        "implementation_code": "def predict_lstm(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    import numpy as np\n    from keras.models import Sequential\n    from keras.layers import LSTM, Dense\n    from sklearn.preprocessing import MinMaxScaler\n    # Prepare training data\n    train_values = train_df[[col for col in train_df.columns if col.startswith('Area-')]].values.reshape(-1, 1)\n    scaler = MinMaxScaler()\n    scaled = scaler.fit_transform(train_values)\n    # Create sequences\n    def create_sequences(data, seq_length=3):\n        return [data[i:i+seq_length] for i in range(len(data)-seq_length)]\n    X, y = create_sequences(scaled)\n    # Build LSTM model\n    model = Sequential()\n    model.add(LSTM(50, activation='relu', input_shape=(3, 1)))\n    model.add(Dense(1))\n    model.compile(optimizer='adam', loss='mse')\n    model.fit(X, y, epochs=200, verbose=0)\n    # Forecast next 3 years\n    last_sequence = scaled[-3:].reshape(1, 3, 1)\n    predictions = []\n    for _ in range(3):\n        pred = model.predict(last_sequence)\n        predictions.append(pred[0,0])\n        last_sequence = np.append(last_sequence[:,1:,:], pred.reshape(1,1,1), axis=1)\n    return pd.DataFrame({'predicted': scaler.inverse_transform(np.array(predictions).reshape(-1,1)).flatten()}, index=test_df.index)",
+        "required_libraries": [
+          "pandas",
+          "numpy",
+          "keras",
+          "scikit-learn"
+        ],
+        "hyperparameters": {
+          "seq_length": "3",
+          "epochs": "200"
+        },
+        "expected_strengths": [
+          "Captures complex patterns",
+          "Handles non-linear relationships"
+        ],
+        "expected_weaknesses": [
+          "Requires large data",
+          "Computationally intensive"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_column",
+      "date_column": "Year",
+      "target_column": "Area",
+      "train_period": "Years 2015-2023",
+      "validation_period": "Year 2024",
+      "test_period": "Year 2025"
+    },
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "date_column": "Year",
+    "target_column": "Area"
+  }
+}

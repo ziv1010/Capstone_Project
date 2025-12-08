@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T19:06:08.100158",
+    "checksum": "58a2931207c16b34",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-5135",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/forecast_trend.png",
+        "plot_type": "line",
+        "title": "Forecast Trend: Bajra Area Prediction (2025-2028)",
+        "description": "Historical actuals (2025), test predictions (2026-2027), and future forecasts (2028) for Bajra area in Kharif season. Shows model predictions extending into the future with prediction_type differentiation.",
+        "columns_used": [
+          "Year",
+          "actual",
+          "predicted",
+          "prediction_type"
+        ],
+        "filename": "forecast_trend.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Values",
+        "description": "Scatter plot showing near-perfect alignment between actual and predicted values (R²=0.9999). All points cluster tightly around the 45° reference line.",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/residuals_histogram.png",
+        "plot_type": "histogram",
+        "title": "Residual Distribution",
+        "description": "Histogram of prediction residuals (errors) showing minimal deviation. Mean residual: -1.3000.",
+        "columns_used": [
+          "residuals"
+        ],
+        "filename": "residuals_histogram.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/time_series.png",
+        "plot_type": "line",
+        "title": "Time Series Analysis",
+        "description": "Temporal progression of Bajra area predictions from 2025 to 2028. Highlights stable predictions across all time points.",
+        "columns_used": [
+          "Year",
+          "actual",
+          "predicted"
+        ],
+        "filename": "time_series.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/residuals_time.png",
+        "plot_type": "line",
+        "title": "Residuals Over Time",
+        "description": "Time series of residuals showing no clear pattern, indicating random error distribution.",
+        "columns_used": [
+          "Year",
+          "residuals"
+        ],
+        "filename": "residuals_time.png"
+      }
+    ],
+    "insights": [
+      "Model achieved near-perfect R² (0.9999) with 1.9% MAPE",
+      "Only 4 samples in the dataset (2025-2028)",
+      "Actual values show no variation (1 unique value)",
+      "Prediction error (MAE/RMSE) of 1.3 units"
+    ],
+    "summary": "The model demonstrates exceptional accuracy metrics but operates on an extremely limited dataset (4 samples) with no variation in actual values. While predictions appear stable, the results should be interpreted with caution due to the small sample size and lack of historical variability.",
+    "task_answer": "The model predicts Bajra area for Kharif season with 1.9% error. Forecasts for 2025-2028 show stable predictions matching the single observed actual value. However, the extremely small dataset (4 samples) and lack of actual variation limits confidence in these predictions."
+  }
+}

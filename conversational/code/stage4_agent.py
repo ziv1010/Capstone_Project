@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from code.config import (
     STAGE3_OUT_DIR, STAGE3B_OUT_DIR, STAGE3_5B_OUT_DIR,
-    STAGE4_OUT_DIR, STAGE4_WORKSPACE, SECONDARY_LLM_CONFIG,
+    STAGE4_OUT_DIR, STAGE4_WORKSPACE, SECONDARY_LLM_CONFIG, STAGE_MAX_TOKENS,
     STAGE_MAX_ROUNDS, DataPassingManager, logger
 )
 from code.models import ExecutionResult, ExecutionStatus, PipelineState
@@ -52,18 +52,34 @@ STAGE4_SYSTEM_PROMPT = """You are an Execution Agent responsible for running the
 ## Your Role
 1. Load the execution context (plan, data, selected method)
 2. Execute the selected method from Stage 3.5B
-3. Generate predictions for the test set
-4. Calculate evaluation metrics
-5. Save comprehensive results
+3. Generate predictions for the test set (for validation)
+4. **FOR FORECASTING**: Generate future forecasts if forecast_horizon > 0
+5. Calculate evaluation metrics
+6. Save comprehensive results
 
-## CRITICAL: METRIC CONSISTENCY WITH STAGE 3.5B
-Your execution MUST produce metrics that match (or are very close to) the benchmark
-metrics from Stage 3.5B. If your MAE/RMSE differ significantly, you are likely using
-a different data split. CHECK THE DATA SPLIT STRATEGY CAREFULLY.
+## CRITICAL: TWO TYPES OF PREDICTIONS
+
+### 1. TEST SET PREDICTIONS (Required for all tasks)
+- Generate predictions on the test set
+- Compare actual vs predicted values
+- Calculate metrics (MAE, RMSE, MAPE, R²)
+- Metrics MUST match Stage 3.5B benchmark
+
+### 2. FUTURE FORECASTS (Required if forecast_horizon > 0)
+- Check the plan for `forecast_horizon` and `forecast_type`
+- If forecast_horizon > 0: Generate predictions for the NEXT N periods
+- forecast_type can be:
+  - "single_step": Predict next period only
+  - "multi_step": Predict next N periods directly
+  - "recursive": Use each prediction as input for the next
+
+**IMPORTANT**: Future forecasts have NO actual values (they're in the future!)
+Save them separately with a 'forecast_type' column to distinguish from test predictions.
 
 ## Your Goals
 - Execute the winning method from benchmarking
-- Generate predictions with actual vs predicted values
+- Generate test set predictions with actual vs predicted values
+- Generate future forecasts if specified in the plan
 - Calculate final metrics (MAE, RMSE, MAPE, R²) that MATCH benchmark
 - Save results in a format suitable for visualization
 
@@ -103,14 +119,20 @@ df = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/ou
    - The EXACT data split strategy used in benchmarking
    - The benchmark metrics (your results should match these)
 3. Load prepared data
-4. **CRITICAL**: Split data according to the EXACT strategy from Stage 3.5B
-5. Execute the method using the EXACT same code
-6. Calculate metrics - they should match benchmark
-7. Create results DataFrame with:
-   - Date/index column
-   - Actual values
-   - Predicted values
-   - Any relevant features
+4. **CRITICAL**: Check if forecast_horizon > 0 in the plan
+5. **STEP A: TEST SET PREDICTIONS** (validation)
+   - Split data according to the EXACT strategy from Stage 3.5B
+   - Execute the method using the EXACT same code
+   - Calculate metrics - they should match benchmark
+   - Create test results DataFrame with actual vs predicted
+6. **STEP B: FUTURE FORECASTS** (if forecast_horizon > 0)
+   - Generate forecasts for the next N periods
+   - Use recursive/multi-step approach as specified
+   - Create forecast DataFrame with predicted values (no actuals)
+   - Add 'forecast_type' column to distinguish from test predictions
+7. **COMBINE RESULTS**:
+   - Concatenate test predictions + future forecasts
+   - Mark each row with 'prediction_type': 'test' or 'forecast'
 8. Save predictions and execution result
 9. Verify the outputs
 
@@ -125,8 +147,9 @@ You MUST use the EXACT same split to get matching metrics:
 ## Results DataFrame Requirements
 The saved predictions must include:
 - date/index column (for time series plotting)
-- 'actual' column (true values)
+- 'actual' column (true values for test set, NaN for forecasts)
 - 'predicted' column (model predictions)
+- 'prediction_type' column: 'test' or 'forecast'
 - Keep original feature columns for context
 
 ## Execution Code Template
@@ -134,58 +157,98 @@ The saved predictions must include:
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from datetime import timedelta
 
 # Load prepared data using PROVIDED VARIABLES (DO NOT HARDCODE PATHS)
-# CRITICAL: Use STAGE3B_OUT_DIR variable (already available in execute_python_code namespace)
 df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_{{plan_id}}.parquet')
 
-# Get column info from execution context
-target_col = 'your_target_column'  # From get_selected_method_code
+# Get context from plan
+target_col = 'your_target_column'   # From get_selected_method_code
 date_col = 'your_date_column'       # From get_selected_method_code
+forecast_horizon = 0                # From execution context (e.g., 5)
+forecast_granularity = 'year'       # From execution context (e.g., 'year', 'month')
 
-# CRITICAL: Use EXACT split strategy from Stage 3.5B
-# These values should come from the data_split_strategy in get_selected_method_code:
-train_size = 0.7   # From data_split_strategy.train_size
-val_size = 0.15    # From data_split_strategy.validation_size
-test_size = 0.15   # From data_split_strategy.test_size
+# === STEP A: TEST SET PREDICTIONS (for validation) ===
+# Use EXACT split strategy from Stage 3.5B
+train_size = 0.7
+val_size = 0.15
+test_size = 0.15
 
-# Apply split based on strategy_type
 train_end = int(len(df) * train_size)
 val_end = int(len(df) * (train_size + val_size))
 
 train_df = df.iloc[:train_end].copy()
-test_df = df.iloc[val_end:].copy()  # Skip validation, use test only
+test_df = df.iloc[val_end:].copy()
 
-# Define the selected method (COPY EXACTLY from get_selected_method_code)
+# Define the selected method (from Stage 3.5B winner)
 def predict_selected_method(train_df, test_df, target_col, date_col, **params):
-    # ... implementation from Stage 3.5B winner ...
+    # ... implementation ...
     pass
 
-# Run prediction
-predictions = predict_selected_method(train_df, test_df, target_col, date_col)
+# Run test predictions
+test_predictions = predict_selected_method(train_df, test_df, target_col, date_col)
 
-# Create results DataFrame
-results_df = test_df.copy()
-results_df['predicted'] = predictions['predicted'].values
-results_df['actual'] = results_df[target_col]
+# Create test results
+test_results = test_df.copy()
+test_results['predicted'] = test_predictions['predicted'].values
+test_results['actual'] = test_results[target_col]
+test_results['prediction_type'] = 'test'
 
-# Calculate metrics
-actual = results_df['actual'].values
-predicted = results_df['predicted'].values
-
+# Calculate metrics (should match Stage 3.5B)
+actual = test_results['actual'].values
+predicted = test_results['predicted'].values
 mae = np.mean(np.abs(actual - predicted))
 rmse = np.sqrt(np.mean((actual - predicted) ** 2))
-mask = actual != 0
-mape = np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100 if mask.any() else 0.0
-r2 = 1 - (np.sum((actual - predicted)**2) / np.sum((actual - np.mean(actual))**2)) if len(actual) > 1 else 0.0
+# ... other metrics ...
 
-# VERIFY: Compare with benchmark metrics
-# Expected MAE from Stage 3.5B: X.XXXX
-# Your MAE should be close to this value!
-print(f"MAE: {mae:.4f}")
-print(f"RMSE: {rmse:.4f}")
-print(f"MAPE: {mape:.2f}%")
-print(f"R²: {r2:.4f}")
+print(f"Test Set Metrics - MAE: {mae:.4f}, RMSE: {rmse:.4f}")
+
+# === STEP B: FUTURE FORECASTS (if forecast_horizon > 0) ===
+if forecast_horizon > 0:
+    print(f"\\nGenerating {forecast_horizon} future forecasts...")
+
+    # Train on ALL available data for forecasting
+    full_train_df = df.copy()
+
+    # Create future date index
+    if date_col and pd.api.types.is_datetime64_any_dtype(df[date_col]):
+        last_date = df[date_col].max()
+        if forecast_granularity == 'year':
+            future_dates = pd.date_range(last_date, periods=forecast_horizon+1, freq='Y')[1:]
+        elif forecast_granularity == 'month':
+            future_dates = pd.date_range(last_date, periods=forecast_horizon+1, freq='M')[1:]
+        else:
+            future_dates = pd.date_range(last_date, periods=forecast_horizon+1, freq='D')[1:]
+    else:
+        # No date column - use sequential index
+        future_dates = range(len(df), len(df) + forecast_horizon)
+
+    # Generate recursive forecasts
+    forecast_values = []
+    for i in range(forecast_horizon):
+        # Predict next period using current data
+        # For recursive: use previous predictions as features
+        next_pred = predict_selected_method(full_train_df, full_train_df.iloc[[-1]], target_col, date_col)
+        forecast_values.append(next_pred['predicted'].values[0])
+
+        # Update training data with prediction for next iteration
+        # (Implementation depends on method - may need to append predicted value)
+
+    # Create forecast DataFrame
+    forecast_df = pd.DataFrame({
+        date_col: future_dates if date_col else future_dates,
+        'predicted': forecast_values,
+        'actual': [np.nan] * forecast_horizon,  # No actuals for future
+        'prediction_type': ['forecast'] * forecast_horizon
+    })
+
+    # Combine test + forecast
+    results_df = pd.concat([test_results, forecast_df], ignore_index=True)
+else:
+    # No future forecasts - just test results
+    results_df = test_results
+
+print(f"\\nTotal results: {len(results_df)} rows ({len(test_results)} test + {forecast_horizon} forecasts)")
 ```
 
 ## Error Handling
@@ -207,7 +270,11 @@ IMPORTANT: The results_df must be saved as parquet for Stage 5 visualization.
 def create_stage4_agent():
     """Create the Stage 4 agent graph."""
 
-    llm = ChatOpenAI(**SECONDARY_LLM_CONFIG)
+    # Use stage-specific max_tokens if available, otherwise use default
+    stage4_config = SECONDARY_LLM_CONFIG.copy()
+    stage4_config["max_tokens"] = STAGE_MAX_TOKENS.get("stage4", SECONDARY_LLM_CONFIG["max_tokens"])
+
+    llm = ChatOpenAI(**stage4_config)
     llm_with_tools = llm.bind_tools(STAGE4_TOOLS, parallel_tool_calls=False)
 
     def agent_node(state: Stage4State) -> Dict[str, Any]:
@@ -355,29 +422,40 @@ Common fixes:
 Execute forecasting for plan: {plan_id} (Attempt {attempt_num})
 {error_context}
 
+CRITICAL: Check if this is a FORECASTING task with forecast_horizon > 0!
+If so, you must generate BOTH test predictions AND future forecasts.
+
 Steps:
 1. Load execution context (plan, data info, selected method)
-2. Get the selected method's implementation code from Stage 3.5B
-3. Load the prepared data and VERIFY column names
-4. Split data according to EXACT strategy from Stage 3.5B (use get_selected_method_code)
-5. Execute the selected method
-6. Calculate final metrics (MAE, RMSE, MAPE, R²)
-7. VERIFY metrics match Stage 3.5B benchmarks (within 10%)
-8. Create results DataFrame with actual and predicted values
-9. Save predictions parquet and execution result JSON using save_predictions tool
-10. Verify outputs are correct
+2. **CHECK forecast_horizon in the plan** - if > 0, this is forecasting!
+3. Get the selected method's implementation code from Stage 3.5B
+4. Load the prepared data and VERIFY column names
+5. **PART A: TEST SET PREDICTIONS** (validation)
+   - Split data according to EXACT strategy from Stage 3.5B
+   - Execute the selected method on test set
+   - Calculate metrics (MAE, RMSE, MAPE, R²) - must match Stage 3.5B benchmarks
+6. **PART B: FUTURE FORECASTS** (if forecast_horizon > 0)
+   - Generate forecasts for the next N periods (N = forecast_horizon)
+   - Use recursive/iterative approach
+   - Create DataFrame with predicted values (actual = NaN for future)
+   - Mark with 'prediction_type' = 'forecast'
+7. Combine test predictions + future forecasts into single DataFrame
+8. Save predictions parquet and execution result JSON using save_predictions tool
+9. Verify outputs are correct
 
-The results should include:
-- Date/index column for time series plots (if applicable)
-- 'actual' column with true values
-- 'predicted' column with model predictions
+The results DataFrame must include:
+- Date/time column (for time series plots)
+- 'actual' column (values for test set, NaN for forecasts)
+- 'predicted' column (model predictions)
+- 'prediction_type' column ('test' or 'forecast')
 - Original relevant columns for context
 
 CRITICAL REQUIREMENTS:
-- Use the EXACT same data split strategy as Stage 3.5B
-- Your MAE should match the benchmark MAE from Stage 3.5B (±10%)
+- If forecast_horizon > 0: Generate future forecasts (NOT just test set)!
+- Use the EXACT same data split strategy as Stage 3.5B for test set
+- Your test MAE should match the benchmark MAE from Stage 3.5B (±10%)
+- Future forecasts should extend beyond the last data point
 - If you get an error, ANALYZE it and FIX it - don't just try again blindly
-- Use execute_python_code tool which provides detailed error diagnostics
 
 IMPORTANT: You MUST use save_predictions tool to save the results.
 

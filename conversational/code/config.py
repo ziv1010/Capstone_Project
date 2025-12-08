@@ -66,7 +66,16 @@ SECONDARY_LLM_CONFIG = {
     "api_key": LLM_API_KEY,
     "model": "Qwen/Qwen3-32B",
     "temperature": 0.0,
-    "max_tokens": 8192,
+    "max_tokens": 4096,  # Default for most stages
+}
+
+# Stage-specific max_tokens overrides (for stages that need more/less)
+STAGE_MAX_TOKENS = {
+    "stage3b": 3072,      # Data prep - less verbose
+    "stage3_5a": 3072,    # Method proposal - less verbose
+    "stage3_5b": 3072,    # Benchmarking - less verbose
+    "stage4": 6144,       # Execution + forecasting - needs more tokens
+    "stage5": 4096,       # Visualization - standard
 }
 
 # Conversation LLM config (for user interaction)
@@ -210,7 +219,7 @@ def parse_forecast_config_from_query(query: str) -> dict:
 
 # Retry parameters
 MAX_RETRIES = 3  # Maximum number of retries for failed stages
-RETRY_STAGES = ["stage3_5a", "stage3_5b"]  # Stages that support retry
+RETRY_STAGES = ["stage3b", "stage3_5a", "stage3_5b"]  # Stages that support retry
 
 # Global recursion limit for LangGraph
 RECURSION_LIMIT = 200
@@ -664,6 +673,7 @@ __all__ = [
     "CONVERSATION_STATE_DIR",
     # LLM configs
     "PRIMARY_LLM_CONFIG", "SECONDARY_LLM_CONFIG", "CONVERSATION_LLM_CONFIG",
+    "STAGE_MAX_TOKENS",
     # Parameters
     "STAGE_MAX_ROUNDS", "STAGE1_SAMPLE_ROWS",
     "MIN_NON_NULL_FRACTION", "MIN_UNIQUE_FRACTION",

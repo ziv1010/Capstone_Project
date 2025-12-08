@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from code.config import (
-    STAGE3_OUT_DIR, STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG,
+    STAGE3_OUT_DIR, STAGE3B_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE_MAX_TOKENS,
     STAGE_MAX_ROUNDS, DataPassingManager, logger, DEBUG, RECURSION_LIMIT
 )
 from code.models import PreparedDataOutput, PipelineState
@@ -48,6 +48,13 @@ class Stage3BState(BaseModel):
 # ============================================================================
 
 STAGE3B_SYSTEM_PROMPT = """You are a Data Preparation Agent responsible for transforming raw data into model-ready format.
+
+## CRITICAL: Be Concise and Action-Oriented
+❌ DO NOT write lengthy explanations or repetitive thinking
+❌ DO NOT repeat the same reasoning multiple times
+✅ Think briefly, then ACT immediately with tool calls
+✅ Keep responses under 500 tokens
+✅ Be direct and efficient
 
 ## Your Role
 Execute the Stage 3 execution plan to:
@@ -111,10 +118,8 @@ When using run_data_prep_code:
 ```python
 import pandas as pd
 import numpy as np
-from pathlib import Path
 
-# Load data
-DATA_DIR = Path('/path/to/data')
+# Load data - DATA_DIR is already provided in the sandbox
 df = pd.read_csv(DATA_DIR / 'file.csv')
 
 # Process...
@@ -123,6 +128,8 @@ df = pd.read_csv(DATA_DIR / 'file.csv')
 print(f"Shape: {df.shape}")
 print(f"Nulls: {df.isnull().sum().sum()}")
 ```
+
+CRITICAL: DATA_DIR is automatically available in the sandbox - DO NOT redefine it!
 
 ## Error Recovery
 If something fails:
@@ -142,7 +149,11 @@ REMEMBER: The final dataset must have ZERO nulls. This is non-negotiable.
 def create_stage3b_agent():
     """Create the Stage 3B agent graph."""
 
-    llm = ChatOpenAI(**SECONDARY_LLM_CONFIG)
+    # Use stage-specific max_tokens if available, otherwise use default
+    stage3b_config = SECONDARY_LLM_CONFIG.copy()
+    stage3b_config["max_tokens"] = STAGE_MAX_TOKENS.get("stage3b", SECONDARY_LLM_CONFIG["max_tokens"])
+
+    llm = ChatOpenAI(**stage3b_config)
     llm_with_tools = llm.bind_tools(STAGE3B_TOOLS, parallel_tool_calls=False)
 
     def agent_node(state: Stage3BState) -> Dict[str, Any]:
@@ -159,9 +170,19 @@ def create_stage3b_agent():
             }
 
         response = llm_with_tools.invoke(messages)
-        
+
+        # Strip verbose <think> tags to prevent context bloat
+        if response.content:
+            import re
+            # Remove <think>...</think> blocks to save context
+            cleaned_content = re.sub(r'<think>.*?</think>', '', response.content, flags=re.DOTALL)
+            # If the cleaned content is empty but we have tool calls, provide minimal message
+            if not cleaned_content.strip() and response.tool_calls:
+                cleaned_content = "Executing tools..."
+            response.content = cleaned_content.strip()
+
         if DEBUG:
-            logger.debug(f"Stage 3B Agent Response: {response.content}")
+            logger.debug(f"Stage 3B Agent Response: {response.content[:200]}...")  # Only log first 200 chars
             if response.tool_calls:
                 logger.debug(f"Tool Calls: {response.tool_calls}")
 

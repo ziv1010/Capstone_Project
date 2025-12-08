@@ -477,29 +477,85 @@ def create_standard_plots(plan_id: str) -> str:
         # Find prediction and actual columns
         pred_cols = [c for c in df.columns if 'predict' in c.lower() or 'forecast' in c.lower()]
         actual_cols = [c for c in df.columns if 'actual' in c.lower() or 'target' in c.lower()]
-        date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
+        date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c]) or 'year' in c.lower()]
+
+        # Check if this is a forecasting task
+        has_prediction_type = 'prediction_type' in df.columns
+        is_forecasting = has_prediction_type and 'forecast' in df['prediction_type'].unique()
 
         created_plots = []
 
-        # 1. Actual vs Predicted scatter
+        # === FORECAST TREND PLOT (for forecasting tasks) ===
+        if is_forecasting and date_cols and pred_cols and actual_cols:
+            date_col = date_cols[0]
+            pred_col, actual_col = pred_cols[0], actual_cols[0]
+
+            # Separate test and forecast data
+            test_df = df[df['prediction_type'] == 'test'].copy()
+            forecast_df = df[df['prediction_type'] == 'forecast'].copy()
+
+            fig, ax = plt.subplots(figsize=(16, 8))
+
+            # Plot historical actuals
+            ax.plot(test_df[date_col], test_df[actual_col],
+                    'o-', label='Historical Actual', linewidth=2, markersize=8, color='blue')
+
+            # Plot test predictions
+            ax.plot(test_df[date_col], test_df[pred_col],
+                    's--', label='Test Predictions', linewidth=2, markersize=6, alpha=0.7, color='green')
+
+            # Plot future forecasts
+            ax.plot(forecast_df[date_col], forecast_df[pred_col],
+                    'D:', label='Future Forecasts', linewidth=2, markersize=8, color='red')
+
+            # Add vertical line separating history from forecast
+            if len(test_df) > 0:
+                last_test_date = test_df[date_col].iloc[-1]
+                ax.axvline(x=last_test_date, color='gray', linestyle='--',
+                          alpha=0.5, linewidth=2, label='Forecast Start')
+
+            ax.set_xlabel('Time', fontsize=12)
+            ax.set_ylabel('Value', fontsize=12)
+            ax.set_title('Forecast Trend: Historical + Future Predictions', fontsize=14, fontweight='bold')
+            ax.legend(fontsize=10, loc='best')
+            ax.grid(True, alpha=0.3)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_forecast_trend.png', dpi=150)
+            plt.close()
+            created_plots.append('forecast_trend.png')
+
+        # 1. Actual vs Predicted scatter (test set only for forecasting tasks)
         if pred_cols and actual_cols:
             pred_col, actual_col = pred_cols[0], actual_cols[0]
 
-            fig, ax = plt.subplots(figsize=(10, 8))
-            ax.scatter(df[actual_col], df[pred_col], alpha=0.5)
-            ax.plot([df[actual_col].min(), df[actual_col].max()],
-                   [df[actual_col].min(), df[actual_col].max()], 'r--', label='Perfect Prediction')
-            ax.set_xlabel('Actual')
-            ax.set_ylabel('Predicted')
-            ax.set_title('Actual vs Predicted')
-            ax.legend()
-            plt.tight_layout()
-            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_actual_vs_predicted.png', dpi=150)
-            plt.close()
-            created_plots.append('actual_vs_predicted.png')
+            # For forecasting tasks, only use test set (forecasts have no actuals)
+            plot_df = df[df['prediction_type'] == 'test'].copy() if is_forecasting else df.copy()
 
-            # 2. Residuals histogram
-            residuals = df[actual_col] - df[pred_col]
+            # Filter out NaN actuals
+            plot_df = plot_df.dropna(subset=[actual_col, pred_col])
+
+            if len(plot_df) > 0:
+                fig, ax = plt.subplots(figsize=(10, 8))
+                ax.scatter(plot_df[actual_col], plot_df[pred_col], alpha=0.6, s=100)
+                ax.plot([plot_df[actual_col].min(), plot_df[actual_col].max()],
+                       [plot_df[actual_col].min(), plot_df[actual_col].max()],
+                       'r--', label='Perfect Prediction', linewidth=2)
+                ax.set_xlabel('Actual', fontsize=12)
+                ax.set_ylabel('Predicted', fontsize=12)
+                title = 'Test Set Accuracy: Actual vs Predicted' if is_forecasting else 'Actual vs Predicted'
+                ax.set_title(title, fontsize=14)
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+                plt.tight_layout()
+                plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_actual_vs_predicted.png', dpi=150)
+                plt.close()
+                created_plots.append('actual_vs_predicted.png')
+
+            # 2. Residuals histogram (test set only for forecasting tasks)
+            residuals_df = df[df['prediction_type'] == 'test'].copy() if is_forecasting else df.copy()
+            residuals_df = residuals_df.dropna(subset=[actual_col, pred_col])
+            residuals = residuals_df[actual_col] - residuals_df[pred_col]
 
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.hist(residuals, bins=50, edgecolor='black', alpha=0.7)

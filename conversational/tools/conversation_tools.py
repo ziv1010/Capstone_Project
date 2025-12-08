@@ -194,45 +194,39 @@ def check_pipeline_status() -> str:
 @tool
 def evaluate_user_query(query: str) -> str:
     """
-    Evaluate if a user's forecasting query is feasible with available data.
+    Evaluate if a user's query is feasible with available data.
 
-    Uses Chain-of-Thought reasoning to assess:
-    - Required data
-    - Required columns
-    - Feasibility of the prediction
+    Uses smart keyword extraction to find the BEST matching dataset.
 
     Args:
-        query: User's natural language query about forecasting
+        query: User's natural language query
 
     Returns:
-        Feasibility assessment with reasoning
+        Feasibility assessment with best dataset recommendation
     """
     try:
+        import re
+
         result = ["=== Query Feasibility Analysis ===", f"Query: {query}\n"]
 
-        # Step 1: Identify what's being requested
-        result.append("Step 1: Understanding the Request")
+        # Step 1: Extract keywords from query (smart extraction)
+        result.append("Step 1: Extracting Keywords from Query")
         query_lower = query.lower()
 
-        target_hints = []
-        if 'price' in query_lower:
-            target_hints.append('price')
-        if 'sales' in query_lower:
-            target_hints.append('sales')
-        if 'demand' in query_lower:
-            target_hints.append('demand')
-        if 'revenue' in query_lower:
-            target_hints.append('revenue')
-        if 'quantity' in query_lower:
-            target_hints.append('quantity')
+        # Extract ALL meaningful words (remove common stopwords)
+        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                     'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'can',
+                     'you', 'me', 'make', 'next', 'years', 'year', 'predict', 'prediction',
+                     'forecast', 'forecasting'}
 
-        if target_hints:
-            result.append(f"  Detected target variables: {target_hints}")
-        else:
-            result.append("  No specific target detected - will look for numeric columns")
+        # Extract words (alphanumeric sequences)
+        words = re.findall(r'\b\w+\b', query_lower)
+        keywords = [w for w in words if w not in stopwords and len(w) > 2]
+
+        result.append(f"  Extracted keywords: {keywords}")
 
         # Step 2: Check available data
-        result.append("\nStep 2: Checking Available Data")
+        result.append("\nStep 2: Scanning Available Datasets")
         summary_files = list_summary_files(SUMMARIES_DIR)
 
         if not summary_files:
@@ -241,109 +235,258 @@ def evaluate_user_query(query: str) -> str:
             result.append("Recommendation: Run Stage 1 to analyze available datasets")
             return "\n".join(result)
 
-        result.append(f"  Found {len(summary_files)} analyzed datasets")
+        result.append(f"  Found {len(summary_files)} datasets to analyze")
 
-        # Step 3: Match query to data
-        result.append("\nStep 3: Matching Query to Data")
-        matches = []
+        # Step 3: Smart dataset matching
+        result.append("\nStep 3: Finding Best Dataset Match")
+        dataset_scores = []
 
         for sf in summary_files:
             try:
                 summary = DataPassingManager.load_artifact(SUMMARIES_DIR / sf)
                 data = summary.get('data', summary)
 
-                # Check for matching columns
+                dataset_name = data.get('filename', '')
                 columns = data.get('columns', [])
-                col_names = [c.get('name', '').lower() for c in columns]
 
-                for hint in target_hints:
-                    matching_cols = [c for c in col_names if hint in c]
-                    if matching_cols:
-                        matches.append({
-                            'dataset': data.get('filename'),
-                            'columns': matching_cols,
-                            'has_datetime': data.get('has_datetime_column', False),
-                            'quality': data.get('data_quality_score', 0)
-                        })
+                # Score this dataset based on keyword matches
+                score = 0
+                matched_keywords = []
+                matched_columns = []
 
-                # Also check target candidates
-                if data.get('has_target_candidates'):
-                    for target in data.get('has_target_candidates', []):
-                        if any(h in target.lower() for h in target_hints) or not target_hints:
-                            matches.append({
-                                'dataset': data.get('filename'),
-                                'columns': [target],
-                                'has_datetime': data.get('has_datetime_column', False),
-                                'quality': data.get('data_quality_score', 0)
-                            })
+                # Check dataset name
+                dataset_name_lower = dataset_name.lower()
+                for kw in keywords:
+                    if kw in dataset_name_lower:
+                        score += 3  # Dataset name match is strong signal
+                        matched_keywords.append(kw)
 
-            except Exception:
+                # Check column names
+                for col in columns:
+                    col_name = col.get('name', '').lower()
+                    col_type = col.get('logical_type', '')
+
+                    for kw in keywords:
+                        if kw in col_name:
+                            score += 2  # Column name match
+                            matched_keywords.append(kw)
+                            matched_columns.append(col.get('name'))
+                            break
+
+                # Bonus for datetime columns (forecasting)
+                if data.get('has_datetime_column'):
+                    score += 1
+
+                # Bonus for high quality data
+                quality = data.get('data_quality_score', 0.5)
+                score += quality
+
+                if score > 0:
+                    dataset_scores.append({
+                        'dataset': dataset_name,
+                        'score': score,
+                        'matched_keywords': list(set(matched_keywords)),
+                        'matched_columns': list(set(matched_columns)),
+                        'has_datetime': data.get('has_datetime_column', False),
+                        'n_rows': data.get('n_rows', 0),
+                        'all_columns': [c.get('name') for c in columns]
+                    })
+
+            except Exception as e:
+                logger.warning(f"Error analyzing {sf}: {e}")
                 continue
 
-        if matches:
-            result.append(f"  Found {len(matches)} potential matches:")
-            for m in matches[:5]:
-                result.append(f"    - {m['dataset']}: {m['columns']}")
-                if m['has_datetime']:
-                    result.append("      (has datetime - suitable for time series)")
+        # Sort by score
+        dataset_scores.sort(key=lambda x: x['score'], reverse=True)
+
+        if dataset_scores:
+            result.append(f"  Ranked {len(dataset_scores)} datasets by relevance:")
+            for i, ds in enumerate(dataset_scores[:5], 1):
+                result.append(f"    {i}. {ds['dataset']} (score: {ds['score']:.1f})")
+                if ds['matched_keywords']:
+                    result.append(f"       Matched keywords: {ds['matched_keywords']}")
+                if ds['matched_columns']:
+                    result.append(f"       Relevant columns: {ds['matched_columns'][:5]}")
         else:
-            result.append("  No direct column matches found")
+            result.append("  No datasets matched the query keywords")
 
-        # Step 4: Feasibility assessment
-        result.append("\nStep 4: Feasibility Assessment")
+        # Step 4: Recommendation
+        result.append("\nStep 4: Recommendation")
 
-        if matches:
-            best_match = max(matches, key=lambda x: (x['has_datetime'], x['quality']))
+        if dataset_scores:
+            best = dataset_scores[0]
+            result.append(f"  ✅ FEASIBLE")
+            result.append(f"  Best dataset: {best['dataset']}")
+            result.append(f"  Rows: {best['n_rows']}")
+            result.append(f"  Relevant columns: {best['matched_columns']}")
+            result.append(f"  All columns: {best['all_columns'][:10]}")
 
-            if best_match['has_datetime']:
-                result.append("  FEASIBLE: Data with datetime column found")
-                result.append(f"  Recommended dataset: {best_match['dataset']}")
-                result.append(f"  Target column(s): {best_match['columns']}")
-                result.append("\nRecommendation: This query can be executed as a forecasting task")
-            else:
-                result.append("  PARTIALLY FEASIBLE: Matching data found but no datetime column")
-                result.append("  May need to use row index as time proxy")
-                result.append("\nRecommendation: Consider if data has implicit temporal ordering")
+            if best['has_datetime']:
+                result.append("  ✅ Has temporal data - suitable for time series forecasting")
+
+            result.append(f"\n  💡 Use this dataset in your task: {best['dataset']}")
         else:
-            result.append("  UNCERTAIN: No exact matches, but forecasting may still be possible")
-            result.append("  Available target candidates may work")
-            result.append("\nRecommendation: Run Stage 2 to get detailed task proposals")
+            result.append("  ⚠️ UNCERTAIN - No clear matches")
+            result.append("  Recommendation: Review available datasets manually")
 
         return "\n".join(result)
 
     except Exception as e:
-        return f"Error evaluating query: {e}"
+        import traceback
+        return f"Error evaluating query: {e}\n{traceback.format_exc()}"
 
 
 @tool
 def create_custom_task_from_query(
     query: str,
-    dataset: str,
-    target_column: str,
+    dataset: str = None,
+    target_column: str = None,
     date_column: str = None
 ) -> str:
     """
     Create a custom task proposal based on user's query.
 
+    INTELLIGENTLY selects the best dataset and target column if not provided.
     AUTOMATICALLY parses forecast configuration from the query (e.g., "next 5 years").
 
     Args:
         query: User's forecasting query
-        dataset: Dataset filename to use
-        target_column: Column to predict
-        date_column: Date column for temporal analysis (optional)
+        dataset: Dataset filename to use (optional - will auto-select if not provided)
+        target_column: Column to predict (optional - will auto-select if not provided)
+        date_column: Date column for temporal analysis (optional - will auto-detect)
 
     Returns:
         Generated task proposal with proper forecast configuration
     """
     try:
+        import re
         from code.config import parse_forecast_config_from_query, get_task_appropriate_metrics
 
-        # Generate task ID
+        result_messages = []
+
+        # === STEP 1: SMART DATASET SELECTION ===
+        if not dataset or not target_column:
+            result_messages.append("🔍 Intelligently selecting best dataset for your query...")
+
+            # Extract keywords from query
+            query_lower = query.lower()
+            stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                         'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'can',
+                         'you', 'me', 'make', 'next', 'years', 'year', 'predict', 'prediction',
+                         'forecast', 'forecasting'}
+
+            words = re.findall(r'\b\w+\b', query_lower)
+            keywords = [w for w in words if w not in stopwords and len(w) > 2]
+
+            result_messages.append(f"  Extracted keywords: {keywords}")
+
+            # Scan all datasets
+            summary_files = list_summary_files(SUMMARIES_DIR)
+            if not summary_files:
+                return "❌ No dataset summaries found. Run Stage 1 first."
+
+            dataset_scores = []
+
+            for sf in summary_files:
+                try:
+                    summary = DataPassingManager.load_artifact(SUMMARIES_DIR / sf)
+                    data = summary.get('data', summary)
+
+                    dataset_name = data.get('filename', '')
+                    columns = data.get('columns', [])
+
+                    # Score this dataset
+                    score = 0
+                    matched_keywords = []
+                    matched_columns = []
+
+                    # Check dataset name
+                    dataset_name_lower = dataset_name.lower()
+                    for kw in keywords:
+                        if kw in dataset_name_lower:
+                            score += 3
+                            matched_keywords.append(kw)
+
+                    # Check column names
+                    for col in columns:
+                        col_name = col.get('name', '').lower()
+                        for kw in keywords:
+                            if kw in col_name:
+                                score += 2
+                                matched_keywords.append(kw)
+                                matched_columns.append(col.get('name'))
+                                break
+
+                    # Bonus for datetime columns
+                    has_datetime = data.get('has_datetime_column', False)
+                    if has_datetime:
+                        score += 1
+
+                    # Bonus for data quality
+                    quality = data.get('data_quality_score', 0.5)
+                    score += quality
+
+                    if score > 0:
+                        dataset_scores.append({
+                            'dataset': dataset_name,
+                            'score': score,
+                            'matched_keywords': list(set(matched_keywords)),
+                            'matched_columns': list(set(matched_columns)),
+                            'has_datetime': has_datetime,
+                            'columns': columns
+                        })
+
+                except Exception as e:
+                    logger.warning(f"Error analyzing {sf}: {e}")
+                    continue
+
+            # Sort by score
+            dataset_scores.sort(key=lambda x: x['score'], reverse=True)
+
+            if not dataset_scores:
+                return "❌ No datasets matched your query. Try being more specific."
+
+            # Select best dataset
+            best = dataset_scores[0]
+            dataset = best['dataset']
+
+            result_messages.append(f"  ✅ Selected dataset: {dataset} (score: {best['score']:.1f})")
+            result_messages.append(f"     Matched keywords: {best['matched_keywords']}")
+
+            # === STEP 2: SMART TARGET COLUMN SELECTION ===
+            if not target_column:
+                # Find best target column from matched columns
+                if best['matched_columns']:
+                    # Prefer numeric columns
+                    numeric_matches = []
+                    for col_name in best['matched_columns']:
+                        col_info = next((c for c in best['columns'] if c.get('name') == col_name), None)
+                        if col_info and col_info.get('logical_type') in ['integer', 'real', 'categorical_numeric']:
+                            numeric_matches.append(col_name)
+
+                    if numeric_matches:
+                        target_column = numeric_matches[0]
+                    else:
+                        target_column = best['matched_columns'][0]
+
+                    result_messages.append(f"  ✅ Selected target column: {target_column}")
+                else:
+                    return f"❌ Could not identify target column in {dataset}. Please specify manually."
+
+            # === STEP 3: AUTO-DETECT DATE COLUMN ===
+            if not date_column and best['has_datetime']:
+                for col in best['columns']:
+                    col_name = col.get('name', '')
+                    if any(keyword in col_name.lower() for keyword in ['year', 'date', 'time', 'period']):
+                        date_column = col_name
+                        result_messages.append(f"  ✅ Detected date column: {date_column}")
+                        break
+
+        # === STEP 4: GENERATE TASK PROPOSAL ===
         import time
         task_id = f"TSK-{int(time.time()) % 10000:04d}"
 
-        # AUTOMATICALLY parse forecast configuration from query
+        # Parse forecast configuration from query
         forecast_config = parse_forecast_config_from_query(query)
 
         # Get appropriate metrics
@@ -368,31 +511,14 @@ def create_custom_task_from_query(
             "feasibility_score": 0.7,
             "feasibility_notes": f"Custom task created from user query: {query}",
 
-            # DYNAMIC forecast configuration (parsed from query!)
+            # DYNAMIC forecast configuration
             "forecast_horizon": forecast_config["forecast_horizon"],
             "forecast_granularity": forecast_config["forecast_granularity"],
             "forecast_type": forecast_config["forecast_type"],
 
-            # DYNAMIC metrics (task-appropriate!)
+            # DYNAMIC metrics
             "evaluation_metrics": metrics
         }
-
-        result = [
-            "=== Custom Task Created ===",
-            f"Task ID: {task_id}",
-            f"Target: {target_column} from {dataset}",
-            f"Category: forecasting",
-            "",
-            "AUTOMATICALLY EXTRACTED FROM YOUR QUERY:",
-            f"  Forecast Horizon: {forecast_config['forecast_horizon']} {forecast_config['forecast_granularity']}(s)",
-            f"  Forecast Type: {forecast_config['forecast_type']}",
-            f"  Evaluation Metrics: {', '.join(metrics)}",
-            "",
-            "Full Proposal:",
-            json.dumps(proposal, indent=2),
-            "",
-            f"To execute this task, use: 'run task {task_id}'"
-        ]
 
         # Save to proposals
         proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
@@ -410,10 +536,27 @@ def create_custom_task_from_query(
             filename="task_proposals.json"
         )
 
-        return "\n".join(result)
+        result_messages.extend([
+            "",
+            "=== Custom Task Created ===",
+            f"Task ID: {task_id}",
+            f"Dataset: {dataset}",
+            f"Target: {target_column}",
+            f"Date Column: {date_column or 'None (will use index)'}",
+            "",
+            "Forecast Configuration:",
+            f"  Horizon: {forecast_config['forecast_horizon']} {forecast_config['forecast_granularity']}(s)",
+            f"  Type: {forecast_config['forecast_type']}",
+            f"  Metrics: {', '.join(metrics)}",
+            "",
+            f"✅ Proposal saved. Use: 'run task {task_id}'"
+        ])
+
+        return "\n".join(result_messages)
 
     except Exception as e:
-        return f"Error creating task: {e}"
+        import traceback
+        return f"❌ Error creating task: {e}\n{traceback.format_exc()}"
 
 
 @tool

@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-08T14:01:57.709630",
-    "checksum": "dd12e40aad87670b",
+    "timestamp": "2025-12-08T17:28:55.655238",
+    "checksum": "92bc651cad53236d",
     "version": "1.0"
   },
   "data": {
@@ -10,9 +10,10 @@
         "id": "TSK-001",
         "category": "forecasting",
         "title": "Forecast Food Grain Production by Crop and Season",
-        "problem_statement": "Predict future food grain production values for different crops and seasons using historical production data from 2020-2025",
+        "problem_statement": "Predict future food grain production using historical area, production, and yield data across different crops and seasons. Use seasonal patterns and crop-specific trends for forecasting.",
         "required_datasets": [
-          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "All-India-profile_-Crop-wise-Area.csv"
         ],
         "target_column": "Production-2024-25",
         "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
@@ -25,28 +26,47 @@
           "Yield-2020-21",
           "Yield-2021-22"
         ],
-        "join_plan": null,
-        "feasibility_score": 0.85,
-        "filters": [
-          {
-            "column": "Season",
-            "operator": "!",
-            "value": "Total"
+        "join_plan": {
+          "datasets": [
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "All-India-profile_-Crop-wise-Area.csv"
+          ],
+          "join_keys": {
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
+            "All-India-profile_-Crop-wise-Area.csv": "Crop"
+          },
+          "join_type": "inner"
+        },
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "filters": {
+          "Season": {
+            "exclude": [
+              "Total"
+            ]
           }
-        ]
+        },
+        "feasibility_score": 0.85
       },
       {
         "id": "TSK-002",
         "category": "regression",
-        "title": "Predict Rice Export Quantity to Bangladesh",
-        "problem_statement": "Predict rice export quantities to Bangladesh using production data from food grain estimates",
+        "title": "Predict Rice Export Value Using Production Data",
+        "problem_statement": "Estimate rice export value to Bangladesh by combining production data with historical export quantities and values. Use rice-specific production metrics as predictors.",
         "required_datasets": [
           "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
           "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
         ],
-        "target_column": "2024 - 25-Quantity",
+        "target_column": "2024 - 25-Value (USD)",
         "target_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
         "feature_columns": [
+          "Crop",
           "Production-2023-24",
           "Yield-2023-24",
           "Area-2023-24"
@@ -60,22 +80,27 @@
             "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
             "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Description"
           },
-          "join_type": "inner"
+          "join_type": "left"
         },
-        "feasibility_score": 0.7,
-        "filters": [
-          {
-            "column": "Description",
-            "operator": "==",
-            "value": "RICE EXCPTG PARBOILED"
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "filters": {
+          "Crop": {
+            "include": [
+              "Rice"
+            ]
           }
-        ]
+        },
+        "feasibility_score": 0.7
       },
       {
         "id": "TSK-003",
         "category": "classification",
-        "title": "Classify Crops by Yield Potential",
-        "problem_statement": "Classify crops into high/medium/low yield categories based on historical yield data",
+        "title": "Classify High-Yield vs Low-Yield Crops by Season",
+        "problem_statement": "Determine whether a crop-season combination will have high or low yield based on historical area and production data. Use seasonal patterns to identify optimal growing conditions.",
         "required_datasets": [
           "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
         ],
@@ -87,21 +112,55 @@
           "Area-2023-24",
           "Production-2023-24"
         ],
-        "join_plan": null,
-        "feasibility_score": 0.75,
-        "filters": [
-          {
-            "column": "Season",
-            "operator": "!",
-            "value": "Total"
+        "evaluation_metrics": [
+          "accuracy",
+          "f1",
+          "auc_roc"
+        ],
+        "filters": {
+          "Season": {
+            "exclude": [
+              "Total"
+            ]
           }
-        ]
+        },
+        "feasibility_score": 0.8
       },
       {
         "id": "TSK-004",
         "category": "regression",
-        "title": "Analyze Seasonal Area Variations",
-        "problem_statement": "Predict crop area by season using historical area data",
+        "title": "Analyze Production Trends by Season",
+        "problem_statement": "Quantify how production varies across seasons for different crops. Use seasonal dummy variables as factors to identify season-specific production patterns.",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Production-2024-25",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Crop",
+          "Season",
+          "Area-2023-24",
+          "Yield-2023-24"
+        ],
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "filters": {
+          "Season": {
+            "exclude": [
+              "Total"
+            ]
+          }
+        },
+        "feasibility_score": 0.8
+      },
+      {
+        "id": "TSK-005",
+        "category": "regression",
+        "title": "Predict Area Under Cultivation by Crop Type",
+        "problem_statement": "Estimate future area under cultivation for different crops using historical trends and seasonal patterns. Use crop-specific and seasonal features as predictors.",
         "required_datasets": [
           "All-India-profile_-Crop-wise-Area.csv"
         ],
@@ -113,63 +172,30 @@
           "Area-2023-24",
           "Area-2022-23"
         ],
-        "join_plan": null,
-        "feasibility_score": 0.8,
-        "filters": [
-          {
-            "column": "Season",
-            "operator": "!",
-            "value": "Total"
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "filters": {
+          "Season": {
+            "exclude": [
+              "Total"
+            ]
           }
-        ]
+        },
+        "feasibility_score": 0.8
       },
       {
-        "id": "TSK-005",
-        "category": "regression",
-        "title": "Predict Regional Production Outcomes",
-        "problem_statement": "Predict production outcomes by region using crop area and yield data",
+        "id": "TSK-5135",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2021-22",
+        "problem_statement": "for the crop bajra can you make me an area prediction for the next 3 years in the kharif season",
         "required_datasets": [
-          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
           "All-India-profile_-Crop-wise-Area.csv"
         ],
-        "target_column": "Production-2024-25",
-        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-        "feature_columns": [
-          "Crop",
-          "Area-2023-24",
-          "Yield-2023-24",
-          "Area-2024-25"
-        ],
-        "join_plan": {
-          "datasets": [
-            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-            "All-India-profile_-Crop-wise-Area.csv"
-          ],
-          "join_keys": {
-            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
-            "All-India-profile_-Crop-wise-Area.csv": "Crop"
-          },
-          "join_type": "inner"
-        },
-        "feasibility_score": 0.78,
-        "filters": [
-          {
-            "column": "Season",
-            "operator": "!",
-            "value": "Total"
-          }
-        ]
-      },
-      {
-        "id": "TSK-1304",
-        "category": "forecasting",
-        "title": "Custom Forecasting: 2024 - 25-Quantity",
-        "problem_statement": "Predict rice export quantity to Bangladesh for 2024-25 season",
-        "required_datasets": [
-          "food_grain_estimates.csv"
-        ],
-        "target_column": "2024 - 25-Quantity",
-        "target_dataset": "food_grain_estimates.csv",
+        "target_column": "Area-2021-22",
+        "target_dataset": "All-India-profile_-Crop-wise-Area.csv",
         "feature_columns": [],
         "validation_plan": {
           "train_fraction": 0.7,
@@ -179,47 +205,15 @@
           "date_column": null
         },
         "feasibility_score": 0.7,
-        "feasibility_notes": "Custom task created from user query: Predict rice export quantity to Bangladesh for 2024-25 season",
-        "forecast_horizon": 1,
+        "feasibility_notes": "Custom task created from user query: for the crop bajra can you make me an area prediction for the next 3 years in the kharif season",
+        "forecast_horizon": 3,
         "forecast_granularity": "year",
-        "forecast_type": "single_step",
+        "forecast_type": "multi_step",
         "evaluation_metrics": [
           "mae",
           "rmse",
           "mape",
           "r2"
-        ]
-      },
-      {
-        "id": "TSK-2717",
-        "category": "forecasting",
-        "title": "Custom Forecasting: GDP",
-        "problem_statement": "forecast next 5 years",
-        "required_datasets": [
-          "economic_data.csv"
-        ],
-        "target_column": "GDP",
-        "target_dataset": "economic_data.csv",
-        "feature_columns": [],
-        "validation_plan": {
-          "train_fraction": 0.7,
-          "validation_fraction": 0.15,
-          "test_fraction": 0.15,
-          "split_strategy": "temporal",
-          "date_column": "Year"
-        },
-        "feasibility_score": 0.7,
-        "feasibility_notes": "Custom task created from user query: forecast next 5 years",
-        "forecast_horizon": 5,
-        "forecast_granularity": "year",
-        "forecast_type": "recursive",
-        "evaluation_metrics": [
-          "mae",
-          "rmse",
-          "mape",
-          "r2",
-          "smape",
-          "mase"
         ]
       }
     ]

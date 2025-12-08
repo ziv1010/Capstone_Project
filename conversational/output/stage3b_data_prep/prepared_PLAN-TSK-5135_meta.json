@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T18:19:59.416716",
+    "checksum": "dc9a620efdb06b7b",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-5135",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-5135.parquet",
+    "original_row_count": 1,
+    "final_row_count": 1,
+    "columns_created": [
+      "Crop",
+      "Season",
+      "Area-2015-16",
+      "Area-2016-17",
+      "Area-2017-18",
+      "Area-2018-19",
+      "Area-2019-20",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Area-2024-25"
+    ],
+    "transformations_applied": [
+      "1. Filtered Bajra Kharif data 2. Melted to long format 3. Created lag features (Lag_1",
+      "Lag_2) and rolling mean 4. Handled NaNs with fillna"
+    ],
+    "data_quality_report": {
+      "total_rows": 1,
+      "total_columns": 12,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "Zero nulls in final dataset (10 rows, 7 columns). All missing values imputed: 0 for lags, mean for rolling average."
+  }
+}

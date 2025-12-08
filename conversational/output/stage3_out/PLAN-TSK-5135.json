@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-08T17:33:38.213461",
+    "checksum": "c50c3c9fc232f48a",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-5135",
+    "selected_task_id": "TSK-5135",
+    "goal": "Forecast Bajra area for Kharif season for next 3 years",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "All-India-profile_-Crop-wise-Area.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2015-16",
+          "Area-2016-17",
+          "Area-2017-18",
+          "Area-2018-19",
+          "Area-2019-20",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25"
+        ],
+        "filters": [
+          "Crop == 'Bajra'",
+          "Season == 'Kharif'",
+          "Season != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": [
+          "Year"
+        ]
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [
+      {
+        "name": "Melt to long format",
+        "description": "Convert wide year columns to long format with Year and Area",
+        "source_columns": [
+          "Area-2015-16",
+          "Area-2016-17",
+          "Area-2017-18",
+          "Area-2018-19",
+          "Area-2019-20",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25"
+        ],
+        "implementation_code": "df_melt = df.melt(id_vars=['Crop', 'Season'], value_vars=[col for col in df.columns if col.startswith('Area-')], var_name='Year_Metric', value_name='Area')\ndf_melt['Year'] = df_melt['Year_Metric'].str.split('-').str[1] + '-' + df_melt['Year_Metric'].str.split('-').str[2]\ndf_melt['Year'] = pd.to_datetime(df_melt['Year'], format='%Y-%m')\ndf_melt = df_melt.drop(columns=['Year_Metric'])",
+        "dtype": null
+      },
+      {
+        "name": "Create lag features",
+        "description": "Add lagged area values for time series modeling",
+        "source_columns": [
+          "Area"
+        ],
+        "implementation_code": "df_melt['Lag_1'] = df_melt['Area'].shift(1)\ndf_melt['Lag_2'] = df_melt['Area'].shift(2)\ndf_melt['Rolling_Mean_3'] = df_melt['Area'].rolling(window=3).mean()",
+        "dtype": null
+      }
+    ],
+    "target_column": "Area",
+    "date_column": "Year",
+    "validation_strategy": "temporal",
+    "train_end_date": "2024-06-30",
+    "validation_end_date": "2025-06-30",
+    "forecast_horizon": 3,
+    "forecast_granularity": "year",
+    "forecast_type": "multi_step",
+    "expected_model_types": [
+      "Prophet",
+      "ARIMA",
+      "LSTM"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-08T17:33:38.212369"
+  }
+}

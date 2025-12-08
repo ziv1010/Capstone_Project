@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from code.config import (
     STAGE3_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR, STAGE5_WORKSPACE,
-    SECONDARY_LLM_CONFIG, STAGE_MAX_ROUNDS, DataPassingManager, logger
+    SECONDARY_LLM_CONFIG, STAGE_MAX_TOKENS, STAGE_MAX_ROUNDS, DataPassingManager, logger
 )
 from code.models import VisualizationReport, PipelineState
 from tools.stage5_tools import STAGE5_TOOLS
@@ -61,12 +61,23 @@ Before creating ANY visualizations:
 2. Call `analyze_data_columns` to understand column types
 3. Use `record_thought_stage5` to plan visualizations that address the task goal
 
-### Step 3: CREATE VISUALIZATIONS
-Create plots that directly answer or illustrate the task goal:
+### Step 3: CREATE TASK-APPROPRIATE VISUALIZATIONS
+**CRITICAL**: Visualizations must match the task type!
+
+#### For FORECASTING tasks (check if prediction_type column exists):
+1. **Forecast Trend Plot** - Historical actuals + test predictions + future forecasts
+   - Show the full timeline from past to future
+   - Distinguish test predictions vs future forecasts with different colors/styles
+   - This is THE MOST IMPORTANT plot for forecasting tasks!
+2. **Test Set Accuracy** - Actual vs Predicted scatter (test set only)
+3. **Residuals** - Error analysis on test set
+
+#### For other tasks:
 1. **Actual vs Predicted Scatter** - How accurate are the predictions?
-2. **Time Series** - Actual and predicted values over time
+2. **Time Series** - Actual and predicted values over time (if datetime exists)
 3. **Residuals** - Distribution and patterns in prediction errors
-4. Use `create_standard_plots` or `create_plot` for custom visualizations
+
+Use `create_standard_plots` for automatic plotting or `create_plot` for custom visualizations.
 
 ### Step 4: GENERATE INSIGHTS & TASK ANSWER
 1. Call `generate_insights` to extract key findings
@@ -121,7 +132,11 @@ OBSERVATION: Answer saved...
 def create_stage5_agent():
     """Create the Stage 5 agent graph."""
 
-    llm = ChatOpenAI(**SECONDARY_LLM_CONFIG)
+    # Use stage-specific max_tokens if available, otherwise use default
+    stage5_config = SECONDARY_LLM_CONFIG.copy()
+    stage5_config["max_tokens"] = STAGE_MAX_TOKENS.get("stage5", SECONDARY_LLM_CONFIG["max_tokens"])
+
+    llm = ChatOpenAI(**stage5_config)
     llm_with_tools = llm.bind_tools(STAGE5_TOOLS, parallel_tool_calls=False)
 
     def agent_node(state: Stage5State) -> Dict[str, Any]:

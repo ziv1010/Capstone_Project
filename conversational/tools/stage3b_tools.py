@@ -157,10 +157,15 @@ def run_data_prep_code(code: str, description: str = "") -> str:
 
     The code should work with DataFrames and prepare data for modeling.
 
-    Available:
-    - pd, np, json
-    - DATA_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR
-    - load_dataframe()
+    Available in sandbox (pre-defined):
+    - pd, np, json (imports)
+    - DATA_DIR (Path object pointing to data directory)
+    - STAGE3_OUT_DIR, STAGE3B_OUT_DIR (Path objects)
+    - load_dataframe() function
+
+    IMPORTANT: DATA_DIR is already defined - use it directly!
+    Example: df = pd.read_csv(DATA_DIR / 'yourfile.csv')
+    DO NOT write: DATA_DIR = Path('/path/to/data')
 
     Args:
         code: Python code for data preparation

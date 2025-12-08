@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from code.config import (
-    STAGE3_OUT_DIR, STAGE3B_OUT_DIR, STAGE3_5A_OUT_DIR, SECONDARY_LLM_CONFIG,
+    STAGE3_OUT_DIR, STAGE3B_OUT_DIR, STAGE3_5A_OUT_DIR, SECONDARY_LLM_CONFIG, STAGE_MAX_TOKENS,
     STAGE_MAX_ROUNDS, DataPassingManager, logger, DEBUG, RECURSION_LIMIT
 )
 from code.models import MethodProposalOutput, PipelineState
@@ -48,6 +48,13 @@ class Stage35AState(BaseModel):
 # ============================================================================
 
 STAGE35A_SYSTEM_PROMPT = """You are a Method Proposal Agent responsible for proposing the 3 BEST ALGORITHMS for the given task.
+
+## CRITICAL: Be Concise and Action-Oriented
+❌ DO NOT write lengthy explanations or repetitive thinking
+❌ DO NOT repeat the same reasoning multiple times
+✅ Think briefly, then ACT immediately with tool calls
+✅ Keep responses under 500 tokens
+✅ Be direct and efficient
 
 ## CRITICAL: Task-Appropriate Algorithms
 You must propose algorithms that MATCH the task category (FORECASTING, REGRESSION, CLASSIFICATION, or CLUSTERING).
@@ -223,7 +230,11 @@ The benchmarking stage will execute this code exactly as written.
 def create_stage3_5a_agent():
     """Create the Stage 3.5A agent graph."""
 
-    llm = ChatOpenAI(**SECONDARY_LLM_CONFIG)
+    # Use stage-specific max_tokens if available, otherwise use default
+    stage3_5a_config = SECONDARY_LLM_CONFIG.copy()
+    stage3_5a_config["max_tokens"] = STAGE_MAX_TOKENS.get("stage3_5a", SECONDARY_LLM_CONFIG["max_tokens"])
+
+    llm = ChatOpenAI(**stage3_5a_config)
     llm_with_tools = llm.bind_tools(STAGE3_5A_TOOLS, parallel_tool_calls=False)
 
     def agent_node(state: Stage35AState) -> Dict[str, Any]:
@@ -241,8 +252,18 @@ def create_stage3_5a_agent():
 
         response = llm_with_tools.invoke(messages)
 
+        # Strip verbose <think> tags to prevent context bloat
+        if response.content:
+            import re
+            # Remove <think>...</think> blocks to save context
+            cleaned_content = re.sub(r'<think>.*?</think>', '', response.content, flags=re.DOTALL)
+            # If the cleaned content is empty but we have tool calls, provide minimal message
+            if not cleaned_content.strip() and response.tool_calls:
+                cleaned_content = "Executing tools..."
+            response.content = cleaned_content.strip()
+
         if DEBUG:
-            logger.debug(f"Stage 3.5A Agent Response: {response.content}")
+            logger.debug(f"Stage 3.5A Agent Response: {response.content[:200]}...")  # Only log first 200 chars
             if response.tool_calls:
                 logger.debug(f"Tool Calls: {response.tool_calls}")
 

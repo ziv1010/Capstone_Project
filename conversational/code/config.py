@@ -48,23 +48,29 @@ for d in [SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
 # LLM CONFIGURATION
 # ============================================================================
 
+# Local LLM configuration
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://localhost:8001/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "EMPTY")
 
+# GROQ LLM configuration (optional)
+USE_GROQ = os.environ.get("USE_GROQ", "false").lower() == "true"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
 # Primary LLM config (for complex reasoning tasks)
 PRIMARY_LLM_CONFIG = {
-    "base_url": LLM_BASE_URL,
-    "api_key": LLM_API_KEY,
-    "model": "Qwen/Qwen2.5-32B-Instruct",
+    "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
+    "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
+    "model": "qwen/qwen3-32b" if USE_GROQ else "Qwen/Qwen2.5-32B-Instruct",
     "temperature": 0.0,
     "max_tokens": 4096,
 }
 
 # Secondary LLM config (for tool-calling agents)
 SECONDARY_LLM_CONFIG = {
-    "base_url": LLM_BASE_URL,
-    "api_key": LLM_API_KEY,
-    "model": "Qwen/Qwen3-32B",
+    "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
+    "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
+    "model": "qwen/qwen3-32b" if USE_GROQ else "Qwen/Qwen3-32B",
     "temperature": 0.3,  # Lower temperature for better instruction following
     "max_tokens": 4096,  # Default for most stages
 }
@@ -80,12 +86,21 @@ STAGE_MAX_TOKENS = {
 
 # Conversation LLM config (for user interaction)
 CONVERSATION_LLM_CONFIG = {
-    "base_url": LLM_BASE_URL,
-    "api_key": LLM_API_KEY,
-    "model": "Qwen/Qwen3-32B",
+    "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
+    "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
+    "model": "qwen/qwen3-32b" if USE_GROQ else "Qwen/Qwen3-32B",
     "temperature": 0.2,  # Slightly higher for more natural conversation
     "max_tokens": 2048,
 }
+
+# Log LLM backend selection
+if USE_GROQ:
+    if GROQ_API_KEY:
+        print(f"[CONFIG] Using GROQ LLM (model: qwen/qwen3-32b)")
+    else:
+        print("[CONFIG] WARNING: USE_GROQ is enabled but GROQ_API_KEY is not set!")
+else:
+    print(f"[CONFIG] Using local LLM (base_url: {LLM_BASE_URL})")
 
 # ============================================================================
 # STAGE-SPECIFIC PARAMETERS
@@ -673,7 +688,7 @@ __all__ = [
     "CONVERSATION_STATE_DIR",
     # LLM configs
     "PRIMARY_LLM_CONFIG", "SECONDARY_LLM_CONFIG", "CONVERSATION_LLM_CONFIG",
-    "STAGE_MAX_TOKENS",
+    "STAGE_MAX_TOKENS", "USE_GROQ", "GROQ_API_KEY", "GROQ_BASE_URL",
     # Parameters
     "STAGE_MAX_ROUNDS", "STAGE1_SAMPLE_ROWS",
     "MIN_NON_NULL_FRACTION", "MIN_UNIQUE_FRACTION",

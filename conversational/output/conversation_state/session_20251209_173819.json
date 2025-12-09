@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T17:40:04.331238",
+    "checksum": "81d0a6c4a4bf6c24",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251209_173819",
+    "messages": [
+      {
+        "role": "user",
+        "content": "run plan-tsk-001",
+        "timestamp": "2025-12-09 17:38:23.687429",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "To run the task TSK-2104, please confirm by providing the task ID.\n\nOnce confirmed, the pipeline will execute the task and provide the results. \n\nPlease respond with 'run task TSK-2104' to proceed.",
+        "timestamp": "2025-12-09 17:38:26.793603",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-09 17:38:19.313944",
+    "last_updated": "2025-12-09 17:38:26.793622"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T16:04:54.767913",
-    "checksum": "70813ce3b12ed792",
+    "timestamp": "2025-12-09T17:38:24.945930",
+    "checksum": "cf9c4f3bd57ce6df",
     "version": "1.0"
   },
   "data": {
@@ -272,6 +272,66 @@
         },
         "feasibility_score": 0.7,
         "feasibility_notes": "Custom task created from user query: predict values of soil nitrogen medium",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-1270",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2018-19",
+        "problem_statement": "forecast annual food crop area utilization for tsk-001",
+        "required_datasets": [
+          "All-India-profile_-Crop-wise-Area.csv"
+        ],
+        "target_column": "Area-2018-19",
+        "target_dataset": "All-India-profile_-Crop-wise-Area.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: forecast annual food crop area utilization for tsk-001",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-2104",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2015-16",
+        "problem_statement": "forecast annual food crop area utilization for tsk-001",
+        "required_datasets": [
+          "All-India-profile_-Crop-wise-Area.csv"
+        ],
+        "target_column": "Area-2015-16",
+        "target_dataset": "All-India-profile_-Crop-wise-Area.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: forecast annual food crop area utilization for tsk-001",
         "forecast_horizon": 1,
         "forecast_granularity": "year",
         "forecast_type": "single_step",

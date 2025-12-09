@@ -61,23 +61,67 @@ Before creating ANY visualizations:
 2. Call `analyze_data_columns` to understand column types
 3. Use `record_thought_stage5` to plan visualizations that address the task goal
 
-### Step 3: CREATE TASK-APPROPRIATE VISUALIZATIONS
-**CRITICAL**: Visualizations must match the task type!
+### Step 3: CREATE CUSTOM TASK-APPROPRIATE VISUALIZATIONS
+**CRITICAL**: You must create visualizations FROM SCRATCH using the `create_plot` tool!
 
-#### For FORECASTING tasks (check if prediction_type column exists):
-1. **Forecast Trend Plot** - Historical actuals + test predictions + future forecasts
-   - Show the full timeline from past to future
-   - Distinguish test predictions vs future forecasts with different colors/styles
-   - This is THE MOST IMPORTANT plot for forecasting tasks!
-2. **Test Set Accuracy** - Actual vs Predicted scatter (test set only)
-3. **Residuals** - Error analysis on test set
+#### Key Principles for Forecasting/Prediction Tasks:
+1. **ALWAYS show historical context**: Load the prepared data from stage3b to show past known values
+   - Path pattern: replace 'stage4_out' with 'stage3b_data_prep' in results path
+   - This allows viewers to see the trend pattern leading up to predictions
+2. **Show the complete timeline**: Historical → Test → Forecast
+3. **Distinguish different data types** with colors/markers:
+   - Historical/training data (what the model learned from)
+   - Test predictions (how well the model performs on known data)
+   - Future forecasts (what we're predicting)
+4. **Make it publication-quality**: Large fonts, clear labels, legends, grid lines
+5. **Aggregate appropriately**: If data has multiple categories (crops, regions, etc.),
+   aggregate to show overall trends
 
-#### For other tasks:
-1. **Actual vs Predicted Scatter** - How accurate are the predictions?
-2. **Time Series** - Actual and predicted values over time (if datetime exists)
-3. **Residuals** - Distribution and patterns in prediction errors
+#### Example Visualization Strategy for Forecasting:
+```python
+# Load prepared data to get ALL historical values
+prepared_path = Path(str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')) / f"prepared_{plan_id}.parquet"
+hist_df = pd.read_parquet(prepared_path)
 
-Use `create_standard_plots` for automatic plotting or `create_plot` for custom visualizations.
+# Extract all year columns (e.g., Area-2020-21, Area-2021-22, etc.)
+year_cols = [c for c in hist_df.columns if 'Area-' in c or 'Production-' in c]
+
+# Aggregate by year to show overall trend
+years = []
+values = []
+for col in sorted(year_cols):
+    year = col.split('-')[-1]
+    years.append(year)
+    values.append(hist_df[col].sum())  # or mean(), depending on context
+
+# Create comprehensive plot
+fig, ax = plt.subplots(figsize=(18, 10))
+ax.plot(years, values, 'o-', label='Historical (Training)', linewidth=3, markersize=10)
+# ... then add test predictions and future forecasts
+```
+
+Use `create_plot` to generate custom Python code for each visualization.
+
+#### Types of Visualizations to Create:
+1. **Main Forecast/Trend Plot** (MOST IMPORTANT for forecasting):
+   - Show complete historical timeline with past known values
+   - Overlay test predictions to show model accuracy
+   - Extend to future forecasts
+   - Use vertical lines or shading to separate past/test/future
+
+2. **Model Accuracy Plots**:
+   - Actual vs Predicted scatter (test set only, with perfect prediction line)
+   - Show how close predictions are to reality
+
+3. **Error Analysis**:
+   - Residuals histogram (distribution of errors)
+   - Residuals over time (are errors random or systematic?)
+   - Box plots by category if applicable
+
+4. **Additional Context** (if relevant):
+   - Predictions by category (if multiple categories exist)
+   - Feature importance or correlation heatmaps
+   - Confidence intervals or prediction ranges (if available)
 
 ### Step 4: GENERATE INSIGHTS & TASK ANSWER
 1. Call `generate_insights` to extract key findings
@@ -96,16 +140,21 @@ Call `save_visualization_report` with a JSON containing:
 
 ## IMPORTANT RULES
 1. ALWAYS start with `get_task_context` to understand what we're trying to answer
-2. ALWAYS call `generate_task_answer` before saving the report
-3. Use `record_thought_stage5` to document your reasoning
-4. Visualizations should TELL A STORY that answers the original task
+2. ALWAYS create custom visualizations using `create_plot` - DO NOT use `create_standard_plots`
+3. ALWAYS show historical context by loading prepared data from stage3b
+4. ALWAYS call `generate_task_answer` before saving the report
+5. Use `record_thought_stage5` to document your reasoning at each step
+6. Visualizations should TELL A STORY that answers the original task
 
 ## Visualization Quality Guidelines
-- Clear titles explaining what the plot shows
-- Proper axis labels with units if applicable
-- Legends for multiple series
-- Reference lines where helpful (e.g., perfect prediction line)
-- Distinct colors for actual vs predicted
+- Large figure sizes (16-20 inches wide for main plots)
+- Clear titles explaining what the plot shows (14-16pt bold)
+- Proper axis labels with units if applicable (12-14pt)
+- Legends for multiple series (10-12pt)
+- Reference lines where helpful (e.g., perfect prediction line, forecast boundaries)
+- Distinct colors and markers for different data types
+- Grid lines for readability (alpha=0.3-0.4)
+- High DPI (150-200) for publication quality
 
 ## Example ReAct Flow
 ```
@@ -205,12 +254,28 @@ Call `get_task_context("{plan_id}")` FIRST to understand the original goal.
 
 ### Step 2: ANALYZE DATA
 - Load execution results from Stage 4
-- Analyze data columns
+- Analyze data columns to understand what's available
 
-### Step 3: CREATE VISUALIZATIONS
-- Create standard plots (actual vs predicted, residuals)
-- Create any task-specific visualizations
-- Save plots to: {STAGE5_OUT_DIR}/
+### Step 3: CREATE CUSTOM VISUALIZATIONS
+**CRITICAL**: Use `create_plot` to generate visualizations FROM SCRATCH!
+
+For forecasting/prediction tasks:
+1. **Load historical context**: Access prepared data from stage3b to get ALL past values
+   - Prepared data path: {str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')}/prepared_{plan_id}.parquet
+   - This shows the trend pattern leading to predictions
+
+2. **Create comprehensive forecast plot**:
+   - Show complete timeline: Historical → Test → Forecast
+   - Use different colors/markers for each data type
+   - Add vertical lines or shading to separate regions
+   - Make it large (18x10 inches), publication-quality
+
+3. **Add accuracy and error analysis plots**:
+   - Actual vs Predicted scatter (test set)
+   - Residuals histogram and over time
+   - Any category-specific breakdowns if applicable
+
+**DO NOT** use `create_standard_plots` - create custom plots using `create_plot`!
 
 ### Step 4: GENERATE ANSWER
 Call `generate_task_answer` with:
@@ -226,9 +291,15 @@ Call `save_visualization_report` with JSON containing:
 - summary: overall assessment
 - task_answer: the answer generated above
 
-DATA LOCATION: {STAGE4_OUT_DIR}/results_{plan_id}.parquet
+DATA LOCATIONS:
+- Stage 4 Results: {STAGE4_OUT_DIR}/results_{plan_id}.parquet
+- Prepared Data (for historical context): {str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')}/prepared_{plan_id}.parquet
+- Output Directory: {STAGE5_OUT_DIR}/
 
-IMPORTANT: Start with get_task_context to understand what we're trying to answer!
+IMPORTANT:
+- Start with get_task_context to understand what we're trying to answer!
+- Always show historical data context in forecast plots!
+- Create custom plots using create_plot, not create_standard_plots!
 """)
 
     config = {"configurable": {"thread_id": f"stage5_{plan_id}"}}

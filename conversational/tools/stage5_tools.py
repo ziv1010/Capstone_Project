@@ -197,6 +197,61 @@ TASK: {task_title}
 
 
 @tool
+def load_historical_data(plan_id: str) -> str:
+    """
+    Load prepared historical data from Stage 3b for showing trends.
+
+    This provides the complete historical dataset that was used for training,
+    allowing you to show the full timeline in visualizations.
+
+    Args:
+        plan_id: Plan ID
+
+    Returns:
+        Summary of historical data structure and sample values
+    """
+    try:
+        # Construct path to prepared data
+        prepared_path = Path(str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')) / f"prepared_{plan_id}.parquet"
+
+        if not prepared_path.exists():
+            return f"Historical data not found at: {prepared_path}"
+
+        hist_df = pd.read_parquet(prepared_path)
+
+        result = [f"=== Historical Data: {plan_id} ===\n"]
+        result.append(f"Shape: {hist_df.shape}")
+        result.append(f"Columns: {list(hist_df.columns)}")
+        result.append("")
+
+        # Identify year columns
+        year_cols = [c for c in hist_df.columns if any(prefix in c for prefix in ['Area-', 'Production-', 'Yield-'])]
+
+        if year_cols:
+            result.append("Time series columns found:")
+            for col in sorted(year_cols)[:10]:  # Show first 10
+                result.append(f"  - {col}: min={hist_df[col].min():.2f}, max={hist_df[col].max():.2f}, sum={hist_df[col].sum():.2f}")
+            if len(year_cols) > 10:
+                result.append(f"  ... and {len(year_cols)-10} more")
+            result.append("")
+
+        # Show how to aggregate
+        result.append("Usage example for trend visualization:")
+        result.append("```python")
+        result.append("# Aggregate by year to show overall trend")
+        result.append("year_cols = [c for c in hist_df.columns if 'Area-' in c]")
+        result.append("years = [c.split('-')[-1] for c in sorted(year_cols)]")
+        result.append("values = [hist_df[c].sum() for c in sorted(year_cols)]")
+        result.append("ax.plot(years, values, 'o-', label='Historical', linewidth=3)")
+        result.append("```")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error loading historical data: {e}"
+
+
+@tool
 def load_execution_results(plan_id: str = None) -> str:
     """
     Load Stage 4 execution results for visualization.
@@ -762,6 +817,7 @@ STAGE5_TOOLS = [
     get_task_context,
     generate_task_answer,
     # Core visualization tools
+    load_historical_data,
     load_execution_results,
     analyze_data_columns,
     plan_visualization,

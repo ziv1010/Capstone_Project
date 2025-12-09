@@ -1,0 +1,93 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T15:47:30.527684",
+    "checksum": "0ea703ef0b2a04c4",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Linear Regression",
+        "category": "baseline",
+        "description": "Simple linear model using all available features",
+        "implementation_code": "def predict_linear_regression(train_df, test_df, target_col, **params):\n    from sklearn.linear_model import LinearRegression\n    import pandas as pd\n    model = LinearRegression()\n    model.fit(train_df.drop(columns=[target_col]), train_df[target_col])\n    return pd.DataFrame({\"predicted\": model.predict(test_df.drop(columns=[target_col]))}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.linear_model",
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple and fast",
+          "Good baseline"
+        ],
+        "expected_weaknesses": [
+          "Assumes linear relationships"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Ridge Regression",
+        "category": "statistical/traditional",
+        "description": "Linear model with L2 regularization",
+        "implementation_code": "def predict_ridge_regression(train_df, test_df, target_col, **params):\n    from sklearn.linear_model import Ridge\n    import pandas as pd\n    model = Ridge(alpha=1.0)\n    model.fit(train_df.drop(columns=[target_col]), train_df[target_col])\n    return pd.DataFrame({\"predicted\": model.predict(test_df.drop(columns=[target_col]))}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.linear_model",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "alpha": 1.0
+        },
+        "expected_strengths": [
+          "Handles multicollinearity",
+          "Regularization prevents overfitting"
+        ],
+        "expected_weaknesses": [
+          "Still linear"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "XGBoost Regressor",
+        "category": "ml",
+        "description": "Advanced gradient boosting for non-linear patterns",
+        "implementation_code": "def predict_xgboost(train_df, test_df, target_col, **params):\n    from xgboost import XGBRegressor\n    import pandas as pd\n    model = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)\n    model.fit(train_df.drop(columns=[target_col]), train_df[target_col])\n    return pd.DataFrame({\"predicted\": model.predict(test_df.drop(columns=[target_col]))}, index=test_df.index)",
+        "required_libraries": [
+          "xgboost",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        },
+        "expected_strengths": [
+          "Captures complex interactions",
+          "High predictive power"
+        ],
+        "expected_weaknesses": [
+          "Requires tuning",
+          "More computationally intensive"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "random",
+      "date_column": null,
+      "target_column": "Yield-2023-24",
+      "train_period": "Random 80% sample",
+      "validation_period": "Hold-out 10%",
+      "test_period": "Hold-out 10%"
+    },
+    "evaluation_metrics": [
+      "r2",
+      "rmse",
+      "mae"
+    ],
+    "date_column": null,
+    "target_column": "Yield-2023-24"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T15:25:02.344285",
+    "checksum": "d02eef7390c646d7",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-001.parquet"
+    },
+    "metrics": {
+      "mae": 2.3284,
+      "rmse": 3.1025,
+      "mape": 9.8502,
+      "r2": 0.9997
+    },
+    "summary": "Generated predictions for 42 samples",
+    "data_shape": [
+      42,
+      11
+    ]
+  }
+}

@@ -191,13 +191,74 @@ def create_stage3_agent():
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=STAGE3_SYSTEM_PROMPT)] + list(messages)
 
-        if state.iteration >= STAGE_MAX_ROUNDS.get("stage3", 30):
+        max_rounds = STAGE_MAX_ROUNDS.get("stage3", 30)
+
+        # Log current iteration
+        logger.info(f"Stage3 agent iteration {state.iteration}/{max_rounds}")
+
+        # Log what the agent has done so far
+        if state.iteration > 0 and state.messages:
+            recent_tools = []
+            for msg in state.messages[-5:]:
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        recent_tools.append(tc.get('name', 'unknown'))
+            if recent_tools:
+                logger.debug(f"Recent tool calls: {recent_tools}")
+
+        # Early intervention at 30 iterations
+        if state.iteration == 30:
+            logger.warning(f"Iteration 30 - injecting strong guidance to save plan")
+            messages = list(messages) + [HumanMessage(content="""
+⚠️ You have used 30 iterations. You MUST create and save the plan within the next 10 iterations.
+
+IMMEDIATE ACTION REQUIRED:
+1. If you haven't already, call get_execution_plan_template()
+2. Create a complete plan JSON based on what you've learned
+3. Call save_stage3_plan() with your plan
+
+Do NOT spend more iterations inspecting or analyzing. CREATE THE PLAN NOW.
+""")]
+
+        # Critical intervention at 40 iterations
+        if state.iteration == 40:
+            logger.error(f"Iteration 40 - forcing immediate plan creation")
+            messages = list(messages) + [HumanMessage(content="""
+🚨 CRITICAL: Iteration 40/100 reached. You MUST save a plan in the NEXT iteration or face termination.
+
+STOP ALL ANALYSIS. Execute these steps NOW:
+1. Call get_execution_plan_template() if you need the structure
+2. Create a plan JSON with all required fields
+3. Call save_stage3_plan() immediately
+
+This is your FINAL chance before forced termination.
+""")]
+
+        # At 90% of max iterations, final warning
+        if state.iteration >= int(max_rounds * 0.9) and state.iteration < max_rounds:
+            logger.warning(f"Iteration {state.iteration}/{max_rounds} - FINAL WARNING")
+            messages = list(messages) + [HumanMessage(content=f"""
+⚠️ FINAL WARNING: You have used {state.iteration}/{max_rounds} iterations.
+
+CREATE AND SAVE THE PLAN IN THIS ITERATION OR YOU WILL FAIL.
+""")]
+
+        if state.iteration >= max_rounds:
+            logger.error(f"Maximum iterations ({max_rounds}) reached without saving plan")
             return {
-                "messages": [AIMessage(content="Maximum iterations reached. Saving current plan.")],
+                "messages": [AIMessage(content="Maximum iterations reached. Plan was not saved in time.")],
                 "complete": True
             }
 
         response = llm_with_tools.invoke(messages)
+
+        # Log what the agent is doing
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            tool_names = [tc.get('name', 'unknown') for tc in response.tool_calls]
+            logger.info(f"Agent calling tools: {tool_names}")
+        elif hasattr(response, 'content'):
+            content_preview = str(response.content)[:100] if response.content else "empty"
+            logger.debug(f"Agent response (no tools): {content_preview}")
 
         return {
             "messages": [response],
@@ -231,9 +292,21 @@ def create_stage3_agent():
                 if recent_tools.count('inspect_data_file_stage3') > 5:
                     logger.warning(f"Loop detected: inspecting data {recent_tools.count('inspect_data_file_stage3')} times in last 10 iterations")
                     # Force agent to create plan on next iteration
-                    if state.iteration > 15:
-                        logger.error("Agent stuck in analysis loop - forcing completion")
-                        return "end"
+                    if state.iteration > 20:
+                        logger.error("Agent stuck in analysis loop - forcing immediate plan creation")
+                        # Inject a forceful message instead of just ending
+                        state.messages.append(
+                            HumanMessage(content="""
+⚠️ CRITICAL: You are stuck in an analysis loop. You MUST create and save the execution plan NOW.
+
+Based on what you've already inspected:
+1. Use get_execution_plan_template() to get the structure
+2. Create a comprehensive plan with all fields filled in
+3. Call save_stage3_plan() with your plan JSON
+
+DO NOT inspect data again. CREATE THE PLAN NOW.""")
+                        )
+                        return "agent"
 
             # Check if last message is AI with tool calls
             if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
@@ -343,19 +416,15 @@ YOU MUST FIX THE ISSUES AND COMPLETE THE PLAN IN THIS ATTEMPT.
 Create an execution plan for task: {task_id}
 {error_context}
 
-Follow these steps:
+Follow these steps EFFICIENTLY:
 1. Load the task proposal for {task_id}
-2. List and inspect all required data files
-3. Validate column quality (≥65% non-null required)
-4. If joins needed, analyze feasibility
-5. Design feature engineering (especially for forecasting: lags, rolling means, etc.)
-6. Create comprehensive execution plan
-7. Save the plan using save_stage3_plan
+2. Inspect the required data file(s) - look at structure, columns, and row count
+3. Create a comprehensive execution plan based on the task
+4. Save the plan using save_stage3_plan
 
 The plan ID should be: PLAN-{task_id}
 
-Be thorough but EFFICIENT - downstream stages depend on this plan being complete and accurate.
-DO NOT get stuck in analysis loops - after inspecting data, CREATE and SAVE the plan.
+IMPORTANT: You have a limited number of iterations. After inspecting the data ONCE, immediately create and save the plan. Do NOT repeatedly inspect the same data.
 """)
 
     config = {"configurable": {"thread_id": f"stage3_{task_id}_attempt{attempt_num}"}}
@@ -371,7 +440,99 @@ DO NOT get stuck in analysis loops - after inspecting data, CREATE and SAVE the 
         return plan
     else:
         logger.error("Plan not saved to disk")
-        raise RuntimeError("Execution plan was not saved - agent may have hit iteration limit")
+
+        # If this is the final attempt, create a fallback plan
+        if attempt_num >= 3:
+            logger.warning("Creating fallback plan as last resort")
+            return _create_fallback_plan(task_id)
+        else:
+            raise RuntimeError("Execution plan was not saved - agent may have hit iteration limit")
+
+
+def _create_fallback_plan(task_id: str) -> Stage3Plan:
+    """
+    Create a basic fallback plan when the agent fails completely.
+    This ensures the pipeline can continue even if stage3 agent fails.
+    """
+    logger.warning(f"Creating fallback plan for {task_id}")
+
+    # Load the task proposal to get basic info
+    proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
+    data = DataPassingManager.load_artifact(proposals_path)
+    proposals = data.get('proposals', data) if isinstance(data, dict) else data
+
+    task_proposal = None
+    for proposal in proposals:
+        if proposal.get('id') == task_id:
+            task_proposal = proposal
+            break
+
+    if not task_proposal:
+        raise RuntimeError(f"Cannot create fallback plan - task {task_id} not found")
+
+    # Get dataset info
+    required_datasets = task_proposal.get('required_datasets', [])
+    if not required_datasets:
+        raise RuntimeError(f"Cannot create fallback plan - no datasets specified for {task_id}")
+
+    primary_dataset = required_datasets[0]
+
+    # Create basic file instructions
+    file_instructions = [{
+        "filename": primary_dataset,
+        "filepath": str(DATA_DIR / primary_dataset),
+        "columns_to_use": task_proposal.get('feature_columns', []) + [task_proposal.get('target_column')],
+        "filters": task_proposal.get('filters', []),
+        "parse_dates": [],
+    }]
+
+    # Basic plan structure
+    plan_data = {
+        "plan_id": f"PLAN-{task_id}",
+        "selected_task_id": task_id,
+        "goal": task_proposal.get('problem_statement', 'Fallback plan - execute task'),
+        "task_category": task_proposal.get('category', 'forecasting'),
+        "file_instructions": file_instructions,
+        "join_steps": [],
+        "feature_engineering": [
+            {
+                "name": "lag_1",
+                "description": "1-period lag of target for time series",
+                "source_columns": [task_proposal.get('target_column')],
+                "implementation_code": f"df['lag_1'] = df.groupby('Crop')['{task_proposal.get('target_column')}'].shift(1)",
+                "dtype": "float64"
+            }
+        ],
+        "target_column": task_proposal.get('target_column'),
+        "date_column": None,
+        "validation_strategy": "temporal",
+        "expected_model_types": ["random_forest", "linear_regression"],
+        "evaluation_metrics": task_proposal.get('evaluation_metrics', ['mae', 'rmse', 'r2']),
+        "output_columns": ["actual", "predicted"],
+        "artifacts_to_save": ["model", "predictions"]
+    }
+
+    # Add forecast-specific fields if applicable
+    if task_proposal.get('task_category') == 'forecasting' or task_proposal.get('category') == 'forecasting':
+        plan_data.update({
+            "forecast_horizon": task_proposal.get('forecast_horizon', 1),
+            "forecast_granularity": task_proposal.get('forecast_granularity', 'year'),
+            "forecast_type": task_proposal.get('forecast_type', 'single_step'),
+        })
+
+    # Save the fallback plan
+    plan_path = DataPassingManager.save_artifact(
+        data=plan_data,
+        output_dir=STAGE3_OUT_DIR,
+        filename=f"PLAN-{task_id}.json",
+        metadata={"stage": "stage3", "type": "execution_plan", "fallback": True}
+    )
+
+    logger.info(f"Fallback plan saved to {plan_path}")
+
+    # Load and return as Stage3Plan
+    plan = Stage3Plan(**plan_data)
+    return plan
 
 
 # ============================================================================

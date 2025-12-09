@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T15:53:10.801127",
+    "checksum": "0b3bd3b1f58c45f8",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "avg_mae": 57.60573121441075,
+        "avg_rmse": 89.25268076044264,
+        "avg_r2": 0.6883591105914789,
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "avg_mae": 66.33588672783031,
+        "avg_rmse": 91.2526067117282,
+        "avg_r2": 0.6831897371850739,
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "error": "No module named 'xgboost'",
+        "valid": false
+      }
+    ],
+    "selected_method_id": "M1",
+    "selected_method_name": "Linear Regression",
+    "selection_rationale": "Lowest average MAE (57.61) with valid consistency (CV=0.18) compared to M2 (66.34 MAE) and failed M3",
+    "winning_method_code": "def predict_linear_regression(train_df, test_df, target_col, **params):\n    from sklearn.linear_model import LinearRegression\n    import pandas as pd\n    model = LinearRegression()\n    model.fit(train_df.drop(columns=[target_col]), train_df[target_col])\n    return pd.DataFrame({\"predicted\": model.predict(test_df.drop(columns=[target_col]))}, index=test_df.index)",
+    "winning_method_hyperparameters": {},
+    "winning_method_libraries": [
+      "sklearn.linear_model",
+      "pandas"
+    ],
+    "data_split_strategy": {
+      "strategy_type": "random",
+      "date_column": null,
+      "target_column": "Yield-2023-24",
+      "train_period": "Random 80% sample",
+      "validation_period": "Hold-out 10%",
+      "test_period": "Hold-out 10%"
+    },
+    "target_column": "Yield-2023-24",
+    "date_column": null,
+    "feature_columns": [],
+    "benchmark_metrics": {
+      "mae": 57.60573121441075,
+      "rmse": 89.25268076044264,
+      "mape": null
+    }
+  }
+}

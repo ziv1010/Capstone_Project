@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T15:41:15.148545",
+    "checksum": "fc67a8663fe0d858",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-002",
+    "selected_task_id": "TSK-002",
+    "goal": "Predict crop yield outcomes using historical land-use metrics, seasonal patterns, and soil parameters",
+    "task_category": "regression",
+    "file_instructions": [
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Yield-2023-24"
+        ],
+        "filters": [
+          "Season != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      },
+      {
+        "filename": "soil_data_final.xlsx - soil_data_final.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "pH - Acidic",
+          "pH - Neutral",
+          "pH - Alkaline",
+          "Nitrogen - High",
+          "Nitrogen - Medium",
+          "Nitrogen - Low",
+          "Phosphorous - High",
+          "Phosphorous - Medium",
+          "Phosphorous - Low",
+          "Potassium - High",
+          "Potassium - Medium",
+          "Potassium - Low"
+        ],
+        "filters": [],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [
+      {
+        "left_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "right_dataset": "soil_data_final.xlsx - soil_data_final.csv",
+        "left_on": "Crop",
+        "right_on": "State",
+        "how": "inner",
+        "validation_rule": null
+      }
+    ],
+    "feature_engineering": [
+      {
+        "name": "melt_area_columns",
+        "description": "Convert wide-format area columns to long format for temporal features",
+        "source_columns": [
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24"
+        ],
+        "implementation_code": "df_area = df.melt(id_vars=['Crop', 'Season'], value_vars=['Area-2020-21', 'Area-2021-22', 'Area-2022-23', 'Area-2023-24'], var_name='Year', value_name='Area')",
+        "dtype": null
+      },
+      {
+        "name": "one_hot_encode",
+        "description": "Encode categorical features for model compatibility",
+        "source_columns": [
+          "Crop",
+          "Season"
+        ],
+        "implementation_code": "df = pd.get_dummies(df, columns=['Crop', 'Season'])",
+        "dtype": null
+      }
+    ],
+    "target_column": "Yield-2023-24",
+    "date_column": null,
+    "validation_strategy": "random",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 1,
+    "forecast_granularity": null,
+    "forecast_type": "single_step",
+    "expected_model_types": [
+      "RandomForestRegressor",
+      "XGBoostRegressor"
+    ],
+    "evaluation_metrics": [
+      "r2",
+      "rmse",
+      "mae"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-09T15:41:15.148353"
+  }
+}

@@ -65,7 +65,7 @@ SECONDARY_LLM_CONFIG = {
     "base_url": LLM_BASE_URL,
     "api_key": LLM_API_KEY,
     "model": "Qwen/Qwen3-32B",
-    "temperature": 0.0,
+    "temperature": 0.3,  # Lower temperature for better instruction following
     "max_tokens": 4096,  # Default for most stages
 }
 
@@ -95,7 +95,7 @@ CONVERSATION_LLM_CONFIG = {
 STAGE_MAX_ROUNDS = {
     "stage1": 1,      # Direct execution
     "stage2": 15,     # Exploration steps
-    "stage3": 50,     # Planning rounds (increased from 30 to handle complex scenarios)
+    "stage3": 100,    # Planning rounds (increased to handle complex wide-format data)
     "stage3b": 100,   # Data preparation
     "stage3_5a": 35,  # Method proposal
     "stage3_5b": 120, # Benchmarking (3 methods x 3 iterations each)

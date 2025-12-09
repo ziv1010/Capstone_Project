@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-08T17:24:43.611134",
-    "checksum": "b33e458c88f015e9",
+    "timestamp": "2025-12-09T14:25:04.772689",
+    "checksum": "5e50b18388018ae8",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary"
@@ -465,7 +465,7 @@
     ],
     "candidate_keys": [],
     "file_size_mb": 0.008678436279296875,
-    "created_at": "2025-12-08 17:24:43.611004",
+    "created_at": "2025-12-09 14:25:04.772556",
     "has_datetime_column": false,
     "has_target_candidates": [
       "Area-2020-21",

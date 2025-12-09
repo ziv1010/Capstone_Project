@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T16:24:15.911172",
+    "checksum": "4f9a405dd6f1199c",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-003",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Majority Class Classifier",
+        "category": "baseline",
+        "description": "Predicts the most frequent season class from training data",
+        "implementation_code": "def predict_majority_class(train_df, test_df, target_col, date_col, **params):\\n    from sklearn.dummy import DummyClassifier\\n    import pandas as pd\\n    \\\\n    # Train on majority class\\n    dummy = DummyClassifier(strategy='most_frequent')\\n    dummy.fit(train_df[[c for c in train_df.columns if c != target_col]], train_df[target_col])\\n    \\\\n    # Predict\\n    predictions = dummy.predict(test_df[[c for c in test_df.columns if c != target_col]])\\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn",
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple baseline",
+          "Fast computation"
+        ],
+        "expected_weaknesses": [
+          "Ignores all features",
+          "Poor performance on imbalanced data"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Logistic Regression",
+        "category": "statistical/traditional",
+        "description": "Multinomial logistic regression with L2 regularization",
+        "implementation_code": "def predict_logistic_regression(train_df, test_df, target_col, date_col, **params):\\n    from sklearn.linear_model import LogisticRegression\\n    from sklearn.preprocessing import OneHotEncoder\\n    from sklearn.compose import ColumnTransformer\\n    import pandas as pd\\n    \\\\n    # Identify categorical features\\n    cat_features = [col for col in train_df.columns if col not in [target_col, date_col, 'Value']]\\n    \\\\n    # Create preprocessing\\n    preprocessor = ColumnTransformer(\\n        transformers=[\\n            ('cat', OneHotEncoder(handle_unknown='ignore'), cat_features)\\n        ])\\n    \\\\n    # Train model\\n    model = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500)\\n    model.fit(preprocessor.fit_transform(train_df), train_df[target_col])\\n    \\\\n    # Predict\\n    predictions = model.predict(preprocessor.transform(test_df))\\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "C": 1.0,
+          "penalty": "l2"
+        },
+        "expected_strengths": [
+          "Interpretable coefficients",
+          "Handles linear relationships"
+        ],
+        "expected_weaknesses": [
+          "Assumes linearity",
+          "May underfit complex patterns"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest Classifier",
+        "category": "ml",
+        "description": "Ensemble of decision trees with feature importance",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, date_col, **params):\\n    from sklearn.ensemble import RandomForestClassifier\\n    from sklearn.preprocessing import OneHotEncoder\\n    from sklearn.compose import ColumnTransformer\\n    import pandas as pd\\n    \\\\n    # Identify categorical features\\n    cat_features = [col for col in train_df.columns if col not in [target_col, date_col, 'Value']]\\n    \\\\n    # Create preprocessing\\n    preprocessor = ColumnTransformer(\\n        transformers=[\\n            ('cat', OneHotEncoder(handle_unknown='ignore'), cat_features)\\n        ])\\n    \\\\n    # Train model\\n    model = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)\\n    model.fit(preprocessor.fit_transform(train_df), train_df[target_col])\\n    \\\\n    # Predict\\n    predictions = model.predict(preprocessor.transform(test_df))\\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "n_estimators": 200,
+          "max_depth": null
+        },
+        "expected_strengths": [
+          "Handles non-linear patterns",
+          "Robust to overfitting"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Higher computational cost"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_row",
+      "date_column": "Year",
+      "target_column": "Season",
+      "train_period": "Years 2020-2024",
+      "validation_period": "Year 2024",
+      "test_period": "Year 2025"
+    },
+    "evaluation_metrics": [
+      "Accuracy",
+      "F1-Score",
+      "Precision",
+      "Recall"
+    ],
+    "date_column": "Year",
+    "target_column": "Season"
+  }
+}

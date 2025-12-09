@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from code.config import (
     SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
-    STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR,
+    STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR, STAGE6_OUT_DIR,
     StageTransition, DataPassingManager, logger
 )
 from code.models import PipelineState, StageStatus
@@ -33,6 +33,7 @@ from code.stage3_5a_agent import stage3_5a_node, run_stage3_5a
 from code.stage3_5b_agent import stage3_5b_node, run_stage3_5b
 from code.stage4_agent import stage4_node, run_stage4
 from code.stage5_agent import stage5_node, run_stage5
+from code.stage6_agent import stage6_node, run_stage6
 from code.conversation_agent import ConversationHandler, get_quick_summary
 
 
@@ -48,7 +49,8 @@ STAGE_ORDER = [
     "stage3_5a",
     "stage3_5b",
     "stage4",
-    "stage5"
+    "stage5",
+    "stage6"
 ]
 
 STAGE_NODES = {
@@ -60,6 +62,7 @@ STAGE_NODES = {
     "stage3_5b": stage3_5b_node,
     "stage4": stage4_node,
     "stage5": stage5_node,
+    "stage6": stage6_node,
 }
 
 
@@ -69,7 +72,7 @@ STAGE_NODES = {
 
 def build_pipeline_graph(
     start_stage: str = "stage1",
-    end_stage: str = "stage5"
+    end_stage: str = "stage6"
 ) -> StateGraph:
     """
     Build a pipeline graph from start_stage to end_stage.
@@ -112,9 +115,9 @@ def build_pipeline_graph(
 
 def build_forecasting_pipeline() -> StateGraph:
     """
-    Build the standard forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5
+    Build the standard forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5 → 6
     """
-    return build_pipeline_graph("stage3", "stage5")
+    return build_pipeline_graph("stage3", "stage6")
 
 
 # ============================================================================
@@ -184,6 +187,13 @@ def load_cached_state(task_id: str = None) -> Tuple[PipelineState, str]:
         viz_path = STAGE5_OUT_DIR / f"visualization_report_{plan_id}.json"
         if viz_path.exists():
             state.mark_stage_completed("stage5", {"path": str(viz_path)})
+            start_stage = "stage6"
+
+        # Check Stage 6
+        task_id_clean = task_id.replace("TSK-", "") if "TSK-" in task_id else task_id
+        report_path = STAGE6_OUT_DIR / f"{task_id}_final_report.json"
+        if report_path.exists():
+            state.mark_stage_completed("stage6", {"path": str(report_path)})
             start_stage = "complete"
 
     return state, start_stage

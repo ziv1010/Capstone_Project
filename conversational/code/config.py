@@ -34,6 +34,7 @@ STAGE4_OUT_DIR = OUTPUT_ROOT / "stage4_out"
 STAGE4_WORKSPACE = OUTPUT_ROOT / "stage4_workspace"
 STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
 STAGE5_WORKSPACE = OUTPUT_ROOT / "stage5_workspace"
+STAGE6_OUT_DIR = OUTPUT_ROOT / "stage6_out"
 
 # Conversation state directory
 CONVERSATION_STATE_DIR = OUTPUT_ROOT / "conversation_state"
@@ -41,7 +42,7 @@ CONVERSATION_STATE_DIR = OUTPUT_ROOT / "conversation_state"
 # Create all directories
 for d in [SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
           STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE,
-          STAGE5_OUT_DIR, STAGE5_WORKSPACE, CONVERSATION_STATE_DIR]:
+          STAGE5_OUT_DIR, STAGE5_WORKSPACE, STAGE6_OUT_DIR, CONVERSATION_STATE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
@@ -82,6 +83,7 @@ STAGE_MAX_TOKENS = {
     "stage3_5b": 3072,    # Benchmarking - less verbose
     "stage4": 6144,       # Execution + forecasting - needs more tokens
     "stage5": 4096,       # Visualization - standard
+    "stage6": 4096,       # Report generation - standard
 }
 
 # Conversation LLM config (for user interaction)
@@ -116,6 +118,7 @@ STAGE_MAX_ROUNDS = {
     "stage3_5b": 120, # Benchmarking (3 methods x 3 iterations each)
     "stage4": 100,    # Execution
     "stage5": 60,     # Visualization
+    "stage6": 30,     # Report generation
 }
 
 # Stage 1 sampling

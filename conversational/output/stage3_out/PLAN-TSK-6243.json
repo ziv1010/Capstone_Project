@@ -1,0 +1,117 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T03:18:11.365611",
+    "checksum": "e8116fd148347de7",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-6243",
+    "selected_task_id": "TSK-6243",
+    "goal": "Forecast Basmati rice export quantity for 2025-2027",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "HS Code",
+          "Description",
+          "2018 - 19-Quantity",
+          "2018 - 19-Value (INR)",
+          "2018 - 19-Value (USD)",
+          "2019 - 20-Quantity",
+          "2019 - 20-Value (INR)",
+          "2019 - 20-Value (USD)",
+          "2020 - 21-Quantity",
+          "2020 - 21-Value (INR)",
+          "2020 - 21-Value (USD)",
+          "2021 - 22-Quantity",
+          "2021 - 22-Value (INR)",
+          "2021 - 22-Value (USD)",
+          "2022 - 23-Quantity",
+          "2022 - 23-Value (INR)",
+          "2022 - 23-Value (USD)",
+          "2023 - 24-Quantity",
+          "2023 - 24-Value (INR)",
+          "2023 - 24-Value (USD)",
+          "2024 - 25-Quantity",
+          "2024 - 25-Value (INR)",
+          "2024 - 25-Value (USD)"
+        ],
+        "filters": [
+          "Description == 'BASMATI RICE'",
+          "HS Code == '10063020'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [
+      {
+        "name": "reshape_to_long",
+        "description": "Convert wide-format temporal data to long format for time series modeling",
+        "source_columns": [
+          "HS Code",
+          "Description",
+          "2018 - 19-Quantity",
+          "2018 - 19-Value (INR)",
+          "2018 - 19-Value (USD)",
+          "2019 - 20-Quantity",
+          "2019 - 20-Value (INR)",
+          "2019 - 20-Value (USD)",
+          "2020 - 21-Quantity",
+          "2020 - 21-Value (INR)",
+          "2020 - 21-Value (USD)",
+          "2021 - 22-Quantity",
+          "2021 - 22-Value (INR)",
+          "2021 - 22-Value (USD)",
+          "2022 - 23-Quantity",
+          "2022 - 23-Value (INR)",
+          "2022 - 23-Value (USD)",
+          "2023 - 24-Quantity",
+          "2023 - 24-Value (INR)",
+          "2023 - 24-Value (USD)",
+          "2024 - 25-Quantity",
+          "2024 - 25-Value (INR)",
+          "2024 - 25-Value (USD)"
+        ],
+        "implementation_code": "df_long = df.melt(id_vars=['HS Code', 'Description'], var_name='period', value_name='value')",
+        "dtype": null
+      },
+      {
+        "name": "impute_missing",
+        "description": "Impute missing values in 2023-24 and 2024-25 columns using forward fill",
+        "source_columns": [
+          "value"
+        ],
+        "implementation_code": "df_long['value'] = df_long.groupby('HS Code')['value'].ffill()",
+        "dtype": null
+      }
+    ],
+    "target_column": "2024 - 25-Quantity",
+    "date_column": "period",
+    "validation_strategy": "temporal",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 3,
+    "forecast_granularity": "year",
+    "forecast_type": "multi_step",
+    "expected_model_types": [
+      "ARIMA",
+      "XGBoost",
+      "Prophet"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-10T03:18:11.365380"
+  }
+}

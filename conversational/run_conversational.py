@@ -25,11 +25,11 @@ Usage:
     # Run a specific task
     python run_conversational.py --mode run --task TSK-001
 
-    # Run full pipeline
+    # Run full pipeline (includes all stages 1-6)
     python run_conversational.py --mode full --task TSK-001
 
     # Run specific stages
-    python run_conversational.py --mode run --task TSK-001 --stages "stage3,stage3b,stage4"
+    python run_conversational.py --mode run --task TSK-001 --stages "stage3,stage3b,stage4,stage5,stage6"
 
     # Show pipeline status
     python run_conversational.py --status
@@ -275,7 +275,7 @@ def run_execute_mode(task_id: str, stages: str = None):
 
         state = run_pipeline_stages(stage_list, task_id)
     else:
-        print("Running forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5\n")
+        print("Running forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5 → 6\n")
         state = quick_run_task(task_id)
 
     print("\n=== Execution Summary ===\n")
@@ -330,6 +330,16 @@ def run_full_mode(task_id: str):
         print(f"\nVisualizations: {len(state.stage5_output.visualizations)} plots created")
         if state.stage5_output.insights:
             print(f"Insights: {len(state.stage5_output.insights)} insights generated")
+
+    # Show stage6 output (final report)
+    stage6_status = state.stages.get("stage6")
+    if stage6_status and stage6_status.status == StageStatus.COMPLETED:
+        from code.models import StageStatus
+        stage6_data = stage6_status.output
+        if stage6_data and isinstance(stage6_data, dict):
+            report_path = stage6_data.get('report_path')
+            if report_path:
+                print(f"\nFinal Report: {report_path}")
 
 
 def main():

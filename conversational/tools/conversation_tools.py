@@ -378,100 +378,134 @@ def create_custom_task_from_query(
             words = re.findall(r'\b\w+\b', query_lower)
             keywords = [w for w in words if w not in stopwords and len(w) > 2]
 
-            result_messages.append(f"  Extracted keywords: {keywords}")
+            # Use LLM to intelligently select best dataset
+            from langchain_openai import ChatOpenAI
+            from code.config import SECONDARY_LLM_CONFIG
 
-            # Scan all datasets
+            llm = ChatOpenAI(**SECONDARY_LLM_CONFIG)
+
+            # Build dataset info for LLM
             summary_files = list_summary_files(SUMMARIES_DIR)
             if not summary_files:
                 return "❌ No dataset summaries found. Run Stage 1 first."
 
-            dataset_scores = []
-
+            dataset_info = []
             for sf in summary_files:
                 try:
                     summary = DataPassingManager.load_artifact(SUMMARIES_DIR / sf)
                     data = summary.get('data', summary)
-
                     dataset_name = data.get('filename', '')
-                    columns = data.get('columns', [])
-
-                    # Score this dataset
-                    score = 0
-                    matched_keywords = []
-                    matched_columns = []
-
-                    # Check dataset name
-                    dataset_name_lower = dataset_name.lower()
-                    for kw in keywords:
-                        if kw in dataset_name_lower:
-                            score += 3
-                            matched_keywords.append(kw)
-
-                    # Check column names
-                    for col in columns:
-                        col_name = col.get('name', '').lower()
-                        for kw in keywords:
-                            if kw in col_name:
-                                score += 2
-                                matched_keywords.append(kw)
-                                matched_columns.append(col.get('name'))
-                                break
-
-                    # Bonus for datetime columns
-                    has_datetime = data.get('has_datetime_column', False)
-                    if has_datetime:
-                        score += 1
-
-                    # Bonus for data quality
-                    quality = data.get('data_quality_score', 0.5)
-                    score += quality
-
-                    if score > 0:
-                        dataset_scores.append({
-                            'dataset': dataset_name,
-                            'score': score,
-                            'matched_keywords': list(set(matched_keywords)),
-                            'matched_columns': list(set(matched_columns)),
-                            'has_datetime': has_datetime,
-                            'columns': columns
-                        })
-
-                except Exception as e:
-                    logger.warning(f"Error analyzing {sf}: {e}")
+                    columns = [c.get('name') for c in data.get('columns', [])]
+                    dataset_info.append({
+                        'filename': dataset_name,
+                        'columns': columns[:10]  # First 10 columns
+                    })
+                except:
                     continue
 
-            # Sort by score
-            dataset_scores.sort(key=lambda x: x['score'], reverse=True)
+            datasets_list = '\n'.join([f"{i+1}. {d['filename']}\n   Columns: {', '.join(d['columns'])}" for i, d in enumerate(dataset_info)])
 
-            if not dataset_scores:
-                return "❌ No datasets matched your query. Try being more specific."
+            selection_prompt = f"""Think step-by-step to select the best dataset for this query.
 
-            # Select best dataset
-            best = dataset_scores[0]
-            dataset = best['dataset']
+User query: "{query}"
 
-            result_messages.append(f"  ✅ Selected dataset: {dataset} (score: {best['score']:.1f})")
-            result_messages.append(f"     Matched keywords: {best['matched_keywords']}")
+Available datasets:
+{datasets_list}
+
+Chain of thought:
+1. What metric does the user want to predict? (e.g., quantity, price, revenue, etc.)
+2. Look at each dataset NAME - does it suggest it contains that metric?
+3. Look at the COLUMNS - do they measure what the user wants?
+4. Pick the dataset where BOTH the name and columns match the user's intent
+
+Output format:
+REASONING: [your step-by-step thinking]
+SELECTED: [exact filename]"""
+
+            response = llm.invoke(selection_prompt)
+            response_text = response.content.strip()
+
+            # Extract selected dataset from response
+            selected_dataset = None
+            if "SELECTED:" in response_text:
+                selected_dataset = response_text.split("SELECTED:")[-1].strip()
+            else:
+                # Fallback: extract from last line
+                selected_dataset = response_text.split('\n')[-1].strip()
+
+            # Validate and find exact match
+            valid_datasets = [d['filename'] for d in dataset_info]
+            if selected_dataset not in valid_datasets:
+                for vd in valid_datasets:
+                    if selected_dataset in vd or vd in selected_dataset:
+                        selected_dataset = vd
+                        break
+
+            if selected_dataset not in valid_datasets:
+                return f"❌ LLM selection failed. Response: {response_text}"
+
+            dataset = selected_dataset
+            result_messages.append(f"  ✅ LLM selected: {dataset}")
+
+            # Get full summary for target selection
+            best_summary = None
+            for sf in summary_files:
+                summary = DataPassingManager.load_artifact(SUMMARIES_DIR / sf)
+                data = summary.get('data', summary)
+                if data.get('filename') == dataset:
+                    best_summary = data
+                    break
+
+            if not best_summary:
+                return f"❌ Selected dataset {dataset} not found"
+
+            best = {
+                'dataset': dataset,
+                'columns': best_summary.get('columns', []),
+                'matched_columns': [],
+                'has_datetime': best_summary.get('has_datetime_column', False)
+            }
 
             # === STEP 2: SMART TARGET COLUMN SELECTION ===
             if not target_column:
-                # Find best target column from matched columns
-                if best['matched_columns']:
-                    # Prefer numeric columns
-                    numeric_matches = []
-                    for col_name in best['matched_columns']:
-                        col_info = next((c for c in best['columns'] if c.get('name') == col_name), None)
-                        if col_info and col_info.get('logical_type') in ['integer', 'real', 'categorical_numeric']:
-                            numeric_matches.append(col_name)
+                # Use LLM to select target column
+                column_names = [c.get('name') for c in best['columns']]
+                column_selection_prompt = f"""Select the best target column for this query.
 
-                    if numeric_matches:
-                        target_column = numeric_matches[0]
-                    else:
-                        target_column = best['matched_columns'][0]
+User query: "{query}"
+Selected dataset: {dataset}
 
-                    result_messages.append(f"  ✅ Selected target column: {target_column}")
+Available columns: {', '.join(column_names)}
+
+Think step-by-step:
+1. What does the user want to predict?
+2. Which column name best matches that?
+3. Pick the column that measures what the user asked for
+
+Output format:
+REASONING: [your thinking]
+SELECTED: [exact column name]"""
+
+                col_response = llm.invoke(column_selection_prompt)
+                col_text = col_response.content.strip()
+
+                if "SELECTED:" in col_text:
+                    target_column = col_text.split("SELECTED:")[-1].strip()
                 else:
-                    return f"❌ Could not identify target column in {dataset}. Please specify manually."
+                    target_column = col_text.split('\n')[-1].strip()
+
+                # Validate column exists
+                if target_column not in column_names:
+                    # Try partial match
+                    for cn in column_names:
+                        if target_column in cn or cn in target_column:
+                            target_column = cn
+                            break
+
+                if target_column not in column_names:
+                    return f"❌ LLM selected invalid column: {target_column}"
+
+                result_messages.append(f"  ✅ LLM selected target: {target_column}")
 
             # === STEP 3: AUTO-DETECT DATE COLUMN ===
             if not date_column and best['has_datetime']:
@@ -522,10 +556,15 @@ def create_custom_task_from_query(
 
         # Save to proposals
         proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
-        if proposals_path.exists():
-            existing = DataPassingManager.load_artifact(proposals_path)
-            proposals = existing.get('proposals', [])
-        else:
+        try:
+            if proposals_path.exists():
+                existing = DataPassingManager.load_artifact(proposals_path)
+                proposals = existing.get('proposals', [])
+            else:
+                proposals = []
+        except Exception as load_error:
+            # If loading fails (e.g., checksum error), start fresh
+            logger.warning(f"Could not load existing proposals ({load_error}), starting fresh")
             proposals = []
 
         proposals.append(proposal)

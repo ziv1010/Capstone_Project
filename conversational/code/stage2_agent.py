@@ -144,6 +144,16 @@ STAGE2_SYSTEM_PROMPT = """You are a Task Proposal Agent. Analyze datasets and pr
 4. READ dataset summaries carefully - pay attention to column semantics
 5. **AT LEAST 2 proposals MUST use MULTIPLE DATASETS (cross-dataset analysis)**
 
+## 🎯 MATCH USER QUERY TO DATASETS
+
+Simple matching:
+1. Read what user wants to predict from their query
+2. Look at dataset NAMES - pick ones that relate to the query
+3. Read those dataset summaries - find columns that match what user wants
+4. Propose task using the best-matching dataset + column
+
+If no good match: set feasibility_score < 0.3
+
 ## ⚠️ MAXIMIZE DATA USAGE (CRITICAL)
 Poor model performance often comes from using too little data. Follow these rules:
 
@@ -384,9 +394,9 @@ Please analyze the available dataset summaries and propose analytical tasks:
 - Valid categories are: forecasting, regression, classification, clustering, descriptive (NOT "factor-based")
 
 When reading summaries:
-- Look at value_interpretation to understand what each column means
-- For categorical columns, understand which values are individual items vs aggregates
-- Identify common columns across datasets that could be used for joining
+- Check column names and types
+- Find common columns for joining datasets
+- Use value_interpretation to understand data
 
 When complete, YOU MUST call save_task_proposals with your proposals JSON and summarize what you proposed.
 """)
@@ -496,15 +506,12 @@ A user has a specific analytical goal:
 
 "{user_query}"
 
-Please:
-1. List and read available dataset summaries
-2. **Call explore_data_relationships() with NO ARGUMENTS** - it auto-uses all datasets
-3. Evaluate if this specific goal is achievable with the data
-4. If feasible, create a task proposal for this goal
-5. Also propose 2-3 alternative tasks in case the primary goal isn't possible
-6. PRIORITIZE FORECASTING tasks when datetime columns exist
-7. **Include at least 1 multi-dataset task** that combines data through joins
-8. YOU MUST call save_task_proposals with your proposals JSON
+Steps:
+1. List dataset summaries - look at filenames
+2. Pick datasets with names related to the user's query
+3. Read those dataset summaries to find matching columns
+4. Create 1 task proposal for user's goal + 2 alternatives
+5. Call save_task_proposals with JSON
 
 Valid categories are: forecasting, regression, classification, clustering, descriptive (NOT "factor-based")
 For join_plan, use format: {{"datasets": [...], "join_keys": {{"ds1": "col", "ds2": "col"}}, "join_type": "inner"}}

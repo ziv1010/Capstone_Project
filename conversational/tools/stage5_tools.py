@@ -492,8 +492,18 @@ def create_plot(
         finally:
             sys.stdout = old_stdout
 
+        # Extract task ID from plan_id (e.g., PLAN-TSK-001 -> TSK-001)
+        task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
+
+        # Append task ID to filename if not already present
+        file_path = Path(filename)
+        if task_id not in file_path.stem:
+            new_filename = f"{task_id}_{file_path.name}"
+        else:
+            new_filename = filename
+
         # Save figure
-        output_path = STAGE5_OUT_DIR / filename
+        output_path = STAGE5_OUT_DIR / new_filename
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         plt.close()
 
@@ -576,9 +586,15 @@ def create_standard_plots(plan_id: str) -> str:
             ax.grid(True, alpha=0.3)
             plt.xticks(rotation=45)
             plt.tight_layout()
-            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_forecast_trend.png', dpi=150)
+
+            # Extract task ID from plan_id
+            task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
+            plt.savefig(STAGE5_OUT_DIR / f'{task_id}_forecast_trend.png', dpi=150)
             plt.close()
-            created_plots.append('forecast_trend.png')
+            created_plots.append(f'{task_id}_forecast_trend.png')
+
+        # Extract task ID from plan_id for all plots
+        task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
 
         # 1. Actual vs Predicted scatter (test set only for forecasting tasks)
         if pred_cols and actual_cols:
@@ -603,9 +619,9 @@ def create_standard_plots(plan_id: str) -> str:
                 ax.legend()
                 ax.grid(True, alpha=0.3)
                 plt.tight_layout()
-                plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_actual_vs_predicted.png', dpi=150)
+                plt.savefig(STAGE5_OUT_DIR / f'{task_id}_actual_vs_predicted.png', dpi=150)
                 plt.close()
-                created_plots.append('actual_vs_predicted.png')
+                created_plots.append(f'{task_id}_actual_vs_predicted.png')
 
             # 2. Residuals histogram (test set only for forecasting tasks)
             residuals_df = df[df['prediction_type'] == 'test'].copy() if is_forecasting else df.copy()
@@ -619,9 +635,9 @@ def create_standard_plots(plan_id: str) -> str:
             ax.set_ylabel('Frequency')
             ax.set_title('Residual Distribution')
             plt.tight_layout()
-            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_residuals_histogram.png', dpi=150)
+            plt.savefig(STAGE5_OUT_DIR / f'{task_id}_residuals_histogram.png', dpi=150)
             plt.close()
-            created_plots.append('residuals_histogram.png')
+            created_plots.append(f'{task_id}_residuals_histogram.png')
 
         # 3. Time series plot
         if date_cols and (pred_cols or actual_cols):
@@ -641,9 +657,9 @@ def create_standard_plots(plan_id: str) -> str:
             ax.legend()
             plt.xticks(rotation=45)
             plt.tight_layout()
-            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_time_series.png', dpi=150)
+            plt.savefig(STAGE5_OUT_DIR / f'{task_id}_time_series.png', dpi=150)
             plt.close()
-            created_plots.append('time_series.png')
+            created_plots.append(f'{task_id}_time_series.png')
 
         # 4. Error distribution by time
         if date_cols and pred_cols and actual_cols:
@@ -659,9 +675,9 @@ def create_standard_plots(plan_id: str) -> str:
             ax.set_title('Residuals Over Time')
             plt.xticks(rotation=45)
             plt.tight_layout()
-            plt.savefig(STAGE5_OUT_DIR / f'{plan_id}_residuals_time.png', dpi=150)
+            plt.savefig(STAGE5_OUT_DIR / f'{task_id}_residuals_time.png', dpi=150)
             plt.close()
-            created_plots.append('residuals_time.png')
+            created_plots.append(f'{task_id}_residuals_time.png')
 
         result = [
             f"=== Standard Plots Created: {plan_id} ===",

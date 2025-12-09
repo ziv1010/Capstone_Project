@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T02:41:46.687112",
+    "checksum": "7a471c9e6b4e9b62",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251210_024131",
+    "messages": [
+      {
+        "role": "user",
+        "content": "can you make forecasts on rice export quantity for the next 3 years from 2025-2027",
+        "timestamp": "2025-12-10 02:41:35.416503",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-10 02:41:31.655902",
+    "last_updated": "2025-12-10 02:41:35.416534"
+  }
+}

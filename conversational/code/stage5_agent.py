@@ -362,6 +362,9 @@ def _create_fallback_visualizations(plan_id: str) -> VisualizationReport:
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
 
+        # Extract task ID from plan_id
+        task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
+
         if pred_cols and actual_cols:
             pred_col, actual_col = pred_cols[0], actual_cols[0]
 
@@ -375,11 +378,11 @@ def _create_fallback_visualizations(plan_id: str) -> VisualizationReport:
             ax.set_title('Actual vs Predicted')
             ax.legend()
             plt.tight_layout()
-            plot_path = STAGE5_OUT_DIR / f'{plan_id}_actual_vs_predicted.png'
+            plot_path = STAGE5_OUT_DIR / f'{task_id}_actual_vs_predicted.png'
             plt.savefig(plot_path, dpi=150)
             plt.close()
             visualizations.append({
-                "filename": f"{plan_id}_actual_vs_predicted.png",
+                "filename": f"{task_id}_actual_vs_predicted.png",
                 "filepath": str(plot_path),
                 "plot_type": "scatter",
                 "title": "Actual vs Predicted",
@@ -396,11 +399,11 @@ def _create_fallback_visualizations(plan_id: str) -> VisualizationReport:
             ax.set_ylabel('Frequency')
             ax.set_title('Residual Distribution')
             plt.tight_layout()
-            plot_path = STAGE5_OUT_DIR / f'{plan_id}_residuals_histogram.png'
+            plot_path = STAGE5_OUT_DIR / f'{task_id}_residuals_histogram.png'
             plt.savefig(plot_path, dpi=150)
             plt.close()
             visualizations.append({
-                "filename": f"{plan_id}_residuals_histogram.png",
+                "filename": f"{task_id}_residuals_histogram.png",
                 "filepath": str(plot_path),
                 "plot_type": "histogram",
                 "title": "Residual Distribution",

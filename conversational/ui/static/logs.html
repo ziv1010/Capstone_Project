@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pipeline - Debug Logs</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .log-container {
+            height: calc(100vh - 300px);
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-left: 3px solid transparent;
+            margin-bottom: 0.25rem;
+            transition: background var(--transition-fast);
+        }
+
+        .log-entry:hover {
+            background: var(--glass-bg);
+        }
+
+        .log-entry.DEBUG {
+            border-left-color: var(--text-tertiary);
+        }
+
+        .log-entry.INFO {
+            border-left-color: var(--info);
+        }
+
+        .log-entry.WARNING {
+            border-left-color: var(--warning);
+        }
+
+        .log-entry.ERROR {
+            border-left-color: var(--error);
+        }
+
+        .log-timestamp {
+            color: var(--text-tertiary);
+            margin-right: 1rem;
+        }
+
+        .log-level {
+            font-weight: 600;
+            margin-right: 1rem;
+            min-width: 60px;
+            display: inline-block;
+        }
+
+        .log-level.DEBUG {
+            color: var(--text-tertiary);
+        }
+
+        .log-level.INFO {
+            color: var(--info);
+        }
+
+        .log-level.WARNING {
+            color: var(--warning);
+        }
+
+        .log-level.ERROR {
+            color: var(--error);
+        }
+
+        .log-message {
+            color: var(--text-secondary);
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-base);
+        }
+
+        .filter-btn.active {
+            background: var(--gradient-primary);
+            color: white;
+            border-color: transparent;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="nav-brand-icon">🤖</span>
+                <span>AI Pipeline</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">💬 Chat</a></li>
+                <li><a href="/logs" class="nav-link active">📋 Logs</a></li>
+                <li><a href="/outputs" class="nav-link">📁 Outputs</a></li>
+                <li><a href="/status" class="nav-link">📊 Status</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <!-- Header -->
+            <div class="flex justify-between items-center mt-4 mb-3">
+                <div>
+                    <h1>Debug Logs</h1>
+                    <p class="text-muted">Real-time debugging logs from the pipeline</p>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <span class="badge badge-running" id="statusBadge">
+                        <span>● Live</span>
+                    </span>
+                    <button class="btn btn-secondary" onclick="clearLogs()">
+                        🗑️ Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="glass-card mb-3">
+                <div class="glass-card-header">
+                    <h3 class="glass-card-title">Filters</h3>
+                </div>
+                <div class="glass-card-body flex gap-2">
+                    <button class="filter-btn active" data-level="ALL" onclick="filterLogs('ALL')">ALL</button>
+                    <button class="filter-btn" data-level="DEBUG" onclick="filterLogs('DEBUG')">DEBUG</button>
+                    <button class="filter-btn" data-level="INFO" onclick="filterLogs('INFO')">INFO</button>
+                    <button class="filter-btn" data-level="WARNING" onclick="filterLogs('WARNING')">WARNING</button>
+                    <button class="filter-btn" data-level="ERROR" onclick="filterLogs('ERROR')">ERROR</button>
+                </div>
+            </div>
+
+            <!-- Log Container -->
+            <div class="glass-card">
+                <div class="log-container" id="logContainer">
+                    <div class="text-center text-muted">
+                        <p>Connecting to log stream...</p>
+                        <div class="spinner" style="margin: 2rem auto;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/logs.js"></script>
+</body>
+
+</html>

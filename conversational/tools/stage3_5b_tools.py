@@ -7,10 +7,12 @@ Tools for benchmarking proposed methods and selecting the best one.
 import json
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from langchain_core.tools import tool
 import pandas as pd
 import numpy as np
+import subprocess
+import importlib
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,6 +27,183 @@ from code.utils import load_dataframe, safe_json_dumps
 # State tracking
 _benchmark_results = {}
 _stage3_5b_thoughts = []
+
+# Package name mapping: import name -> pip package name
+PACKAGE_MAPPING = {
+    'sklearn': 'scikit-learn',
+    'xgboost': 'xgboost',
+    'lightgbm': 'lightgbm',
+    'catboost': 'catboost',
+    'statsmodels': 'statsmodels',
+    'prophet': 'prophet',
+    'tensorflow': 'tensorflow',
+    'keras': 'keras',
+    'torch': 'torch',
+    'pytorch': 'torch',
+    'cv2': 'opencv-python',
+    'PIL': 'pillow',
+    'skimage': 'scikit-image',
+}
+
+
+def install_package(package_name: str, timeout: int = 120) -> bool:
+    """
+    Install a Python package using pip.
+
+    Args:
+        package_name: Name of the package to install
+        timeout: Maximum time to wait for installation (seconds)
+
+    Returns:
+        True if installation succeeded, False otherwise
+    """
+    try:
+        logger.info(f"Installing package: {package_name}")
+        result = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', package_name],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        if result.returncode == 0:
+            logger.info(f"Successfully installed {package_name}")
+            return True
+        else:
+            logger.warning(f"Failed to install {package_name}: {result.stderr}")
+            return False
+    except subprocess.TimeoutExpired:
+        logger.error(f"Installation of {package_name} timed out after {timeout}s")
+        return False
+    except Exception as e:
+        logger.error(f"Error installing {package_name}: {e}")
+        return False
+
+
+def import_with_auto_install(module_name: str, package_name: str = None, timeout: int = 120):
+    """
+    Import a module, installing it automatically if not found.
+
+    Args:
+        module_name: Name of the module to import (e.g., 'xgboost', 'sklearn')
+        package_name: Pip package name if different from module name
+        timeout: Max time for installation
+
+    Returns:
+        Imported module or None if failed
+    """
+    # Map import name to pip package name
+    if package_name is None:
+        package_name = PACKAGE_MAPPING.get(module_name, module_name)
+
+    try:
+        # Try to import first
+        module = importlib.import_module(module_name)
+        return module
+    except ImportError:
+        logger.info(f"Module {module_name} not found, attempting auto-install...")
+
+        # Try to install
+        if install_package(package_name, timeout=timeout):
+            try:
+                # Retry import after installation
+                module = importlib.import_module(module_name)
+                logger.info(f"Successfully imported {module_name} after installation")
+                return module
+            except ImportError as e:
+                logger.error(f"Still cannot import {module_name} after installation: {e}")
+                return None
+        else:
+            logger.error(f"Failed to install package for {module_name}")
+            return None
+
+
+def setup_ml_namespace(required_libraries: List[str] = None) -> Dict[str, Any]:
+    """
+    Setup namespace with ML libraries, installing missing ones automatically.
+
+    Args:
+        required_libraries: List of required library names
+
+    Returns:
+        Dictionary with imported modules and common utilities
+    """
+    namespace = {
+        'pd': pd,
+        'np': np,
+        'json': json,
+        'Path': Path,
+        'DATA_DIR': DATA_DIR,
+        'STAGE3B_OUT_DIR': STAGE3B_OUT_DIR,
+        'STAGE3_OUT_DIR': STAGE3_OUT_DIR,
+        'time': time,
+        'load_dataframe': load_dataframe,
+    }
+
+    # Define core libraries to always try importing
+    core_libraries = [
+        ('sklearn.metrics', 'mean_absolute_error', 'scikit-learn'),
+        ('sklearn.metrics', 'mean_squared_error', 'scikit-learn'),
+        ('sklearn.ensemble', 'RandomForestRegressor', 'scikit-learn'),
+        ('sklearn.linear_model', 'LinearRegression', 'scikit-learn'),
+        ('statsmodels.tsa.arima.model', 'ARIMA', 'statsmodels'),
+        ('statsmodels.tsa.holtwinters', 'ExponentialSmoothing', 'statsmodels'),
+    ]
+
+    # Extended libraries that might be requested
+    extended_libraries = {
+        'xgboost': [('xgboost', 'XGBRegressor', 'xgboost')],
+        'lightgbm': [('lightgbm', 'LGBMRegressor', 'lightgbm')],
+        'catboost': [('catboost', 'CatBoostRegressor', 'catboost')],
+        'prophet': [('prophet', 'Prophet', 'prophet')],
+        'tensorflow': [('tensorflow', 'tensorflow', 'tensorflow')],
+        'keras': [('keras', 'keras', 'keras')],
+        'torch': [('torch', 'torch', 'torch')],
+        'pytorch': [('torch', 'torch', 'torch')],
+    }
+
+    # Import core libraries (always available)
+    for module_path, attr_name, pip_package in core_libraries:
+        try:
+            module = import_with_auto_install(module_path.split('.')[0], pip_package)
+            if module:
+                # Navigate to nested attribute
+                parts = module_path.split('.')
+                obj = module
+                for part in parts[1:]:
+                    obj = getattr(obj, part)
+                # Get the specific attribute
+                namespace[attr_name] = getattr(obj, attr_name)
+        except Exception as e:
+            logger.warning(f"Could not import {module_path}.{attr_name}: {e}")
+
+    # Import requested libraries
+    if required_libraries:
+        for lib in required_libraries:
+            lib_lower = lib.lower()
+
+            # Handle common library names
+            if lib_lower in extended_libraries:
+                for module_path, attr_name, pip_package in extended_libraries[lib_lower]:
+                    try:
+                        module = import_with_auto_install(module_path, pip_package)
+                        if module:
+                            namespace[attr_name] = module if attr_name == module_path else getattr(module, attr_name, module)
+                            # Also add the module itself
+                            namespace[module_path] = module
+                    except Exception as e:
+                        logger.warning(f"Could not import {module_path}: {e}")
+
+            # Try direct import for any other library
+            else:
+                try:
+                    module = import_with_auto_install(lib)
+                    if module:
+                        namespace[lib] = module
+                except Exception as e:
+                    logger.warning(f"Could not import {lib}: {e}")
+
+    return namespace
 
 
 @tool
@@ -214,9 +393,9 @@ def record_thought_3_5b(thought: str, next_action: str) -> str:
 
 
 @tool
-def run_benchmark_code(code: str, method_name: str) -> str:
+def run_benchmark_code(code: str, method_name: str, required_libraries: str = None) -> str:
     """
-    Execute benchmarking code for a method.
+    Execute benchmarking code for a method with automatic dependency installation.
 
     The code should:
     1. Load the prepared data
@@ -228,6 +407,7 @@ def run_benchmark_code(code: str, method_name: str) -> str:
     Args:
         code: Python code to execute
         method_name: Name of the method being tested
+        required_libraries: Comma-separated list of required libraries (optional)
 
     Returns:
         Execution output with metrics
@@ -235,40 +415,16 @@ def run_benchmark_code(code: str, method_name: str) -> str:
     import sys
     from io import StringIO
 
-    # Prepare namespace with necessary imports
-    namespace = {
-        'pd': pd,
-        'np': np,
-        'json': json,
-        'Path': Path,
-        'DATA_DIR': DATA_DIR,
-        'STAGE3B_OUT_DIR': STAGE3B_OUT_DIR,
-        'STAGE3_OUT_DIR': STAGE3_OUT_DIR,
-        'time': time,
-    }
+    # Parse required libraries
+    libs = []
+    if required_libraries:
+        if isinstance(required_libraries, str):
+            libs = [lib.strip() for lib in required_libraries.split(',')]
+        elif isinstance(required_libraries, list):
+            libs = required_libraries
 
-    # Import common ML libraries
-    try:
-        from sklearn.metrics import mean_absolute_error, mean_squared_error
-        from sklearn.ensemble import RandomForestRegressor
-        from sklearn.linear_model import LinearRegression
-        namespace['mean_absolute_error'] = mean_absolute_error
-        namespace['mean_squared_error'] = mean_squared_error
-        namespace['RandomForestRegressor'] = RandomForestRegressor
-        namespace['LinearRegression'] = LinearRegression
-    except ImportError:
-        pass
-
-    try:
-        from statsmodels.tsa.arima.model import ARIMA
-        from statsmodels.tsa.holtwinters import ExponentialSmoothing
-        namespace['ARIMA'] = ARIMA
-        namespace['ExponentialSmoothing'] = ExponentialSmoothing
-    except ImportError:
-        pass
-
-    # Add load_dataframe function
-    namespace['load_dataframe'] = load_dataframe
+    # Setup namespace with auto-install support
+    namespace = setup_ml_namespace(required_libraries=libs)
 
     # Capture output
     old_stdout = sys.stdout
@@ -300,6 +456,7 @@ def run_benchmark_code(code: str, method_name: str) -> str:
         f"=== Benchmark: {method_name} ===",
         f"Execution time: {execution_time:.2f}s",
         f"Status: {'SUCCESS' if success else 'FAILED'}",
+        f"Libraries used: {libs if libs else 'default'}",
         "",
         "Output:",
         output
@@ -822,30 +979,19 @@ def test_single_method(plan_id: str, method_id: str) -> str:
         train_df = df.iloc[:train_size].copy()
         test_df = df.iloc[train_size+val_size:].copy()
 
-        # Setup namespace
-        namespace = {
-            'pd': pd,
-            'np': np,
+        # Get required libraries from method
+        required_libs = method.get('required_libraries', [])
+
+        # Setup namespace with auto-install
+        namespace = setup_ml_namespace(required_libraries=required_libs)
+
+        # Add test-specific data
+        namespace.update({
             'train_df': train_df,
             'test_df': test_df,
             'target_col': target_col,
             'date_col': date_col,
-        }
-
-        # Add ML imports
-        try:
-            from sklearn.ensemble import RandomForestRegressor
-            from sklearn.linear_model import LinearRegression
-            namespace['RandomForestRegressor'] = RandomForestRegressor
-            namespace['LinearRegression'] = LinearRegression
-        except ImportError:
-            pass
-
-        try:
-            from statsmodels.tsa.arima.model import ARIMA
-            namespace['ARIMA'] = ARIMA
-        except ImportError:
-            pass
+        })
 
         # Execute method code
         impl_code = method.get('implementation_code', '')

@@ -1,0 +1,44 @@
+════════════════════════════════════════════════════════════════════════════════
+FINAL ANALYSIS REPORT: TSK-6243
+════════════════════════════════════════════════════════════════════════════════
+
+EXECUTIVE SUMMARY
+--------------------------------------------------------------------------------
+This report evaluates the forecasting of Basmati rice export quantities for 2025-2027. The Naive Forecast model demonstrated extremely poor performance (MAPE 143,875.52%) and failed to capture data patterns, rendering it unsuitable for reliable predictions.
+
+METHODOLOGY
+--------------------------------------------------------------------------------
+A Naive Forecast model was applied to historical export data. The approach included:
+- Data preparation using the '2024 - 25-Quantity' target column
+- 3-step forecast horizon for 2025-2027
+- Evaluation using MAE, RMSE, MAPE, and R2 metrics
+- Validation through actual vs. predicted comparisons and residual analysis
+
+RESULTS ANALYSIS
+--------------------------------------------------------------------------------
+Performance metrics revealed severe limitations:
+- MAE: 59,518.51 (high absolute error)
+- RMSE: 95,853.02 (large prediction deviations)
+- MAPE: 143,875.52% (worse than mean prediction)
+- R2: -0.39 (negative explanatory power)
+
+Prediction data showed static values (7,419.55 ± 0.00) across all 6 samples. Visualizations confirmed:
+1. Flat-line forecasts with no trend capture
+2. Wide scatter of actual vs. predicted values
+3. Non-random residuals indicating poor model fit
+
+CONCLUSIONS
+--------------------------------------------------------------------------------
+The Naive Forecast model cannot reliably predict Basmati rice exports for 2025-2027. Its performance metrics and visualizations demonstrate it fails to capture essential patterns in the data, making the forecasts statistically insignificant and practically unusable.
+
+RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Implement advanced models (ARIMA, XGBoost, Prophet) as originally planned
+2. Investigate data quality issues and potential missing features
+3. Conduct feature engineering to improve pattern recognition
+4. Validate model performance using cross-validation techniques
+5. Consider alternative forecasting approaches if data limitations persist
+
+════════════════════════════════════════════════════════════════════════════════
+Report generated for TSK-6243
+════════════════════════════════════════════════════════════════════════════════

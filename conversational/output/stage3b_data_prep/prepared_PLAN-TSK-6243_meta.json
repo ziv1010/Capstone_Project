@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T03:22:18.456316",
+    "checksum": "30b1640c874c4d88",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-6243",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-6243.parquet",
+    "original_row_count": 1,
+    "final_row_count": 1,
+    "columns_created": [
+      "HS Code",
+      "Description",
+      "2018 - 19-Quantity",
+      "2018 - 19-Value (INR)",
+      "2018 - 19-Value (USD)",
+      "2019 - 20-Quantity",
+      "2019 - 20-Value (INR)",
+      "2019 - 20-Value (USD)",
+      "2020 - 21-Quantity",
+      "2020 - 21-Value (INR)",
+      "2020 - 21-Value (USD)",
+      "2021 - 22-Quantity",
+      "2021 - 22-Value (INR)",
+      "2021 - 22-Value (USD)",
+      "2022 - 23-Quantity",
+      "2022 - 23-Value (INR)",
+      "2022 - 23-Value (USD)",
+      "2023 - 24-Quantity",
+      "2023 - 24-Value (INR)",
+      "2023 - 24-Value (USD)",
+      "2024 - 25-Quantity",
+      "2024 - 25-Value (INR)",
+      "2024 - 25-Value (USD)"
+    ],
+    "transformations_applied": [
+      "reshape_to_long",
+      "impute_missing"
+    ],
+    "data_quality_report": {
+      "total_rows": 1,
+      "total_columns": 23,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "Zero nulls after forward-fill imputation. 21 records in long format."
+  }
+}

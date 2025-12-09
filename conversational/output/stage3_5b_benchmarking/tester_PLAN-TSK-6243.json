@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T03:55:12.084366",
+    "checksum": "ba8c51a08e6d92fa",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-6243",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "avg_mae": 59518.51,
+        "avg_rmse": 95853.02,
+        "avg_mape": 143875.52,
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "avg_mae": 215095.1,
+        "avg_rmse": 215095.1,
+        "avg_mape": 12505529.01,
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "error": "Missing xgboost dependency",
+        "valid": false
+      }
+    ],
+    "selected_method_id": "M1",
+    "selected_method_name": "Naive Forecast",
+    "selection_rationale": "M1 achieved lowest MAE (59,518.51) and MAPE (143,875.52%) compared to M2 (215,095.10 MAE, 12.5M% MAPE). M3 failed due to missing xgboost dependency.",
+    "method_comparison_summary": "M1 outperformed M2 in all metrics. M3 could not be evaluated due to missing dependencies.",
+    "winning_method_code": "import pandas as pd\nimport numpy as np\nfrom sklearn.metrics import mean_absolute_error, mean_squared_error\n\n# Load data\nSTAGE3B_OUT_DIR = '/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep'\ndf = pd.read_parquet(f'{STAGE3B_OUT_DIR}/prepared_PLAN-TSK-6243.parquet')\n\ntarget_col = '2024 - 25-Quantity'\n\n# Temporal column split\ntrain_cols = [col for col in df.columns if '2018' in col or '2019' in col or '2020' in col or '2021' in col or '2022' in col]\nval_col = [col for col in df.columns if '2023' in col]\ntest_cols = [col for col in df.columns if '2024' in col or '2025' in col]\n\n# Naive forecast: use last observed value (2022) for all future periods\nlast_value = df[train_cols[-1]].values\n\n# Predict for all test periods (2024-2027) using same value\npredictions = np.tile(last_value, len(test_cols))\n\n# Actual values\nactuals = df[test_cols].values.flatten()\n\n# Calculate metrics\nmae = mean_absolute_error(actuals, predictions)\nrmse = np.sqrt(mean_squared_error(actuals, predictions))\nmape = np.mean(np.abs((actuals - predictions) / actuals)) * 100\n\nprint(json.dumps({\n    'mae': float(mae),\n    'rmse': float(rmse),\n    'mape': float(mape)\n}))",
+    "data_split_strategy": "temporal_column\nTrain: 2018-2022\nValidation: 2023\nTest: 2024-2027",
+    "benchmark_metrics": {
+      "mae": 59518.51,
+      "rmse": 95853.02,
+      "mape": 143875.52
+    }
+  }
+}

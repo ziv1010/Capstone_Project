@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T04:40:07.583390",
+    "checksum": "0efb3b9072373f3a",
+    "version": "1.0",
+    "stage": "stage6",
+    "type": "final_report"
+  },
+  "data": {
+    "task_id": "TSK-6243",
+    "plan_id": "PLAN-TSK-6243",
+    "executive_summary": "This report evaluates the forecasting of Basmati rice export quantities for 2025-2027. The Naive Forecast model demonstrated extremely poor performance (MAPE 143,875.52%) and failed to capture data patterns, rendering it unsuitable for reliable predictions.",
+    "methodology": "A Naive Forecast model was applied to historical export data. The approach included:\n- Data preparation using the '2024 - 25-Quantity' target column\n- 3-step forecast horizon for 2025-2027\n- Evaluation using MAE, RMSE, MAPE, and R2 metrics\n- Validation through actual vs. predicted comparisons and residual analysis",
+    "results_analysis": "Performance metrics revealed severe limitations:\n- MAE: 59,518.51 (high absolute error)\n- RMSE: 95,853.02 (large prediction deviations)\n- MAPE: 143,875.52% (worse than mean prediction)\n- R2: -0.39 (negative explanatory power)\n\nPrediction data showed static values (7,419.55 ± 0.00) across all 6 samples. Visualizations confirmed:\n1. Flat-line forecasts with no trend capture\n2. Wide scatter of actual vs. predicted values\n3. Non-random residuals indicating poor model fit",
+    "conclusions": "The Naive Forecast model cannot reliably predict Basmati rice exports for 2025-2027. Its performance metrics and visualizations demonstrate it fails to capture essential patterns in the data, making the forecasts statistically insignificant and practically unusable.",
+    "recommendations": "1. Implement advanced models (ARIMA, XGBoost, Prophet) as originally planned\n2. Investigate data quality issues and potential missing features\n3. Conduct feature engineering to improve pattern recognition\n4. Validate model performance using cross-validation techniques\n5. Consider alternative forecasting approaches if data limitations persist",
+    "generated_at": "2025-12-10 04:40:07.583230"
+  }
+}

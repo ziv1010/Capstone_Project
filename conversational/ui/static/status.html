@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pipeline - Task Status</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .pipeline-visual {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-lg);
+            overflow-x: auto;
+        }
+
+        .stage-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+        }
+
+        .stage-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            border: 3px solid var(--glass-border);
+            background: var(--bg-secondary);
+            transition: all var(--transition-base);
+        }
+
+        .stage-circle.completed {
+            background: var(--gradient-success);
+            border-color: var(--success);
+            color: white;
+        }
+
+        .stage-circle.running {
+            background: var(--gradient-primary);
+            border-color: var(--accent-purple);
+            color: white;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        .stage-circle.pending {
+            background: var(--bg-secondary);
+            border-color: var(--glass-border);
+            color: var(--text-tertiary);
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(139, 92, 246, 0.8);
+            }
+        }
+
+        .stage-label {
+            margin-top: var(--spacing-sm);
+            font-size: 0.875rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .stage-connector {
+            width: 40px;
+            height: 3px;
+            background: var(--glass-border);
+            transition: background var(--transition-base);
+        }
+
+        .stage-connector.active {
+            background: var(--gradient-primary);
+        }
+
+        .task-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            transition: all var(--transition-base);
+        }
+
+        .task-card:hover {
+            background: var(--glass-hover);
+            transform: translateX(4px);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+
+        .metric-box {
+            background: var(--bg-secondary);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-purple);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="nav-brand-icon">🤖</span>
+                <span>AI Pipeline</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">💬 Chat</a></li>
+                <li><a href="/logs" class="nav-link">📋 Logs</a></li>
+                <li><a href="/outputs" class="nav-link">📁 Outputs</a></li>
+                <li><a href="/status" class="nav-link active">📊 Status</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <!-- Header -->
+            <div class="flex justify-between items-center mt-4 mb-3">
+                <div>
+                    <h1>Task Progress</h1>
+                    <p class="text-muted">Monitor pipeline execution and task status</p>
+                </div>
+                <button class="btn btn-primary" onclick="refreshStatus()">
+                    🔄 Refresh
+                </button>
+            </div>
+
+            <!-- Pipeline Visualization -->
+            <div class="glass-card mb-3">
+                <div class="glass-card-header">
+                    <h3 class="glass-card-title">Pipeline Stages</h3>
+                </div>
+                <div class="glass-card-body">
+                    <div class="pipeline-visual" id="pipelineVisual">
+                        <!-- Will be populated dynamically -->
+                        <div class="text-center" style="width: 100%;">
+                            <div class="spinner" style="margin: 2rem auto;"></div>
+                            <p class="text-muted">Loading pipeline status...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks List -->
+            <div class="glass-card">
+                <div class="glass-card-header">
+                    <h3 class="glass-card-title">Active Tasks</h3>
+                    <span class="badge badge-info" id="taskCountBadge">0 tasks</span>
+                </div>
+                <div class="glass-card-body" id="tasksList">
+                    <p class="text-muted text-center">No active tasks</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/status.js"></script>
+</body>
+
+</html>

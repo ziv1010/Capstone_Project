@@ -100,23 +100,32 @@ You MUST run each method {BENCHMARK_ITERATIONS} times to check consistency:
 - save_tester_output: Save final results
 - finish_benchmarking: Signal completion (Call this LAST)
 
-## Execution Strategies (CRITICAL)
+## Execution Strategy Discovery (CRITICAL)
 
-### 1. LONG Format (Row-wise Split)
-- Use standard train/test split on rows.
-- `train_df = df.iloc[:train_size]`
-- `test_df = df.iloc[train_size:]`
+You MUST analyze the data split strategy from the method proposal before running any benchmarks.
 
-### 2. WIDE Format (Column-wise Split) - **COMMON**
-- **Do NOT split rows!** Use ALL rows for both Train and Test.
-- **Train Phase**: Predict the *previous* year (t-1) using years before it.
-  - You must construct `train_df` by shifting columns or using `lag` features for year (t-1).
-  - Target for Train: The column for year (t-1).
-- **Test Phase**: Predict the *target* year (t) using years before it.
-  - `test_df` is the original dataframe (or subset with correct features).
-  - Target for Test: The actual target column (year t).
+### Step 1: Load and Understand the Split Strategy
+The method proposal contains `data_split_strategy` with:
+- `strategy_type`: Describes how to split (e.g., "temporal_row", "temporal_column", "random")
+- `train_period`, `validation_period`, `test_period`: Descriptions of what data goes where
+- Column/row specifications for implementing the split
 
-#### Wide Format Code Template:
+### Step 2: Reason About Implementation
+Based on the strategy_type, think about:
+- **Row-based splits**: Use iloc or date-based filtering to separate train/test
+- **Column-based splits**: Use different columns as features/targets for train vs test
+- **Hybrid approaches**: May combine row and column operations
+
+DO NOT assume a specific format. Read the strategy from the proposal and implement accordingly.
+
+### Step 3: Implement the Split
+Write code that:
+1. Loads the prepared data
+2. Implements the split strategy from the proposal
+3. Runs the method's prediction function
+4. Calculates metrics dynamically based on plan.evaluation_metrics
+
+### Example Framework (Adapt Based on Actual Strategy):
 ```python
 import pandas as pd
 import numpy as np
@@ -126,52 +135,71 @@ from pathlib import Path
 STAGE3B_OUT_DIR = Path('{STAGE3B_OUT_DIR}')
 df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_{{plan_id}}.parquet')
 
-# Identify Target and Previous Year Columns
-target_col = '2024 - 25-Value (USD)' # Example
-prev_target_col = '2023 - 24-Value (USD)' # Example
+# Get split strategy from method proposal
+strategy = method_proposal['data_split_strategy']
+strategy_type = strategy['strategy_type']
 
-# --- TRAIN SET CONSTRUCTION (Predicting t-1) ---
-# We need features that predict prev_target_col.
-# If we have lag features for target_col (e.g. lag_1 = t-1),
-# then lag features for prev_target_col would be shifted (e.g. lag_1 = t-2).
-# SIMPLER APPROACH:
-# If the method uses specific columns (e.g. '2022', '2023'), shift them back by 1 year.
-# Or if using 'lag' columns, reconstruct them for the previous year.
+# Implement split based on strategy_type
+if 'row' in strategy_type.lower():
+    # Row-based split (e.g., temporal_row, random)
+    train_size = int(len(df) * 0.7)
+    train_df = df.iloc[:train_size]
+    test_df = df.iloc[train_size:]
+elif 'column' in strategy_type.lower():
+    # Column-based split (discover from strategy details)
+    # Use strategy['train_period'] and strategy['test_period'] to determine columns
+    # This will vary by dataset - REASON about the specific columns
+    pass
+else:
+    # Unknown strategy - analyze and decide
+    pass
 
-# Example for Naive (Last Value):
-# Train: Predict 2023 using 2022.
-# Test: Predict 2024 using 2023.
+# Run the method (from method proposal)
+predictions = method_function(train_df, test_df, target_col, date_col)
 
-# Construct Train DF (All rows)
-train_df = df.copy()
-# ... logic to set up features for predicting prev_target_col ...
+# Calculate metrics DYNAMICALLY from plan.evaluation_metrics
+# CRITICAL: Use the metrics specified in the plan, not hardcoded defaults!
+results = {{}}
+for metric_name in plan['evaluation_metrics']:
+    metric_lower = metric_name.lower()
 
-# Construct Test DF (All rows)
-test_df = df.copy()
-# ... logic to set up features for predicting target_col ...
+    # Regression/Forecasting metrics
+    if metric_lower == 'mae':
+        results[metric_name] = float(np.mean(np.abs(actual - predicted)))
+    elif metric_lower == 'rmse':
+        results[metric_name] = float(np.sqrt(np.mean((actual - predicted) ** 2)))
+    elif metric_lower == 'mse':
+        results[metric_name] = float(np.mean((actual - predicted) ** 2))
+    elif metric_lower == 'mape':
+        # Avoid division by zero
+        mask = actual != 0
+        results[metric_name] = float(np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100)
+    elif metric_lower == 'r2':
+        from sklearn.metrics import r2_score
+        results[metric_name] = float(r2_score(actual, predicted))
 
-# Define Method
-def predict_method(train_df, test_df, target_col, date_col, **params):
-    # ... implementation ...
-    return pd.DataFrame({{'predicted': predictions}}, index=test_df.index)
+    # Classification metrics (if task is classification)
+    elif metric_lower == 'accuracy':
+        from sklearn.metrics import accuracy_score
+        results[metric_name] = float(accuracy_score(actual, predicted))
+    elif metric_lower == 'precision':
+        from sklearn.metrics import precision_score
+        results[metric_name] = float(precision_score(actual, predicted, average='weighted'))
+    elif metric_lower == 'recall':
+        from sklearn.metrics import recall_score
+        results[metric_name] = float(recall_score(actual, predicted, average='weighted'))
+    elif metric_lower == 'f1' or metric_lower == 'f1_score':
+        from sklearn.metrics import f1_score
+        results[metric_name] = float(f1_score(actual, predicted, average='weighted'))
 
-# Run Prediction
-# Note: For Wide format, we might run 'predict' on test_df directly trained on train_df
-# OR if the method is simple (like Naive), just apply logic.
+    else:
+        # Unknown metric - log warning but don't fail
+        print(f"Warning: Unknown metric '{{metric_name}}' - skipping")
 
-# Example Naive Execution:
-# Train metrics (Optional but good for validation)
-# Test metrics (Required)
-predictions = predict_method(train_df, test_df, target_col, None)
-
-# Calculate Metrics
-actual = test_df[target_col].values
-predicted = predictions['predicted'].values
-
-mae = np.mean(np.abs(actual - predicted))
-# ...
-print(json.dumps({{"mae": mae, ...}}))
+print(json.dumps(results))
 ```
+
+**KEY PRINCIPLE**: Don't prescribe code templates - reason about the strategy and data, then generate appropriate code.
 
 ## Workflow
 1. Load method proposals
@@ -199,6 +227,12 @@ The tester output must include:
 - selected_method_name: Winner's name
 - selection_rationale: Why this method was selected
 - method_comparison_summary: Brief comparison of all methods
+- winning_method_code: EXACT code used (automatically added from proposal)
+- data_split_strategy: EXACT split strategy used (automatically added)
+- benchmark_metrics: Metrics from winning method (for Stage 4 validation)
+
+CRITICAL: The winning_method_code stored will be used verbatim by Stage 4!
+Make sure your benchmarking uses the EXACT code from the method proposal.
 
 IMPORTANT: Use checkpoints! If interrupted, you can resume from the last completed method.
 """

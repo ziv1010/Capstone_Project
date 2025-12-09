@@ -104,28 +104,52 @@ Consider these factors when choosing algorithms:
 5. Write complete, executable implementation code using ONLY existing columns
 6. Define data split strategy
 
-## Data Formats & Split Strategies (CRITICAL)
-You must detect if the data is **LONG** (time in rows) or **WIDE** (time in columns).
+## Data Format Discovery & Split Strategy Design (CRITICAL)
+You must ANALYZE the data structure before proposing split strategies.
 
-### 1. LONG Format (Time in Rows)
-- Typical structure: [Entity, Date, Target]
-- Split Strategy: **Row-wise Temporal**
-  - Train: First N rows (past dates)
-  - Test: Last M rows (future dates)
+### Step 1: Discover How Time is Encoded
+Call `get_actual_columns()` and `load_plan_and_data()` to understand:
+1. **Row-based time (LONG format)**:
+   - Look for date/time columns in the column list
+   - Each row represents one time point
+   - Time progresses vertically through rows
 
-### 2. WIDE Format (Time in Columns) - **COMMON IN THIS PIPELINE**
-- Typical structure: [Entity, Feature1, ... Year1, Year2, ... TargetYear]
-- Example: Columns are '2018', '2019', ... '2024' (Target)
-- Split Strategy: **Column-wise Temporal**
-  - **Train**: Use data from past years to predict the *previous* year.
-    - Input: Years[start] to Years[t-2]
-    - Target: Years[t-1]
-  - **Test**: Use data from past years to predict the *target* year.
-    - Input: Years[start+1] to Years[t-1]
-    - Target: Years[t] (The actual target column)
-  - **Validation**: Can be same as Train or a separate hold-out column.
+2. **Column-based time (WIDE format)**:
+   - Look for temporal patterns in column names (years, dates, periods)
+   - Each row represents an entity tracked over time
+   - Time progresses horizontally through columns
 
-**IMPORTANT**: For Wide format, do NOT split rows! Use ALL rows for both Train and Test, but change the *columns* used as features and target.
+### Step 2: Reason About Split Strategy
+DO NOT prescribe a specific split approach. Consider:
+
+**For Task Type:**
+- Forecasting: Always temporal split (train on past, test on future)
+- Regression: May use random or temporal depending on data
+- Classification: May use stratified or temporal depending on task
+
+**For Data Format:**
+- **LONG format options**:
+  - Simple temporal: Split by row index or date threshold
+  - Rolling window: Multiple train/test splits for robustness
+  - Expanding window: Growing training set over time
+
+- **WIDE format options**:
+  - Column-wise temporal: Use earlier time columns for training, later for testing
+  - Keep wide: Use all columns as features (some models handle this)
+  - Transform to long: Reshape before splitting (if beneficial for models)
+
+**For Model Types:**
+- Simple baselines (Naive, Mean): May need minimal splitting
+- Classical ML (Random Forest, XGBoost): Standard train/test
+- Time series models (ARIMA, Prophet): Require temporal ordering
+
+### Step 3: Document Your Strategy
+In data_split_strategy, clearly explain:
+- **WHY** you chose this approach (reasoning based on data, task, models)
+- **WHAT** columns/rows are used for train/validation/test
+- **HOW** to implement the split (but let benchmarking stage execute it)
+
+**KEY PRINCIPLE**: Split strategy should follow from data characteristics and task requirements, not assumptions about "common" formats.
 
 ## Available Tools
 - get_actual_columns: **CALL THIS FIRST** to prevent column hallucination

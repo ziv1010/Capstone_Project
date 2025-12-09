@@ -109,15 +109,45 @@ When inspecting data files, pay attention to:
 - All available numeric columns (INCLUDE THEM ALL as features)
 - The data may have rows that summarize other rows - understand and filter appropriately
 
-## CRITICAL: Wide-Format Temporal Data
-If you see columns like "Production-2020-21", "Production-2021-22", "Area-2023-24":
-- This is WIDE-FORMAT temporal data (years in column names)
-- You MUST melt/pivot to LONG format: one row per year
-- Extract the year from column names (e.g., "Production-2020-21" → Year="2020-21", Feature="Production")
-- Do this in feature_engineering step with implementation_code
-- Example melt code: `df.melt(id_vars=['Crop'], var_name='Year_Metric', value_name='Value')`
-- After melting, you'll have more rows (which is GOOD for forecasting!)
-- DO NOT OVERTHINK THIS - wide format is common, just melt and proceed
+## CRITICAL: Temporal Data Structure Analysis
+When inspecting data files, you must ANALYZE how temporal information is encoded:
+
+### Step 1: Discover the Data Format
+- **Row-based time (LONG format)**: Look for date/year columns (e.g., 'date', 'year', 'timestamp')
+  - Each row represents one time point
+  - Time series progresses vertically down rows
+- **Column-based time (WIDE format)**: Look for temporal patterns in column names
+  - Year suffixes, date ranges, or time periods in column names (e.g., "Production-2020-21", "Area-2023-24")
+  - Each row represents an entity tracked over multiple time periods
+  - Time series progresses horizontally across columns
+
+### Step 2: Reason About Transformation Strategy
+DO NOT blindly transform data. Consider:
+1. **Task requirements**: What does the task category (forecasting/regression/classification) need?
+2. **Model compatibility**: What format works best for expected_model_types?
+   - Tree-based models (Random Forest, XGBoost): Can handle wide format directly
+   - Classical time series (ARIMA, Prophet): Often need long format
+   - Simple baselines: May work with either format
+3. **Data volume trade-offs**:
+   - Wide → Long (melt): Creates more rows (good for sample size)
+   - Wide → Long (melt): May create nulls if columns have different entities
+   - Keeping wide: Preserves structure, may be simpler
+
+### Step 3: Document Your Decision
+In feature_engineering, if you choose to reshape:
+- Clearly document WHY you're transforming (reasoning, not reflex)
+- Write implementation_code that handles the transformation
+- Consider entity grouping if melting (don't assume column names like 'Crop')
+- Analyze actual column names to determine grouping keys
+
+Example reasoning:
+```
+name: "reshape_to_long"
+description: "Converting wide-format temporal data to long format because the task uses ARIMA which requires time-indexed rows"
+implementation_code: "df = df.melt(id_vars=[entity_col], var_name='period', value_name='value')"
+```
+
+**KEY PRINCIPLE**: Let the task, models, and data characteristics guide your choice - not assumptions.
 
 ## Plan Requirements
 Your plan MUST include:
@@ -157,9 +187,21 @@ For forecasting tasks, EXTRACT from the selected proposal and include in your pl
 ## Implementation Code Guidelines
 Keep implementation_code CONCISE:
 - Use simple pandas operations
-- Single line when possible: "df['lag_1'] = df['target'].shift(1)"
+- Single line when possible for simple features
 - No comments in the code
 - No error handling (that's for execution stage)
+- **NEVER assume column names exist** - base code on actual inspected columns
+- For grouped operations (e.g., shift by entity), determine group column from data inspection
+
+Example (generic):
+```
+df['lag_1'] = df['target'].shift(1)  # Simple lag without grouping
+```
+
+Example (with grouping - only if you confirmed the group column exists):
+```
+df['lag_1'] = df.groupby('entity_column')['target'].shift(1)  # Grouped lag
+```
 
 ## Workflow
 1. Load the task proposal
@@ -440,99 +482,8 @@ IMPORTANT: You have a limited number of iterations. After inspecting the data ON
         return plan
     else:
         logger.error("Plan not saved to disk")
-
-        # If this is the final attempt, create a fallback plan
-        if attempt_num >= 3:
-            logger.warning("Creating fallback plan as last resort")
-            return _create_fallback_plan(task_id)
-        else:
-            raise RuntimeError("Execution plan was not saved - agent may have hit iteration limit")
-
-
-def _create_fallback_plan(task_id: str) -> Stage3Plan:
-    """
-    Create a basic fallback plan when the agent fails completely.
-    This ensures the pipeline can continue even if stage3 agent fails.
-    """
-    logger.warning(f"Creating fallback plan for {task_id}")
-
-    # Load the task proposal to get basic info
-    proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
-    data = DataPassingManager.load_artifact(proposals_path)
-    proposals = data.get('proposals', data) if isinstance(data, dict) else data
-
-    task_proposal = None
-    for proposal in proposals:
-        if proposal.get('id') == task_id:
-            task_proposal = proposal
-            break
-
-    if not task_proposal:
-        raise RuntimeError(f"Cannot create fallback plan - task {task_id} not found")
-
-    # Get dataset info
-    required_datasets = task_proposal.get('required_datasets', [])
-    if not required_datasets:
-        raise RuntimeError(f"Cannot create fallback plan - no datasets specified for {task_id}")
-
-    primary_dataset = required_datasets[0]
-
-    # Create basic file instructions
-    file_instructions = [{
-        "filename": primary_dataset,
-        "filepath": str(DATA_DIR / primary_dataset),
-        "columns_to_use": task_proposal.get('feature_columns', []) + [task_proposal.get('target_column')],
-        "filters": task_proposal.get('filters', []),
-        "parse_dates": [],
-    }]
-
-    # Basic plan structure
-    plan_data = {
-        "plan_id": f"PLAN-{task_id}",
-        "selected_task_id": task_id,
-        "goal": task_proposal.get('problem_statement', 'Fallback plan - execute task'),
-        "task_category": task_proposal.get('category', 'forecasting'),
-        "file_instructions": file_instructions,
-        "join_steps": [],
-        "feature_engineering": [
-            {
-                "name": "lag_1",
-                "description": "1-period lag of target for time series",
-                "source_columns": [task_proposal.get('target_column')],
-                "implementation_code": f"df['lag_1'] = df.groupby('Crop')['{task_proposal.get('target_column')}'].shift(1)",
-                "dtype": "float64"
-            }
-        ],
-        "target_column": task_proposal.get('target_column'),
-        "date_column": None,
-        "validation_strategy": "temporal",
-        "expected_model_types": ["random_forest", "linear_regression"],
-        "evaluation_metrics": task_proposal.get('evaluation_metrics', ['mae', 'rmse', 'r2']),
-        "output_columns": ["actual", "predicted"],
-        "artifacts_to_save": ["model", "predictions"]
-    }
-
-    # Add forecast-specific fields if applicable
-    if task_proposal.get('task_category') == 'forecasting' or task_proposal.get('category') == 'forecasting':
-        plan_data.update({
-            "forecast_horizon": task_proposal.get('forecast_horizon', 1),
-            "forecast_granularity": task_proposal.get('forecast_granularity', 'year'),
-            "forecast_type": task_proposal.get('forecast_type', 'single_step'),
-        })
-
-    # Save the fallback plan
-    plan_path = DataPassingManager.save_artifact(
-        data=plan_data,
-        output_dir=STAGE3_OUT_DIR,
-        filename=f"PLAN-{task_id}.json",
-        metadata={"stage": "stage3", "type": "execution_plan", "fallback": True}
-    )
-
-    logger.info(f"Fallback plan saved to {plan_path}")
-
-    # Load and return as Stage3Plan
-    plan = Stage3Plan(**plan_data)
-    return plan
+        # NO FALLBACK - agent must create a proper plan or fail
+        raise RuntimeError(f"Execution plan was not saved on attempt {attempt_num} - agent may have hit iteration limit or failed to execute save_stage3_plan tool")
 
 
 # ============================================================================

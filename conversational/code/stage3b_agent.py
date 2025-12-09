@@ -67,11 +67,39 @@ Execute the Stage 3 execution plan to:
 
 ## CRITICAL REQUIREMENT: NO NULLS
 The prepared data MUST have ZERO null values. Before saving:
-- Check for nulls in every column
-- Impute numeric columns (median or mean)
-- Fill categorical columns with 'UNKNOWN' or mode
-- Drop rows only as last resort
-- VERIFY: df.isnull().sum().sum() == 0
+
+### Step 1: Analyze Missing Patterns
+- Check nulls per column: `df.isnull().sum()`
+- Identify percentage missing: `df.isnull().mean()`
+- Consider WHY data is missing (random? systematic?)
+
+### Step 2: Choose Imputation Strategy Based on Analysis
+DO NOT blindly apply median/mean/'UNKNOWN'. Reason about the best approach:
+
+**For Numeric Columns:**
+- **Time series data**: Consider forward-fill, backward-fill, or interpolation
+- **Normally distributed**: Mean imputation may work
+- **Skewed distributions**: Median imputation (more robust)
+- **Low missingness (<5%)**: Consider dropping rows instead
+- **Domain knowledge**: Use domain-specific values if known
+
+**For Categorical Columns:**
+- **Mode**: Use most frequent value (if one category dominates)
+- **Missing as category**: Create explicit 'Missing' category with indicator variable
+- **Low missingness (<5%)**: Consider dropping rows
+- **Never use generic 'UNKNOWN'** without reasoning - it may distort predictions
+
+**For Strategic Decisions:**
+- Some models (XGBoost, LightGBM) handle nulls natively - but this pipeline requires clean data
+- Document your imputation choices for transparency
+- Consider adding indicator columns: `df['col_was_missing'] = df['col'].isna().astype(int)`
+
+### Step 3: Document and Verify
+- Record your imputation strategy in observations
+- VERIFY: `df.isnull().sum().sum() == 0` before saving
+- Save imputation metadata so downstream stages understand transformations
+
+**KEY PRINCIPLE**: Imputation strategy should follow from data analysis and task context, not reflexive defaults.
 
 ## ReAct Framework (MANDATORY)
 For EVERY action, you MUST:

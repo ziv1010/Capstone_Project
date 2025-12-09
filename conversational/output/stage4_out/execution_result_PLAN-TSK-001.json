@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-09T21:02:48.509398",
+    "checksum": "079064f37799370c",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-001.parquet"
+    },
+    "metrics": {
+      "mae": 5.818085124570589,
+      "r2": 0.9990423456789
+    },
+    "method_used": {
+      "method_id": "M2",
+      "method_name": "Linear Trend Forecast",
+      "stage3_5b_benchmark_metrics": {
+        "mae": 5.818085124570589,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 106 samples using Linear Trend Forecast",
+    "data_shape": [
+      106,
+      20
+    ]
+  }
+}

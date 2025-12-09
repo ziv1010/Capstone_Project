@@ -118,12 +118,14 @@ df = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/ou
    - The winning method's implementation code
    - The EXACT data split strategy used in benchmarking
    - The benchmark metrics (your results should match these)
-3. Load prepared data
+3. Load prepared data and VERIFY the column names match what's expected
 4. **CRITICAL**: Check if forecast_horizon > 0 in the plan
 5. **STEP A: TEST SET PREDICTIONS** (validation)
-   - Split data according to the EXACT strategy from Stage 3.5B
-   - Execute the method using the EXACT same code
-   - Calculate metrics - they should match benchmark
+   - **MUST USE**: Copy the EXACT winning_method_code from get_selected_method_code
+   - **MUST USE**: The EXACT data split strategy from Stage 3.5B
+   - **DO NOT MODIFY** the method code - use it verbatim!
+   - Execute the method using the code exactly as provided
+   - Calculate metrics - they MUST match benchmark (±5%)
    - Create test results DataFrame with actual vs predicted
 6. **STEP B: FUTURE FORECASTS** (if forecast_horizon > 0)
    - Generate forecasts for the next N periods
@@ -135,6 +137,11 @@ df = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/ou
    - Mark each row with 'prediction_type': 'test' or 'forecast'
 8. Save predictions and execution result
 9. Verify the outputs
+
+**CRITICAL VALIDATION**:
+- Your test MAE MUST be within ±5% of the Stage 3.5B benchmark MAE
+- If metrics differ significantly, you are NOT using the same code or split strategy
+- DO NOT proceed if validation fails - debug the issue first
 
 ## DATA SPLIT STRATEGY (MUST FOLLOW EXACTLY)
 The get_selected_method_code tool returns the data_split_strategy JSON.
@@ -169,24 +176,34 @@ forecast_horizon = 0                # From execution context (e.g., 5)
 forecast_granularity = 'year'       # From execution context (e.g., 'year', 'month')
 
 # === STEP A: TEST SET PREDICTIONS (for validation) ===
-# Use EXACT split strategy from Stage 3.5B
-train_size = 0.7
-val_size = 0.15
-test_size = 0.15
+# CRITICAL: Use data_split_strategy from get_selected_method_code
+# Example shows temporal_column strategy - ADAPT based on actual strategy!
+split_strategy = {{"strategy_type": "temporal_column"}}  # From get_selected_method_code
 
-train_end = int(len(df) * train_size)
-val_end = int(len(df) * (train_size + val_size))
-
-train_df = df.iloc[:train_end].copy()
-test_df = df.iloc[val_end:].copy()
-
-# Define the selected method (from Stage 3.5B winner)
+# CRITICAL: Copy the EXACT winning_method_code from get_selected_method_code
+# DO NOT modify it - paste it verbatim!
+# Example (replace with actual code from get_selected_method_code):
 def predict_selected_method(train_df, test_df, target_col, date_col, **params):
-    # ... implementation ...
+    # <<< PASTE EXACT CODE FROM get_selected_method_code HERE >>>
+    # DO NOT modify the code at all!
     pass
 
-# Run test predictions
-test_predictions = predict_selected_method(train_df, test_df, target_col, date_col)
+# For temporal_column strategy: features are year columns, target is specific year
+# This example assumes wide format data - adjust based on actual split_strategy
+if split_strategy.get('strategy_type') == 'temporal_column':
+    # Wide format: different years are different columns
+    # Implementation depends on the exact winning_method_code
+    # Just execute the method as-is from Stage 3.5B
+    test_predictions = predict_selected_method(df, df, target_col, date_col)
+else:
+    # Row-based temporal split (long format)
+    train_size = 0.7
+    val_size = 0.15
+    train_end = int(len(df) * train_size)
+    val_end = int(len(df) * (train_size + val_size))
+    train_df = df.iloc[:train_end].copy()
+    test_df = df.iloc[val_end:].copy()
+    test_predictions = predict_selected_method(train_df, test_df, target_col, date_col)
 
 # Create test results
 test_results = test_df.copy()
@@ -194,14 +211,44 @@ test_results['predicted'] = test_predictions['predicted'].values
 test_results['actual'] = test_results[target_col]
 test_results['prediction_type'] = 'test'
 
-# Calculate metrics (should match Stage 3.5B)
+# Calculate metrics DYNAMICALLY based on plan.evaluation_metrics (should match Stage 3.5B)
 actual = test_results['actual'].values
 predicted = test_results['predicted'].values
-mae = np.mean(np.abs(actual - predicted))
-rmse = np.sqrt(np.mean((actual - predicted) ** 2))
-# ... other metrics ...
 
-print(f"Test Set Metrics - MAE: {mae:.4f}, RMSE: {rmse:.4f}")
+# Get metrics from execution context (plan.evaluation_metrics)
+# CRITICAL: Calculate ALL metrics specified in the plan, not just MAE/RMSE
+metrics = {{}}
+for metric_name in plan['evaluation_metrics']:
+    metric_lower = metric_name.lower()
+
+    if metric_lower == 'mae':
+        metrics[metric_name] = float(np.mean(np.abs(actual - predicted)))
+    elif metric_lower == 'rmse':
+        metrics[metric_name] = float(np.sqrt(np.mean((actual - predicted) ** 2)))
+    elif metric_lower == 'mse':
+        metrics[metric_name] = float(np.mean((actual - predicted) ** 2))
+    elif metric_lower == 'mape':
+        mask = actual != 0
+        metrics[metric_name] = float(np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100)
+    elif metric_lower == 'r2':
+        from sklearn.metrics import r2_score
+        metrics[metric_name] = float(r2_score(actual, predicted))
+    elif metric_lower == 'accuracy':
+        from sklearn.metrics import accuracy_score
+        metrics[metric_name] = float(accuracy_score(actual, predicted))
+    elif metric_lower in ['precision', 'recall', 'f1', 'f1_score']:
+        # Classification metrics (if applicable)
+        from sklearn.metrics import precision_score, recall_score, f1_score
+        if metric_lower == 'precision':
+            metrics[metric_name] = float(precision_score(actual, predicted, average='weighted'))
+        elif metric_lower == 'recall':
+            metrics[metric_name] = float(recall_score(actual, predicted, average='weighted'))
+        else:
+            metrics[metric_name] = float(f1_score(actual, predicted, average='weighted'))
+
+# Print metrics
+metric_str = ", ".join([f"{{k}}: {{v:.4f}}" for k, v in metrics.items()])
+print(f"Test Set Metrics - {{metric_str}}")
 
 # === STEP B: FUTURE FORECASTS (if forecast_horizon > 0) ===
 if forecast_horizon > 0:
@@ -428,12 +475,16 @@ If so, you must generate BOTH test predictions AND future forecasts.
 Steps:
 1. Load execution context (plan, data info, selected method)
 2. **CHECK forecast_horizon in the plan** - if > 0, this is forecasting!
-3. Get the selected method's implementation code from Stage 3.5B
-4. Load the prepared data and VERIFY column names
+3. **CRITICAL**: Get the selected method's EXACT implementation code from Stage 3.5B using get_selected_method_code
+4. Load the prepared data and VERIFY column names match what the method expects
 5. **PART A: TEST SET PREDICTIONS** (validation)
-   - Split data according to EXACT strategy from Stage 3.5B
-   - Execute the selected method on test set
-   - Calculate metrics (MAE, RMSE, MAPE, R²) - must match Stage 3.5B benchmarks
+   - **COPY VERBATIM** the winning_method_code from get_selected_method_code
+   - **DO NOT MODIFY** the code - use it exactly as provided!
+   - Use the EXACT data_split_strategy from Stage 3.5B
+   - Execute the method exactly as it was run in benchmarking
+   - Calculate metrics (MAE, RMSE, MAPE, R²)
+   - **VALIDATE**: Your MAE MUST be within ±5% of Stage 3.5B benchmark MAE!
+   - If validation fails, you are NOT using the same code/strategy - debug it!
 6. **PART B: FUTURE FORECASTS** (if forecast_horizon > 0)
    - Generate forecasts for the next N periods (N = forecast_horizon)
    - Use recursive/iterative approach
@@ -451,11 +502,12 @@ The results DataFrame must include:
 - Original relevant columns for context
 
 CRITICAL REQUIREMENTS:
+- **MUST USE**: The EXACT winning_method_code from Stage 3.5B (DO NOT write your own version!)
+- **MUST USE**: The EXACT data_split_strategy from Stage 3.5B
+- **MUST VALIDATE**: Test MAE within ±5% of benchmark (e.g., if benchmark=0.246, yours should be ~0.23-0.26)
 - If forecast_horizon > 0: Generate future forecasts (NOT just test set)!
-- Use the EXACT same data split strategy as Stage 3.5B for test set
-- Your test MAE should match the benchmark MAE from Stage 3.5B (±10%)
-- Future forecasts should extend beyond the last data point
 - If you get an error, ANALYZE it and FIX it - don't just try again blindly
+- If metrics don't match, you did something wrong - debug before proceeding!
 
 IMPORTANT: You MUST use save_predictions tool to save the results.
 

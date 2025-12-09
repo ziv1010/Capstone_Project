@@ -518,6 +518,17 @@ def save_predictions(
         predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
         results_df.to_parquet(predictions_path, index=False)
 
+        # Load method information from stage3_5b
+        method_info = {}
+        tester_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}.json"
+        if tester_path.exists():
+            tester_data = DataPassingManager.load_artifact(tester_path)
+            method_info = {
+                "method_id": tester_data.get('selected_method_id'),
+                "method_name": tester_data.get('selected_method_name'),
+                "stage3_5b_benchmark_metrics": tester_data.get('benchmark_metrics', {}),
+            }
+
         # Save execution result
         result = {
             "plan_id": plan_id,
@@ -526,7 +537,8 @@ def save_predictions(
                 "predictions": str(predictions_path)
             },
             "metrics": metrics,
-            "summary": f"Generated predictions for {len(results_df)} samples",
+            "method_used": method_info,
+            "summary": f"Generated predictions for {len(results_df)} samples using {method_info.get('method_name', 'unknown method')}",
             "data_shape": list(results_df.shape),
         }
 

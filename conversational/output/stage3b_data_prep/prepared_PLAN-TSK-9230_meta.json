@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:41:27.995789",
+    "checksum": "8fe5ce4b3dd22cb0",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-9230",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-9230.parquet",
+    "original_row_count": 3,
+    "final_row_count": 3,
+    "columns_created": [
+      "Crop",
+      "Season",
+      "Area-2020-21",
+      "Area-2021-22",
+      "Area-2022-23",
+      "Area-2023-24",
+      "Production-2020-21",
+      "Production-2021-22",
+      "Production-2022-23",
+      "Production-2023-24",
+      "Production-2024-25"
+    ],
+    "transformations_applied": [
+      "Filtered for Rice",
+      "removed Total season",
+      "median imputation for missing area/production values"
+    ],
+    "data_quality_report": {
+      "total_rows": 3,
+      "total_columns": 11,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "Zero nulls in final dataset (3 rows, 11 columns). Imputed using row-wise median for time-series consistency."
+  }
+}

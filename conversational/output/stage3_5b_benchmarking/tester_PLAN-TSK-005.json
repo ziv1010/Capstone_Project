@@ -1,0 +1,63 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:52:45.233102",
+    "checksum": "04da450beaf16d07",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-005",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "avg_mae": 61.198391,
+        "avg_rmse": 64.344355,
+        "avg_mape": 28.518663,
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "avg_mae": 61.198367,
+        "avg_rmse": 64.35002,
+        "avg_mape": 28.517387,
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "avg_mae": 61.425963,
+        "avg_rmse": 64.47157,
+        "avg_mape": 28.640957,
+        "valid": true
+      }
+    ],
+    "selected_method_id": "M2",
+    "selected_method_name": "Ridge Regression",
+    "selection_rationale": "Lowest average MAE (61.198367) across 3 consistent runs",
+    "method_comparison_summary": "M2: 61.198367 (BEST)\nM1: 61.198391 (+0.0%)\nM3: 61.425963 (+0.4%)",
+    "winning_method_code": "def predict_ridge_regression(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    from sklearn.linear_model import Ridge\n    from sklearn.preprocessing import OneHotEncoder\n    from sklearn.compose import ColumnTransformer\n    from sklearn.pipeline import Pipeline\n    from sklearn.impute import SimpleImputer\n\n    # Identify categorical and numerical features\n    categorical_features = ['Crop', 'Season']\n    numerical_features = [col for col in train_df.columns if col not in categorical_features + [date_col, target_col]]\n\n    # Create preprocessing pipeline\n    preprocessor = ColumnTransformer(\n        transformers=[\n            ('num', SimpleImputer(strategy='mean'), numerical_features),\n            ('cat', Pipeline([\n                ('imputer', SimpleImputer(strategy='most_frequent'),),\n                ('onehot', OneHotEncoder(handle_unknown='ignore'),)\n            ]), categorical_features)\n        ])\n\n    # Create full pipeline\n    model = Pipeline([\n        ('preprocessor', preprocessor),\n        ('regressor', Ridge(alpha=params.get('alpha', 1.0)))\n    ])\n\n    # Train model\n    model.fit(train_df[[date_col] + categorical_features + numerical_features], train_df[target_col])\n\n    # Make predictions\n    predictions = model.predict(test_df[[date_col] + categorical_features + numerical_features])\n\n    # Return predictions\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)\n",
+    "winning_method_hyperparameters": {
+      "alpha": 1.0
+    },
+    "winning_method_libraries": [
+      "pandas",
+      "sklearn"
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_row",
+      "date_column": "period",
+      "target_column": "Price",
+      "train_period": "2012-2023",
+      "validation_period": "2024",
+      "test_period": "2025"
+    },
+    "target_column": "Price",
+    "date_column": "period",
+    "feature_columns": [],
+    "benchmark_metrics": {
+      "mae": 61.198367,
+      "rmse": 64.35002,
+      "mape": 28.517387
+    }
+  }
+}

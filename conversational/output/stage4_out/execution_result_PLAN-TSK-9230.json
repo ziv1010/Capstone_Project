@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:49:33.884124",
+    "checksum": "ef299786019e0ef6",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-9230",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-9230.parquet"
+    },
+    "metrics": {
+      "mae": 37.4967,
+      "rmse": 50.8353,
+      "mape": 9.1985,
+      "r2": 0.9901
+    },
+    "method_used": {
+      "method_id": "M1",
+      "method_name": "Naive Forecast (Last Value)",
+      "stage3_5b_benchmark_metrics": {
+        "mae": 0.0,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 4 samples using Naive Forecast (Last Value)",
+    "data_shape": [
+      4,
+      15
+    ]
+  }
+}

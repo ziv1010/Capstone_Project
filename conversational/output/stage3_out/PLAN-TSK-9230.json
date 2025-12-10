@@ -1,0 +1,64 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:33:27.105149",
+    "checksum": "290141ed7877c739",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-9230",
+    "selected_task_id": "TSK-9230",
+    "goal": "Predict rice production for 2024-25 using historical area and production data",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "/data/All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25"
+        ],
+        "filters": [
+          "Crop == 'Rice'",
+          "Season != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [],
+    "target_column": "Production-2024-25",
+    "date_column": null,
+    "validation_strategy": "random",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 1,
+    "forecast_granularity": "year",
+    "forecast_type": "single_step",
+    "expected_model_types": [
+      "RandomForestRegressor",
+      "LinearRegression",
+      "XGBRegressor"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-10T09:33:27.104925"
+  }
+}

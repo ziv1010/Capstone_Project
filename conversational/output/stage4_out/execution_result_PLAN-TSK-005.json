@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:54:49.617267",
+    "checksum": "2fa7988844f66a3f",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-005",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-005.parquet"
+    },
+    "metrics": {
+      "mae": 61.198367,
+      "rmse": 64.35002,
+      "mape": 28.517387,
+      "r2": 0.8234
+    },
+    "method_used": {
+      "method_id": "M2",
+      "method_name": "Ridge Regression",
+      "stage3_5b_benchmark_metrics": {
+        "mae": 61.198367,
+        "rmse": 64.35002,
+        "mape": 28.517387
+      }
+    },
+    "summary": "Generated predictions for 190 samples using Ridge Regression",
+    "data_shape": [
+      190,
+      24
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:57:45.631862",
+    "checksum": "a899a3b38f6a0d89",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-005",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-005_mandi_price_forecast.png",
+        "plot_type": "line",
+        "title": "Mandi Price Forecast with Historical Context",
+        "description": "Comprehensive forecast plot showing historical prices, test set predictions, and future forecasts with clear separation between data types.",
+        "columns_used": [
+          "period",
+          "Price",
+          "predicted",
+          "prediction_type"
+        ],
+        "filename": "TSK-005_mandi_price_forecast.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-005_actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Prices (Test Set)",
+        "description": "Scatter plot comparing actual vs predicted prices in the test set with perfect prediction reference line.",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-005_actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-005_residuals_analysis.png",
+        "plot_type": "residuals",
+        "title": "Residuals Analysis",
+        "description": "Residuals analysis showing distribution and relationship with actual prices in the test set.",
+        "columns_used": [
+          "actual",
+          "residuals"
+        ],
+        "filename": "TSK-005_residuals_analysis.png"
+      }
+    ],
+    "insights": [
+      "Model achieves 82.3% variance explained (R²=0.8234) with 28.5% MAPE. Residuals show positive bias and 4.2% outliers."
+    ],
+    "summary": "Model demonstrates moderate forecasting capability with historical alignment but requires caution due to residual bias and error margins.",
+    "task_answer": "The model can forecast mandi prices with moderate accuracy (R²=0.8234), but predictions have significant margin of error (28.5% MAPE). Historical patterns show strong alignment, but future forecasts should be interpreted with caution due to residual bias and non-Gaussian error distribution."
+  }
+}

@@ -227,6 +227,9 @@ class ConversationHandler:
 
             # Add assistant response to context
             self.context.add_message("assistant", response)
+            
+            # Auto-save session after each message exchange
+            self.save_session()
 
             # Check for pipeline action
             action = self._detect_pipeline_action(user_message, response)
@@ -240,6 +243,8 @@ class ConversationHandler:
 
         except Exception as e:
             logger.error(f"Conversation error: {e}")
+            # Still save session even on error to preserve user message
+            self.save_session()
             return {
                 "response": f"I encountered an error: {e}. Please try again.",
                 "action": None,

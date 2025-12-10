@@ -1,0 +1,251 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T09:30:30.180747",
+    "checksum": "2e978c4d1a38041c",
+    "version": "1.0"
+  },
+  "data": {
+    "proposals": [
+      {
+        "id": "TSK-001",
+        "category": "forecasting",
+        "title": "Forecast Annual Crop Production",
+        "problem_statement": "Predict annual crop production values using historical production data and market prices",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+        ],
+        "target_column": "Production",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Year",
+          "Crop",
+          "Area",
+          "Yield",
+          "January-2013",
+          "January-2014",
+          "January-2015"
+        ],
+        "join_plan": {
+          "datasets": [
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+          ],
+          "join_keys": {
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv": "crop"
+          },
+          "join_type": "inner"
+        },
+        "forecast_horizon": 3,
+        "forecast_granularity": "year",
+        "forecast_type": "multi_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2",
+          "mape"
+        ],
+        "feasibility_score": 0.85,
+        "filters": []
+      },
+      {
+        "id": "TSK-002",
+        "category": "regression",
+        "title": "Predict Crop Yield by Region",
+        "problem_statement": "Estimate crop yield values using area statistics and soil properties",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "soil_data_final.xlsx - soil_data_final.csv"
+        ],
+        "target_column": "Yield",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Area",
+          "Production",
+          "Soil Type",
+          "pH Level",
+          "Organic Matter"
+        ],
+        "join_plan": {
+          "datasets": [
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "soil_data_final.xlsx - soil_data_final.csv"
+          ],
+          "join_keys": {
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Region",
+            "soil_data_final.xlsx - soil_data_final.csv": "Region"
+          },
+          "join_type": "inner"
+        },
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "feasibility_score": 0.78,
+        "filters": []
+      },
+      {
+        "id": "TSK-003",
+        "category": "classification",
+        "title": "Classify High-Yield Crops",
+        "problem_statement": "Identify crops with high yield potential using production statistics",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Yield_Category",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Area",
+          "Production",
+          "Season",
+          "Year"
+        ],
+        "evaluation_metrics": [
+          "accuracy",
+          "f1",
+          "auc_roc"
+        ],
+        "feasibility_score": 0.82,
+        "filters": []
+      },
+      {
+        "id": "TSK-004",
+        "category": "regression",
+        "title": "Predict Export Quantity by Season",
+        "problem_statement": "Estimate rice export quantities using production data and seasonal patterns",
+        "required_datasets": [
+          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Export_Quantity",
+        "target_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "feature_columns": [
+          "Year",
+          "Season",
+          "Production",
+          "Area"
+        ],
+        "join_plan": {
+          "datasets": [
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+          ],
+          "join_keys": {
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Year",
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Year"
+          },
+          "join_type": "inner"
+        },
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ],
+        "feasibility_score": 0.75,
+        "filters": []
+      },
+      {
+        "id": "TSK-005",
+        "category": "regression",
+        "title": "Predict Mandi Price Fluctuations",
+        "problem_statement": "Forecast wholesale mandi prices using historical price data and crop production",
+        "required_datasets": [
+          "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Price",
+        "target_dataset": "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
+        "feature_columns": [
+          "Month",
+          "Year",
+          "Production",
+          "Yield"
+        ],
+        "join_plan": {
+          "datasets": [
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+          ],
+          "join_keys": {
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv": "Crop",
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop"
+          },
+          "join_type": "inner"
+        },
+        "forecast_horizon": 6,
+        "forecast_granularity": "month",
+        "forecast_type": "multi_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2",
+          "mape"
+        ],
+        "feasibility_score": 0.8,
+        "filters": []
+      },
+      {
+        "id": "TSK-9017",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Modal_Price_per_kg_INR",
+        "problem_statement": "forecast the price of Urad for the next year month wise",
+        "required_datasets": [
+          "daily_mandi_prices_19-25_Sep_2025 (1).csv"
+        ],
+        "target_column": "Modal_Price_per_kg_INR",
+        "target_dataset": "daily_mandi_prices_19-25_Sep_2025 (1).csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Date"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: forecast the price of Urad for the next year month wise",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-9230",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Production-2024-25",
+        "problem_statement": "make a regression task based on the crop rice and factors area and production",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Production-2024-25",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: make a regression task based on the crop rice and factors area and production",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      }
+    ]
+  }
+}

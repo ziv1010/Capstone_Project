@@ -610,6 +610,15 @@ def setup_logging(level: str = None) -> logging.Logger:
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
         logger.addHandler(handler)
+        
+        # Add file handler
+        log_file = PROJECT_ROOT / "output" / "pipeline.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(file_handler)
 
     return logger
 

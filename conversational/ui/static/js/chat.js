@@ -5,13 +5,36 @@
 
 let currentSessionId = null;
 let conversations = [];
-let chatMode = 'history'; // 'history' or 'live'
+let chatMode = 'live'; // Default to live
 let liveMessages = [];
 
 /**
  * Initialize the chat page
  */
 async function init() {
+    // Start in live mode
+    const toggleBtn = document.getElementById('modeToggle');
+    const sessionCard = document.getElementById('sessionSelectorCard');
+    const inputContainer = document.getElementById('chatInputContainer');
+
+    toggleBtn.innerHTML = '📜 History';
+    toggleBtn.classList.add('btn-primary');
+    toggleBtn.classList.remove('btn-secondary');
+    sessionCard.style.display = 'none';
+    inputContainer.style.display = 'block';
+
+    document.getElementById('sessionBadge').textContent = 'Live Chat';
+    document.getElementById('sessionBadge').className = 'badge badge-running';
+
+    // Add welcome message
+    liveMessages = [{
+        role: 'assistant',
+        content: '👋 Welcome! I\'m your AI pipeline assistant. Ask me anything about your data or request analysis tasks.',
+        timestamp: new Date().toISOString()
+    }];
+    displayLiveMessages();
+
+    // Load conversations in background for history mode
     await loadConversations();
 }
 

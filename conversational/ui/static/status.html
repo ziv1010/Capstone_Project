@@ -148,27 +148,30 @@
     <div class="page-wrapper">
         <div class="container">
             <!-- Header -->
-            <div class="flex justify-between items-center mt-4 mb-3">
-                <div>
-                    <h1>Task Progress</h1>
-                    <p class="text-muted">Monitor pipeline execution and task status</p>
+            <div class="glass-card"
+                style="margin-bottom: 1.5rem; padding: 1.5rem; background: linear-gradient(to right, rgba(139, 92, 246, 0.1), transparent);">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1>Pipeline Status</h1>
+                        <p class="text-muted" style="font-size: 1.1rem;">Real-time execution monitoring</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshStatus()">
+                        🔄 Refresh View
+                    </button>
                 </div>
-                <button class="btn btn-primary" onclick="refreshStatus()">
-                    🔄 Refresh
-                </button>
             </div>
 
             <!-- Pipeline Visualization -->
             <div class="glass-card mb-3">
                 <div class="glass-card-header">
-                    <h3 class="glass-card-title">Pipeline Stages</h3>
+                    <h3 class="glass-card-title">Live Pipeline Flow</h3>
                 </div>
-                <div class="glass-card-body">
+                <div class="glass-card-body" style="background: rgba(0,0,0,0.2);">
                     <div class="pipeline-visual" id="pipelineVisual">
                         <!-- Will be populated dynamically -->
                         <div class="text-center" style="width: 100%;">
                             <div class="spinner" style="margin: 2rem auto;"></div>
-                            <p class="text-muted">Loading pipeline status...</p>
+                            <p class="text-muted">Connecting to pipeline...</p>
                         </div>
                     </div>
                 </div>
@@ -177,11 +180,11 @@
             <!-- Tasks List -->
             <div class="glass-card">
                 <div class="glass-card-header">
-                    <h3 class="glass-card-title">Active Tasks</h3>
-                    <span class="badge badge-info" id="taskCountBadge">0 tasks</span>
+                    <h3 class="glass-card-title">Active Missions</h3>
+                    <span class="badge badge-info" id="taskCountBadge">Scanning...</span>
                 </div>
-                <div class="glass-card-body" id="tasksList">
-                    <p class="text-muted text-center">No active tasks</p>
+                <div class="glass-card-body" id="tasksList" style="display: grid; gap: 1rem;">
+                    <p class="text-muted text-center" style="padding: 2rem;">No active missions found</p>
                 </div>
             </div>
         </div>

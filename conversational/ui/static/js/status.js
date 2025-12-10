@@ -140,10 +140,10 @@ function displayTasksList() {
 }
 
 /**
- * View task details (navigate to outputs page filtered by task)
+ * View task details
  */
 function viewTaskDetails(taskId) {
-    window.location.href = `/outputs?task=${taskId}`;
+    window.location.href = `/static/task_details.html?task=${taskId}`;
 }
 
 /**

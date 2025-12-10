@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pipeline - Task Details</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .task-header {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .task-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+
+        .meta-item {
+            background: var(--bg-secondary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+        }
+
+        .meta-label {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+        }
+
+        .meta-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .tabs {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: var(--spacing-sm);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            cursor: pointer;
+            font-family: var(--font-sans);
+            font-weight: 500;
+            border-radius: var(--radius-md);
+            transition: all var(--transition-base);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--glass-bg);
+        }
+
+        .tab-btn.active {
+            color: white;
+            background: var(--accent-purple);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-box {
+            background: var(--bg-secondary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            height: 400px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+        }
+
+        .visual-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin-bottom: var(--spacing-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .visual-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .visual-caption {
+            padding: var(--spacing-sm);
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="nav-brand-icon">🤖</span>
+                <span>AI Pipeline</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">💬 Chat</a></li>
+                <li><a href="/logs" class="nav-link">📋 Logs</a></li>
+                <li><a href="/outputs" class="nav-link">📁 Outputs</a></li>
+                <li><a href="/status" class="nav-link active">📊 Status</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="mb-3">
+                <a href="/status" class="btn btn-secondary btn-sm">← Back to All Tasks</a>
+            </div>
+
+            <div id="loadingState" class="text-center py-5">
+                <div class="spinner mb-3"></div>
+                <p class="text-muted">Loading task details...</p>
+            </div>
+
+            <div id="contentState" style="display: none;">
+                <!-- Task Header -->
+                <div class="task-header">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <h1 id="taskId">TSK-...</h1>
+                                <span class="badge" id="taskStatus">Status</span>
+                            </div>
+                            <p class="text-muted" id="taskTitle">Task Title</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="refreshTaskData()">🔄 Refresh</button>
+                    </div>
+
+                    <div class="task-meta-grid" id="taskMeta">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('pipeline')">Pipeline Status</button>
+                    <button class="tab-btn" onclick="switchTab('logs')">Logs</button>
+                    <button class="tab-btn" onclick="switchTab('outputs')">Outputs</button>
+                    <button class="tab-btn" onclick="switchTab('visualizations')">Visualizations</button>
+                </div>
+
+                <!-- Pipeline Tab -->
+                <div id="pipeline-tab" class="tab-content active">
+                    <div class="glass-card">
+                        <div class="glass-card-body">
+                            <div class="pipeline-visual" id="pipelineVisual"
+                                style="justify-content: center; padding: 3rem 1rem;">
+                                <!-- Reusing the pipeline visual style from status.html -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div id="logs-tab" class="tab-content">
+                    <div class="glass-card">
+                        <div class="glass-card-header flex justify-between items-center">
+                            <h3 class="glass-card-title">Task Logs</h3>
+                            <button class="btn btn-sm btn-secondary" onclick="copyLogs()">📋 Copy</button>
+                        </div>
+                        <div class="glass-card-body">
+                            <div class="log-box" id="taskLogs">
+                                <p class="text-muted">Connecting to logs...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Outputs Tab -->
+                <div id="outputs-tab" class="tab-content">
+                    <div class="glass-card">
+                        <div class="glass-card-body">
+                            <div id="outputsList" class="file-list">
+                                <!-- File items -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualizations Tab -->
+                <div id="visualizations-tab" class="tab-content">
+                    <div class="glass-card">
+                        <div class="glass-card-body">
+                            <div id="visualizationsGrid" class="grid grid-cols-2 gap-4">
+                                <!-- Images -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script>
+        // Inline script for task details logic to keep it simple
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskId = urlParams.get('task');
+        let logsWebSocket = null;
+
+        // Stage config for visual
+        const STAGE_CONFIG = [
+            { name: 'stage3', label: 'Planning', icon: '📋' },
+            { name: 'stage3b', label: 'Data Prep', icon: '🔧' },
+            { name: 'stage3_5a', label: 'Methods', icon: '🧪' },
+            { name: 'stage3_5b', label: 'Benchmark', icon: '📊' },
+            { name: 'stage4', label: 'Execute', icon: '⚡' },
+            { name: 'stage5', label: 'Visualize', icon: '📈' },
+            { name: 'stage6', label: 'Report', icon: '📝' }
+        ];
+
+        async function init() {
+            if (!taskId) {
+                window.location.href = '/status';
+                return;
+            }
+            document.getElementById('taskId').textContent = taskId;
+            await refreshTaskData();
+            connectLogs();
+        }
+
+        async function refreshTaskData() {
+            try {
+                const data = await APIClient.getTaskStatus(taskId);
+                renderTaskHeader(data);
+                renderPipeline(data);
+                await loadOutputs();
+
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('contentState').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading task:', error);
+            }
+        }
+
+        function renderTaskHeader(data) {
+            // Status Badge
+            const statusEl = document.getElementById('taskStatus');
+            statusEl.textContent = data.status;
+            statusEl.className = `badge ${data.status === 'completed' ? 'badge-success' : 'badge-running'}`;
+
+            // Meta Grid
+            const metaContainer = document.getElementById('taskMeta');
+            const metrics = data.metrics || {};
+
+            let metaHTML = `
+                <div class="meta-item">
+                    <div class="meta-label">Current Stage</div>
+                    <div class="meta-value">${data.last_stage || 'N/A'}</div>
+                </div>
+            `;
+
+            if (Object.keys(metrics).length > 0) {
+                Object.entries(metrics).forEach(([key, value]) => {
+                    metaHTML += `
+                        <div class="meta-item">
+                            <div class="meta-label">${key}</div>
+                            <div class="meta-value" style="color: var(--accent-purple);">${typeof value === 'number' ? value.toFixed(4) : value}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            metaContainer.innerHTML = metaHTML;
+        }
+
+        function renderPipeline(data) {
+            const container = document.getElementById('pipelineVisual');
+            const stages = data.stages || {};
+
+            container.innerHTML = STAGE_CONFIG.map((stage, index) => {
+                const status = stages[stage.name] || 'pending';
+                const connectorClass = status === 'completed' ? 'active' : '';
+
+                return `
+                    <div class="stage-node">
+                        <div class="stage-circle ${status}">
+                            <span>${stage.icon}</span>
+                        </div>
+                        <div class="stage-label">${stage.label}</div>
+                    </div>
+                    ${index < STAGE_CONFIG.length - 1 ? `<div class="stage-connector ${connectorClass}"></div>` : ''}
+                `;
+            }).join('');
+        }
+
+        async function loadOutputs() {
+            // This is a bit tricky as output API is by stage, not task.
+            // But we know the file naming convention includes task ID.
+            // We'll fetch all stage outputs and filter client-side.
+
+            const stages = await APIClient.getStages();
+            let allFiles = [];
+
+            for (const stage of stages.stages) {
+                try {
+                    const out = await APIClient.getStageOutputs(stage.name);
+                    if (out.outputs) {
+                        const filtered = out.outputs.filter(f => f.filename.includes(taskId));
+                        allFiles = allFiles.concat(filtered);
+                    }
+                } catch (e) { console.warn(e); }
+            }
+
+            renderOutputs(allFiles);
+            renderVisualizations(allFiles);
+        }
+
+        function renderOutputs(files) {
+            const list = document.getElementById('outputsList');
+            if (files.length === 0) {
+                list.innerHTML = '<p class="text-muted text-center">No outputs found yet.</p>';
+                return;
+            }
+
+            list.innerHTML = files.map(file => `
+                <div class="file-item" onclick="window.open('/outputs?file=' + encodeURIComponent('${file.path}'), '_blank')">
+                    <div class="flex items-center">
+                        <span class="file-icon">${file.type === 'image' ? '🖼️' : (file.type === 'json' ? '📄' : '📊')}</span>
+                        <div class="file-info">
+                            <div class="file-name">${file.filename}</div>
+                            <div class="file-meta">${file.type.toUpperCase()} • ${formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <a href="/api/files/${file.path}" class="btn btn-sm btn-secondary" download>⬇️</a>
+                </div>
+            `).join('');
+        }
+
+        function renderVisualizations(files) {
+            const grid = document.getElementById('visualizationsGrid');
+            const images = files.filter(f => f.type === 'image');
+
+            if (images.length === 0) {
+                grid.parentElement.innerHTML = '<p class="text-muted text-center">No visualizations generated yet.</p>';
+                return;
+            }
+
+            grid.innerHTML = images.map(img => `
+                <div class="visual-card">
+                    <img src="/api/files/${img.path}" alt="${img.filename}" onclick="window.open(this.src, '_blank')">
+                    <div class="visual-caption">${img.filename}</div>
+                </div>
+            `).join('');
+        }
+
+        function connectLogs() {
+            const logBox = document.getElementById('taskLogs');
+            logBox.innerHTML = '';
+
+            try {
+                logsWebSocket = APIClient.connectLogsWebSocket((msg) => {
+                    // Primitive highlighting for current task
+                    const isRelevant = msg.message.includes(taskId);
+                    const highlightStyle = isRelevant ? 'background: rgba(139, 92, 246, 0.1); border-left: 2px solid var(--accent-purple); padding-left: 0.5rem;' : '';
+
+                    // Show all logs but highlight relevant ones
+                    const div = document.createElement('div');
+                    div.style = `margin-bottom: 2px; ${highlightStyle}`;
+                    div.innerHTML = `
+                        <span style="color: var(--text-tertiary); font-size: 0.75rem;">${new Date(msg.timestamp).toLocaleTimeString()}</span>
+                        <span style="margin-left: 8px; color: var(--text-secondary);">${msg.message}</span>
+                    `;
+                    logBox.appendChild(div);
+                    logBox.scrollTop = logBox.scrollHeight;
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabId + '-tab').classList.add('active');
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>

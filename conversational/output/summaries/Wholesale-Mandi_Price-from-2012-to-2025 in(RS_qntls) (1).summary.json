@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:44:31.370581",
-    "checksum": "9bfec8e410ffe6dd",
+    "timestamp": "2025-12-10T09:14:50.967508",
+    "checksum": "4a33b0c47186b882",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary"
@@ -4220,7 +4220,7 @@
       "December-2024"
     ],
     "file_size_mb": 0.04605388641357422,
-    "created_at": "2025-12-09 19:44:31.370116",
+    "created_at": "2025-12-10 09:14:50.967025",
     "has_datetime_column": false,
     "has_target_candidates": [
       "January-2015",

@@ -301,12 +301,15 @@ async def send_chat_message(request: dict):
         # Import here to avoid circular dependencies
         sys.path.insert(0, str(Path(__file__).parent.parent))
         from code.master_orchestrator import ConversationalOrchestrator
+        from fastapi.concurrency import run_in_threadpool
         
         # Create or reuse orchestrator with session_id
+        # Note: Initialization might check files but is generally fast enough
         orchestrator = ConversationalOrchestrator(session_id=session_id)
         
-        # Process the message
-        result = orchestrator.process_user_input(message)
+        # Process the message in a thread pool to avoid blocking the event loop
+        # This allows other endpoints (status, logs) to respond while the pipeline runs
+        result = await run_in_threadpool(orchestrator.process_user_input, message)
         
         return {
             "success": True,
@@ -346,23 +349,89 @@ async def get_recent_logs(lines: int = 100):
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     """WebSocket endpoint for real-time log streaming."""
-    await manager.connect(websocket)
+    await websocket.accept()
+    
+    # Register connection
+    with logs_manager.lock:
+        logs_manager.connections.append(websocket)
+        count = len(logs_manager.connections)
+    
+    logger.info(f"WebSocket connected. Total connections: {count}")
+    
     try:
+        # Send initial recent logs
+        log_file = PROJECT_ROOT / "output" / "pipeline.log"
+        if log_file.exists():
+            with open(log_file, "r") as f:
+                # Get last 100 lines
+                lines = f.readlines()[-100:]
+                for line in lines:
+                    try:
+                        # Parse log line
+                        # Format: 2025-12-10 03:00:00,000 - logger - LEVEL - message
+                        parts = line.strip().split(" - ", 3)
+                        if len(parts) >= 4:
+                            timestamp, _, level, message = parts
+                        else:
+                            timestamp = datetime.now().isoformat()
+                            level = "INFO"
+                            message = line.strip()
+                            
+                        await websocket.send_json({
+                            "type": "log",
+                            "level": level,
+                            "timestamp": timestamp,
+                            "message": message
+                        })
+                    except Exception:
+                        pass
+
+        # Keep connection open and send heartbeats
         while True:
-            # Keep connection alive and send periodic updates
             await asyncio.sleep(1)
-            # In production, this would stream actual logs
-            await websocket.send_json({
-                "type": "log",
-                "level": "INFO",
-                "timestamp": datetime.now().isoformat(),
-                "message": "Heartbeat - log streaming active"
-            })
+            # In a real implementation, we would tail the file here
+            # For now, we rely on the log_manager broadcast from the API process logs
+            # To support external process logs, we need a file watcher
+            
+            # Simple file watcher logic
+            if log_file.exists():
+                stat = log_file.stat()
+                current_size = getattr(websocket, "_last_size", 0)
+                if stat.st_size > current_size:
+                    with open(log_file, "r") as f:
+                        f.seek(current_size)
+                        new_lines = f.readlines()
+                        for line in new_lines:
+                            try:
+                                parts = line.strip().split(" - ", 3)
+                                if len(parts) >= 4:
+                                    timestamp, _, level, message = parts
+                                else:
+                                    timestamp = datetime.now().isoformat()
+                                    level = "INFO"
+                                    message = line.strip()
+                                    
+                                await websocket.send_json({
+                                    "type": "log",
+                                    "level": level,
+                                    "timestamp": timestamp,
+                                    "message": message
+                                })
+                            except Exception:
+                                pass
+                    websocket._last_size = stat.st_size
+            
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        with logs_manager.lock:
+            if websocket in logs_manager.connections:
+                logs_manager.connections.remove(websocket)
+                count = len(logs_manager.connections)
+        logger.info(f"WebSocket disconnected. Total connections: {count}")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        manager.disconnect(websocket)
+        with logs_manager.lock:
+            if websocket in logs_manager.connections:
+                logs_manager.connections.remove(websocket)
 
 # ============================================================================
 # STAGE OUTPUTS API ENDPOINTS

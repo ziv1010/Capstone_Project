@@ -41,6 +41,7 @@ class Stage2State(BaseModel):
     exploration_notes: str = ""
     iteration: int = 0
     complete: bool = False
+    save_task_proposals_failures: int = 0  # Track consecutive failures
 
 
 # ============================================================================
@@ -259,6 +260,28 @@ These use categorical columns as analysis dimensions:
 - save_task_proposals: Save your proposals (CALL THIS TO FINISH)
 - get_proposal_template: Get JSON format
 
+## 🚨 CRITICAL: JSON Generation Rules
+When calling save_task_proposals, your JSON MUST be valid:
+
+1. **Use the exact format from get_proposal_template** - don't deviate
+2. **All object keys must be quoted** with double quotes: "key"
+3. **All string values must be quoted** with double quotes: "value"
+4. **Arrays and objects must be comma-separated**: [..., ...] and {..., ...}
+5. **NO trailing commas**: {"key": "value"} NOT {"key": "value",}
+6. **Verify your JSON** before submitting - check bracket matching, commas, quotes
+
+Common mistakes to avoid:
+- Missing comma between array elements: [{...} {...}] ❌ → [{...}, {...}] ✅
+- Trailing comma: [{...},] ❌ → [{...}] ✅
+- Unquoted keys: {key: "value"} ❌ → {"key": "value"} ✅
+- Single quotes: {'key': 'value'} ❌ → {"key": "value"} ✅
+
+If save_task_proposals returns an error:
+- READ the error message carefully - it shows EXACTLY where the problem is
+- FIX only that specific issue
+- DO NOT regenerate the entire JSON from scratch
+- If you fail 3 times, ask for the template and start over
+
 IMPORTANT: After save_task_proposals succeeds, STOP. Do not call more tools.
 """
 
@@ -281,6 +304,14 @@ def create_stage2_agent():
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=STAGE2_SYSTEM_PROMPT)] + list(messages)
 
+        # Check for repeated save_task_proposals failures (agent stuck in loop)
+        if state.save_task_proposals_failures >= 3:
+            logger.warning(f"Stage 2: Agent failed to save valid JSON {state.save_task_proposals_failures} times. Forcing completion.")
+            return {
+                "messages": [AIMessage(content="Unable to generate valid JSON after multiple attempts. Please check the data and try again.")],
+                "complete": True
+            }
+
         if state.iteration >= STAGE_MAX_ROUNDS.get("stage2", 15):
             logger.warning(f"Stage 2: Maximum iterations ({STAGE_MAX_ROUNDS.get('stage2', 15)}) reached")
             return {
@@ -300,10 +331,28 @@ def create_stage2_agent():
                 for tc in response.tool_calls:
                     logger.debug(f"Tool Call: {tc['name']} with args: {str(tc['args'])[:500]}...")
 
-        return {
+        # Detect if the last tool result was a save_task_proposals failure
+        update_dict = {
             "messages": [response],
             "iteration": state.iteration + 1
         }
+
+        # Check if previous message was a failed save_task_proposals
+        if len(messages) >= 2:
+            last_msg = messages[-1]
+            if hasattr(last_msg, 'content') and isinstance(last_msg.content, str):
+                # Check if it's a JSON parse error or structure error from save_task_proposals
+                if 'JSON_PARSE_ERROR' in last_msg.content or 'JSON structure invalid' in last_msg.content:
+                    update_dict['save_task_proposals_failures'] = state.save_task_proposals_failures + 1
+                    if DEBUG:
+                        logger.debug(f"Detected save_task_proposals failure #{update_dict['save_task_proposals_failures']}")
+                # Reset counter on success
+                elif 'SUCCESS: Saved' in last_msg.content:
+                    update_dict['save_task_proposals_failures'] = 0
+                    if DEBUG:
+                        logger.debug("save_task_proposals succeeded - resetting failure counter")
+
+        return update_dict
 
     def should_continue(state: Stage2State) -> str:
         """Determine if we should continue or end."""

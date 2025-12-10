@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:44:31.381475",
-    "checksum": "1dec9389c5f329e1",
+    "timestamp": "2025-12-10T09:14:50.978403",
+    "checksum": "6ce9d1f48bbadcb4",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary"
@@ -127,7 +127,7 @@
       "Modal_Price_per_kg_INR"
     ],
     "file_size_mb": 0.0009174346923828125,
-    "created_at": "2025-12-09 19:44:31.381348",
+    "created_at": "2025-12-10 09:14:50.978259",
     "has_datetime_column": true,
     "has_target_candidates": [],
     "data_quality_score": 1.0

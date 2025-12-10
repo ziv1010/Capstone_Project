@@ -404,6 +404,93 @@ def evaluate_forecasting_feasibility(
         return f"Error assessing feasibility: {e}"
 
 
+def _sanitize_json_string(json_str: str) -> str:
+    """
+    Attempt to fix common JSON formatting issues that LLMs make.
+
+    This is dataset-agnostic and fixes structural issues, not content.
+    """
+    import re
+
+    # Remove any BOM or weird characters at start
+    json_str = json_str.strip().lstrip('\ufeff')
+    
+    # Remove markdown code blocks if present
+    if json_str.startswith('```') or json_str.startswith('```json'):
+        lines = json_str.split('\n')
+        if lines[0].startswith('```'):
+            lines = lines[1:]
+        if lines[-1].startswith('```'):
+            lines = lines[:-1]
+        json_str = '\n'.join(lines).strip()
+
+    # Fix trailing commas before closing brackets/braces
+    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+
+    # Fix missing commas between array elements (objects)
+    # Pattern: } { or }\n{ or }"{
+    json_str = re.sub(r'}\s*({)', r'},\1', json_str)
+    json_str = re.sub(r'}\s*(")', r'},\1', json_str)
+    
+    # Fix missing commas between array elements (arrays)
+    # Pattern: ] [ or ]\n[
+    json_str = re.sub(r']\s*(\[)', r'],\1', json_str)
+    
+    # Fix missing commas after strings in arrays/objects
+    # Pattern: "value" "next" -> "value", "next"
+    # Be careful not to match inside strings
+    # This is hard with regex, skipping for safety unless specialized library used
+
+    return json_str
+
+
+def _get_json_error_context(json_str: str, error: json.JSONDecodeError, context_lines: int = 3) -> str:
+    """
+    Extract context around a JSON parsing error to help LLM debug.
+
+    Args:
+        json_str: The JSON string that failed to parse
+        error: The JSONDecodeError exception
+        context_lines: Number of lines to show before/after error
+
+    Returns:
+        Formatted error context with line numbers
+    """
+    lines = json_str.split('\n')
+    error_line = error.lineno - 1  # Convert to 0-indexed
+    error_col = error.colno - 1
+
+    # Calculate context window
+    start_line = max(0, error_line - context_lines)
+    end_line = min(len(lines), error_line + context_lines + 1)
+
+    context = []
+    context.append(f"JSON Parse Error: {error.msg}")
+    context.append(f"Location: Line {error.lineno}, Column {error.colno}")
+    context.append("\nContext:")
+    context.append("-" * 60)
+
+    for i in range(start_line, end_line):
+        line_num = i + 1
+        marker = ">>> " if i == error_line else "    "
+        context.append(f"{marker}{line_num:4d} | {lines[i]}")
+
+        # Show error position with arrow
+        if i == error_line:
+            arrow = " " * (len(marker) + 7 + error_col) + "^--- ERROR HERE"
+            context.append(arrow)
+
+    context.append("-" * 60)
+    context.append("\nCommon fixes:")
+    context.append("1. Check for missing commas between array/object elements")
+    context.append("2. Check for trailing commas before closing }, ]")
+    context.append("3. Ensure all strings are properly quoted")
+    context.append("4. Verify all brackets/braces are balanced")
+    context.append("\nPlease fix the JSON and try again.")
+
+    return "\n".join(context)
+
+
 @tool
 def save_task_proposals(proposals_json: str) -> str:
     """
@@ -423,12 +510,38 @@ def save_task_proposals(proposals_json: str) -> str:
         # Log the first 500 chars of input for debugging
         logger.debug(f"Received proposals_json (first 500 chars): {proposals_json[:500] if proposals_json else 'None'}...")
 
-        proposals = json.loads(proposals_json)
+        # Try to sanitize common JSON issues before parsing
+        original_json = proposals_json
+        proposals_json = _sanitize_json_string(proposals_json)
+
+        if proposals_json != original_json:
+            logger.debug("Applied JSON sanitization fixes")
+
+        # Attempt to parse JSON
+        try:
+            proposals = json.loads(proposals_json)
+        except json.JSONDecodeError as e:
+            # If parsing fails, provide detailed error context
+            error_context = _get_json_error_context(proposals_json, e, context_lines=5)
+            logger.error(f"JSON parsing failed:\n{error_context}")
+            return f"JSON_PARSE_ERROR:\n{error_context}"
 
         # Validate structure
         if 'proposals' not in proposals:
             logger.error("Error: JSON must contain 'proposals' key")
-            return "Error: JSON must contain 'proposals' key"
+            error_msg = (
+                "Error: JSON structure invalid\n"
+                "Expected format:\n"
+                "{\n"
+                '  "proposals": [\n'
+                '    { "id": "TSK-001", ... },\n'
+                '    { "id": "TSK-002", ... }\n'
+                "  ]\n"
+                "}\n\n"
+                f"Received keys: {list(proposals.keys())}\n"
+                "Please wrap your proposals array in an object with 'proposals' key."
+            )
+            return error_msg
 
         n_proposals = len(proposals.get('proposals', []))
         logger.info(f"Parsed {n_proposals} proposals from JSON")
@@ -446,7 +559,7 @@ def save_task_proposals(proposals_json: str) -> str:
         )
 
         logger.info(f"✅ Saved {n_proposals} task proposals to: {output_path}")
-        
+
         # Verify the file was saved
         if output_path.exists():
             logger.debug(f"Verified: File exists at {output_path}")
@@ -455,9 +568,6 @@ def save_task_proposals(proposals_json: str) -> str:
 
         return f"SUCCESS: Saved {n_proposals} task proposals to: {output_path}"
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Error: Invalid JSON - {e}")
-        return f"Error: Invalid JSON - {e}"
     except Exception as e:
         logger.error(f"Error saving proposals: {e}")
         import traceback
@@ -476,18 +586,13 @@ def get_proposal_template() -> str:
         "proposals": [
             {
                 "id": "TSK-001",
-                "category": "forecasting | classification | regression | clustering | anomaly_detection | descriptive",
+                "category": "forecasting",
                 "title": "Short descriptive title",
                 "problem_statement": "Detailed description of the analytical problem",
-                "required_datasets": ["dataset1.csv", "dataset2.csv"],
+                "required_datasets": ["dataset1.csv"],
                 "target_column": "column_to_predict",
-                "target_dataset": "dataset_containing_target.csv",
+                "target_dataset": "dataset1.csv",
                 "feature_columns": ["feature1", "feature2"],
-                "join_plan": {
-                    "datasets": ["dataset1.csv", "dataset2.csv"],
-                    "join_keys": {"dataset1.csv": "key1", "dataset2.csv": "key2"},
-                    "join_type": "inner"
-                },
                 "validation_plan": {
                     "train_fraction": 0.7,
                     "validation_fraction": 0.15,
@@ -498,12 +603,48 @@ def get_proposal_template() -> str:
                 "feasibility_score": 0.8,
                 "feasibility_notes": "Notes on why this task is feasible",
                 "forecast_horizon": 30,
-                "forecast_granularity": "daily"
+                "forecast_granularity": "daily",
+                "forecast_type": "multi_step",
+                "evaluation_metrics": ["mae", "rmse", "mape", "r2"]
             }
         ]
     }
 
-    return "Task Proposal Template:\n\n" + json.dumps(template, indent=2)
+    explanation = """
+Task Proposal Template:
+
+IMPORTANT JSON RULES:
+1. Wrap proposals in an object with "proposals" key
+2. Use double quotes for all strings and keys
+3. Separate array/object elements with commas
+4. NO trailing commas before closing ], }
+5. Ensure all brackets are balanced: { }, [ ]
+
+Required fields:
+- id: Unique ID like "TSK-001", "TSK-002", etc.
+- category: One of: forecasting, regression, classification, clustering, descriptive
+- title: Short descriptive title
+- problem_statement: What you're trying to predict/analyze
+- required_datasets: Array of dataset filenames (actual .csv files, not .summary.json)
+- target_column: Column name to predict (must exist in target_dataset)
+- target_dataset: Which dataset has the target column
+- feature_columns: Array of column names to use as features
+- feasibility_score: Number between 0 and 1
+- feasibility_notes: Why this task is feasible
+
+Optional fields (only for multi-dataset tasks):
+- join_plan: {"datasets": [...], "join_keys": {"ds1": "col", "ds2": "col"}, "join_type": "inner"}
+
+Category-specific fields:
+- For forecasting: forecast_horizon, forecast_granularity, forecast_type, evaluation_metrics
+- For classification: evaluation_metrics
+- For regression: evaluation_metrics
+- For clustering: evaluation_metrics
+
+Template:
+"""
+
+    return explanation + "\n" + json.dumps(template, indent=2)
 
 
 # Export tools list

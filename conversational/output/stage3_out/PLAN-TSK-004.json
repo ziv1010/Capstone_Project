@@ -1,0 +1,114 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T07:58:01.695745",
+    "checksum": "077aa647436a9a5b",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-004",
+    "selected_task_id": "TSK-004",
+    "goal": "Predict rice exports to Bangladesh using seasonal production patterns",
+    "task_category": "regression",
+    "file_instructions": [
+      {
+        "filename": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "HS Code",
+          "Description",
+          "2018 - 19-Quantity",
+          "2019 - 20-Quantity",
+          "2020 - 21-Quantity",
+          "2021 - 22-Quantity",
+          "2022 - 23-Quantity",
+          "2023 - 24-Quantity",
+          "2024 - 25-Quantity"
+        ],
+        "filters": [
+          "Description != 'Total'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      },
+      {
+        "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "filepath": "data/",
+        "columns_to_use": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24"
+        ],
+        "filters": [
+          "Crop = 'Rice'"
+        ],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [
+      {
+        "left_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
+        "right_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "left_on": "",
+        "right_on": "",
+        "how": "inner",
+        "validation_rule": null
+      }
+    ],
+    "feature_engineering": [
+      {
+        "name": "export_trend",
+        "description": "Calculate year-over-year export quantity change",
+        "source_columns": [
+          "2023 - 24-Quantity",
+          "2024 - 25-Quantity"
+        ],
+        "implementation_code": "df['export_trend'] = df['2024 - 25-Quantity'] - df['2023 - 24-Quantity']",
+        "dtype": null
+      },
+      {
+        "name": "production_ratio",
+        "description": "Compare production levels across years",
+        "source_columns": [
+          "Production-2022-23",
+          "Production-2023-24"
+        ],
+        "implementation_code": "df['production_ratio'] = df['Production-2023-24'] / df['Production-2022-23']",
+        "dtype": null
+      }
+    ],
+    "target_column": "2024 - 25-Quantity",
+    "date_column": null,
+    "validation_strategy": "random",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 1,
+    "forecast_granularity": null,
+    "forecast_type": "single_step",
+    "expected_model_types": [
+      "RandomForestRegressor",
+      "XGBRegressor"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "r2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-10T07:58:01.695483"
+  }
+}

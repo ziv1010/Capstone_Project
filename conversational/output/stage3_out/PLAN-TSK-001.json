@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:56:14.479733",
-    "checksum": "ae7d44e40c0da7ab",
+    "timestamp": "2025-12-10T05:53:01.186790",
+    "checksum": "a3f173929a93654b",
     "version": "1.0",
     "stage": "stage3",
     "type": "execution_plan"
@@ -9,24 +9,30 @@
   "data": {
     "plan_id": "PLAN-TSK-001",
     "selected_task_id": "TSK-001",
-    "goal": "Predict annual crop production for different seasons using historical area and yield data",
+    "goal": "Forecast annual crop production using historical area, yield, and price data",
     "task_category": "forecasting",
     "file_instructions": [
       {
         "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-        "filepath": "",
+        "filepath": "data/All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
         "columns_to_use": [
           "Crop",
           "Season",
           "Area-2020-21",
           "Area-2021-22",
           "Area-2022-23",
+          "Area-2023-24",
+          "Area-2024-25",
           "Production-2020-21",
           "Production-2021-22",
           "Production-2022-23",
+          "Production-2023-24",
+          "Production-2024-25",
           "Yield-2020-21",
           "Yield-2021-22",
-          "Yield-2022-23"
+          "Yield-2022-23",
+          "Yield-2023-24",
+          "Yield-2024-25"
         ],
         "filters": [
           "Season != 'Total'"
@@ -35,18 +41,12 @@
         "parse_dates": []
       },
       {
-        "filename": "All-India-profile_-Crop-wise-Area.csv",
-        "filepath": "",
+        "filename": "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
+        "filepath": "data/Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
         "columns_to_use": [
-          "Crop",
-          "Season",
-          "Area-2022-23",
-          "Area-2023-24",
-          "Area-2024-25"
+          "Crop"
         ],
-        "filters": [
-          "Season != 'Total'"
-        ],
+        "filters": [],
         "date_column": null,
         "parse_dates": []
       }
@@ -54,54 +54,57 @@
     "join_steps": [
       {
         "left_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-        "right_dataset": "All-India-profile_-Crop-wise-Area.csv",
+        "right_dataset": "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
         "left_on": "Crop",
         "right_on": "Crop",
         "how": "inner",
-        "validation_rule": "Expect 1:1 mapping"
+        "validation_rule": null
       }
     ],
     "feature_engineering": [
       {
-        "name": "season_encoding",
-        "description": "One-hot encode Season categorical variable",
+        "name": "melt_price_data",
+        "description": "Convert wide-format price data to long format for temporal analysis",
         "source_columns": [
-          "Season"
+          "Crop"
         ],
-        "implementation_code": "df = pd.get_dummies(df, columns=['Season'], drop_first=True)",
+        "implementation_code": "price_long = price_df.melt(id_vars=['Crop'], var_name='period', value_name='price')",
         "dtype": null
       },
       {
-        "name": "historical_trend",
-        "description": "Create 3-year production trend",
+        "name": "create_production_lags",
+        "description": "Create lag features from historical production data",
         "source_columns": [
           "Production-2020-21",
           "Production-2021-22",
-          "Production-2022-23"
+          "Production-2022-23",
+          "Production-2023-24"
         ],
-        "implementation_code": "df['prod_trend'] = df['Production-2022-23'] - df['Production-2020-21']",
+        "implementation_code": "df['prod_lag_1'] = df['Production-2020-21'].shift(1)\ndf['prod_lag_2'] = df['Production-2021-22'].shift(1)\ndf['prod_lag_3'] = df['Production-2022-23'].shift(1)",
         "dtype": null
       }
     ],
     "target_column": "Production-2024-25",
-    "date_column": "Year",
+    "date_column": "period",
     "validation_strategy": "temporal",
-    "train_end_date": "2023-06-30",
-    "validation_end_date": "2024-06-30",
-    "forecast_horizon": 1,
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 3,
     "forecast_granularity": "year",
-    "forecast_type": "single_step",
+    "forecast_type": "multi_step",
     "expected_model_types": [
-      "ARIMA",
-      "RandomForestRegressor"
+      "arima",
+      "xgboost",
+      "random_forest"
     ],
     "evaluation_metrics": [
       "mae",
       "rmse",
-      "r2"
+      "r2",
+      "mape"
     ],
     "output_columns": [],
     "artifacts_to_save": [],
-    "created_at": "2025-12-09T19:56:14.479471"
+    "created_at": "2025-12-10T05:53:01.186569"
   }
 }

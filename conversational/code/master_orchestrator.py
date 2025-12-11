@@ -13,6 +13,7 @@ from enum import Enum
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+import time
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -20,7 +21,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from code.config import (
     SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
     STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR,
-    StageTransition, DataPassingManager, logger
+    OUTPUT_ROOT, StageTransition, DataPassingManager, logger
+)
+from code.guardrails import (
+    Stage1Guardrail, Stage2Guardrail, Stage3Guardrail,
+    Stage3bGuardrail, Stage3_5aGuardrail, Stage3_5bGuardrail,
+    Stage4Guardrail, Stage5Guardrail, GuardrailReport
 )
 from code.models import PipelineState, StageStatus
 
@@ -60,6 +66,18 @@ STAGE_NODES = {
     "stage3_5b": stage3_5b_node,
     "stage4": stage4_node,
     "stage5": stage5_node,
+}
+
+# Map stage names to guardrail classes (all stages)
+STAGE_GUARDRAILS = {
+    "stage1": Stage1Guardrail,
+    "stage2": Stage2Guardrail,
+    "stage3": Stage3Guardrail,
+    "stage3b": Stage3bGuardrail,
+    "stage3_5a": Stage3_5aGuardrail,
+    "stage3_5b": Stage3_5bGuardrail,
+    "stage4": Stage4Guardrail,
+    "stage5": Stage5Guardrail,
 }
 
 
@@ -225,7 +243,8 @@ def run_pipeline_stages(
     stages: List[str],
     task_id: str = None,
     user_query: str = None,
-    resume_from_checkpoint: bool = True
+    resume_from_checkpoint: bool = True,
+    enable_guardrails: bool = True
 ) -> PipelineState:
     """
     Run specific pipeline stages with checkpoint support.
@@ -282,14 +301,180 @@ def run_pipeline_stages(
         if DEBUG:
             logger.debug(f"State before {stage}: {state.model_dump_json(indent=2, exclude={'session_id'})}")
 
-        state = STAGE_NODES[stage](state)
+        # === NEW: Retry loop with guardrail feedback ===
+        max_stage_retries = 2  # Stage can retry twice based on guardrail feedback
+        stage_retry_count = 0
+        guardrail_feedback = None
+        report = None  # Initialize report variable
 
-        # Check for failure
-        if stage in state.stages and state.stages[stage].status == StageStatus.FAILED:
-            logger.error(f"Stage {stage} failed: {state.stages[stage].errors}")
-            break
+        while stage_retry_count <= max_stage_retries:
+            # Execute stage (with feedback if retry)
+            if stage_retry_count > 0 and guardrail_feedback:
+                logger.warning(f"🔄 Retrying {stage} (attempt {stage_retry_count + 1}) with guardrail feedback")
+                # Store feedback in state for stage to access
+                state.guardrail_reports[f"{stage}_feedback"] = guardrail_feedback
+
+            state = STAGE_NODES[stage](state)
+
+            # Check for stage execution failure
+            if stage in state.stages and state.stages[stage].status == StageStatus.FAILED:
+                logger.error(f"Stage {stage} failed: {state.stages[stage].errors}")
+                break  # Exit retry loop if stage itself failed
+
+            # === Run guardrail after stage execution ===
+            if not enable_guardrails or stage not in STAGE_GUARDRAILS:
+                # No guardrail for this stage, proceed
+                break  # Exit retry loop
+
+            # Guardrail enabled for this stage
+            logger.info(f"🛡️  Running guardrail for {stage} (stage attempt {stage_retry_count + 1})")
+
+            # RETRY LOGIC for guardrail execution: Try once, retry on crash
+            max_guardrail_attempts = 2
+            guardrail_executed = False
+
+            for attempt in range(max_guardrail_attempts):
+                try:
+                    guardrail = STAGE_GUARDRAILS[stage](stage)
+
+                    # Get stage output
+                    stage_output = getattr(state, f"{stage}_output", None)
+
+                    # Run validation
+                    start_time = time.time()
+                    report = guardrail.validate(stage_output, state)
+                    execution_time = (time.time() - start_time) * 1000
+                    report.execution_time_ms = execution_time
+
+                    # Store guardrail report in state
+                    state.guardrail_reports[stage] = report
+
+                    # Log results
+                    logger.info(f"Guardrail {stage}: {report.overall_status}")
+
+                    if report.overall_status == "failed":
+                        critical_failures = [c for c in report.checks if not c.passed and c.severity == "critical"]
+                        logger.error(f"Guardrail FAILED with {len(critical_failures)} critical issues:")
+                        for check in critical_failures:
+                            logger.error(f"  - {check.check_name}: {check.message}")
+
+                        # Check if retry is needed
+                        if report.requires_retry and stage_retry_count < max_stage_retries:
+                            logger.warning(f"Guardrail requests retry for {stage}")
+                            if report.feedback_for_agent:
+                                logger.info(f"Feedback for agent:\n{report.feedback_for_agent}")
+                                guardrail_feedback = report.feedback_for_agent
+                                stage_retry_count += 1
+
+                                # Save failed attempt report
+                                guardrail_dir = OUTPUT_ROOT / "guardrails_out"
+                                guardrail_dir.mkdir(parents=True, exist_ok=True)
+                                report_filename = f"guardrail_{stage}_{task_id or 'session'}_attempt{stage_retry_count}.json"
+                                DataPassingManager.save_artifact(
+                                    data=report.model_dump(),
+                                    output_dir=guardrail_dir,
+                                    filename=report_filename,
+                                    metadata={"stage": stage, "plan_id": task_id, "attempt": stage_retry_count}
+                                )
+
+                                guardrail_executed = True
+                                break  # Break guardrail retry loop to retry stage
+                            else:
+                                logger.warning("Guardrail failed but no feedback provided, continuing pipeline")
+                        else:
+                            if stage_retry_count >= max_stage_retries:
+                                logger.error(f"Max retries reached for {stage}, continuing despite failures")
+                            logger.warning(f"Pipeline continuing despite guardrail failures")
+
+                    elif report.overall_status == "warning":
+                        warnings = [c for c in report.checks if not c.passed and c.severity == "warning"]
+                        logger.warning(f"Guardrail warnings ({len(warnings)}):")
+                        for check in warnings:
+                            logger.warning(f"  - {check.check_name}: {check.message}")
+
+                    # Save guardrail report to disk
+                    guardrail_dir = OUTPUT_ROOT / "guardrails_out"
+                    guardrail_dir.mkdir(parents=True, exist_ok=True)
+
+                    report_filename = f"guardrail_{stage}_{task_id or 'session'}.json"
+                    DataPassingManager.save_artifact(
+                        data=report.model_dump(),
+                        output_dir=guardrail_dir,
+                        filename=report_filename,
+                        metadata={"stage": stage, "plan_id": task_id}
+                    )
+
+                    guardrail_executed = True
+                    break  # Success - break guardrail retry loop
+
+                except Exception as e:
+                    if attempt < max_guardrail_attempts - 1:
+                        logger.warning(f"Guardrail execution failed for {stage} (attempt {attempt + 1}), retrying: {e}")
+                        continue
+                    else:
+                        logger.error(f"Guardrail execution failed for {stage} after {max_guardrail_attempts} attempts: {e}")
+                        logger.warning(f"Pipeline continuing without guardrail validation for {stage}")
+                        guardrail_executed = True  # Mark as done to avoid infinite loop
+                        break
+
+            # If guardrail passed or we're done retrying, exit stage retry loop
+            if guardrail_executed and (not report.requires_retry or stage_retry_count >= max_stage_retries):
+                break  # Exit stage retry loop
+
+    # === NEW: Generate consolidated guardrail report ===
+    if enable_guardrails and state.guardrail_reports:
+        consolidated_report = _generate_consolidated_guardrail_report(state, task_id)
+
+        # Save consolidated report
+        guardrail_dir = OUTPUT_ROOT / "guardrails_out"
+        DataPassingManager.save_artifact(
+            data=consolidated_report.model_dump(),
+            output_dir=guardrail_dir,
+            filename=f"guardrail_report_PLAN-{task_id}.json" if task_id else "guardrail_report_session.json",
+            metadata={"type": "consolidated_report", "plan_id": task_id}
+        )
+
+        logger.info(f"Consolidated guardrail report: {consolidated_report.overall_status}")
 
     return state
+
+
+def _generate_consolidated_guardrail_report(state: PipelineState, task_id: str) -> GuardrailReport:
+    """Generate consolidated report from all stage guardrails"""
+    stage_reports = state.guardrail_reports
+
+    total_critical = sum(
+        len([c for c in r.checks if not c.passed and c.severity == "critical"])
+        for r in stage_reports.values()
+    )
+    total_warnings = sum(
+        len([c for c in r.checks if not c.passed and c.severity == "warning"])
+        for r in stage_reports.values()
+    )
+
+    if total_critical > 0:
+        overall_status = "failed"
+    elif total_warnings > 0:
+        overall_status = "warning"
+    else:
+        overall_status = "passed"
+
+    # Generate recommendations
+    recommendations = []
+    for stage_name, report in stage_reports.items():
+        for check in report.checks:
+            if not check.passed and check.suggestion:
+                recommendations.append(f"[{stage_name}] {check.suggestion}")
+
+    return GuardrailReport(
+        plan_id=f"PLAN-{task_id}" if task_id else "session",
+        overall_status=overall_status,
+        stage_reports=stage_reports,
+        total_critical_failures=total_critical,
+        total_warnings=total_warnings,
+        recommendations=recommendations,
+        timestamp=datetime.now()
+    )
 
 
 def run_forecasting_pipeline(task_id: str, resume: bool = True) -> PipelineState:

@@ -1,14 +1,14 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:44:31.282472",
-    "checksum": "7a7d648f31b2b8ad",
+    "timestamp": "2025-12-10T11:23:44.987187",
+    "checksum": "a1031472075bc5b0",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary"
   },
   "data": {
     "filename": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-    "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/data/All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+    "filepath": "/home/jacob_mathew/scratch/Capstone_Project/conversational/data/All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
     "n_rows": 60,
     "n_cols": 17,
     "columns": [
@@ -465,7 +465,7 @@
     ],
     "candidate_keys": [],
     "file_size_mb": 0.008678436279296875,
-    "created_at": "2025-12-09 19:44:31.282352",
+    "created_at": "2025-12-10 11:23:44.987041",
     "has_datetime_column": false,
     "has_target_candidates": [
       "Area-2020-21",

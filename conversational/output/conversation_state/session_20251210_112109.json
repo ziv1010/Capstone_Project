@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T11:21:59.970981",
+    "checksum": "97513dfe3e90fd5e",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251210_112109",
+    "messages": [],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-10 11:21:09.780597",
+    "last_updated": "2025-12-10 11:21:09.780607"
+  }
+}

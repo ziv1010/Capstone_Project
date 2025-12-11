@@ -19,7 +19,7 @@ from datetime import datetime
 # PROJECT PATHS
 # ============================================================================
 
-PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/scratch/ziv_baretto/llmserve/final_code/conversational"))
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/home/jacob_mathew/scratch/Capstone_Project/conversational"))
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_ROOT = PROJECT_ROOT / "output"
 
@@ -38,10 +38,13 @@ STAGE5_WORKSPACE = OUTPUT_ROOT / "stage5_workspace"
 # Conversation state directory
 CONVERSATION_STATE_DIR = OUTPUT_ROOT / "conversation_state"
 
+# Guardrail output directory
+GUARDRAILS_OUT_DIR = OUTPUT_ROOT / "guardrails_out"
+
 # Create all directories
 for d in [SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
           STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE,
-          STAGE5_OUT_DIR, STAGE5_WORKSPACE, CONVERSATION_STATE_DIR]:
+          STAGE5_OUT_DIR, STAGE5_WORKSPACE, CONVERSATION_STATE_DIR, GUARDRAILS_OUT_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
@@ -685,7 +688,7 @@ __all__ = [
     "SUMMARIES_DIR", "STAGE2_OUT_DIR", "STAGE3_OUT_DIR",
     "STAGE3B_OUT_DIR", "STAGE3_5A_OUT_DIR", "STAGE3_5B_OUT_DIR",
     "STAGE4_OUT_DIR", "STAGE4_WORKSPACE", "STAGE5_OUT_DIR", "STAGE5_WORKSPACE",
-    "CONVERSATION_STATE_DIR",
+    "CONVERSATION_STATE_DIR", "GUARDRAILS_OUT_DIR",
     # LLM configs
     "PRIMARY_LLM_CONFIG", "SECONDARY_LLM_CONFIG", "CONVERSATION_LLM_CONFIG",
     "STAGE_MAX_TOKENS", "USE_GROQ", "GROQ_API_KEY", "GROQ_BASE_URL",

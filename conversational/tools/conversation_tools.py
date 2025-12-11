@@ -16,10 +16,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from code.config import (
     DATA_DIR, SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR,
     STAGE3B_OUT_DIR, STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR,
-    STAGE4_OUT_DIR, STAGE5_OUT_DIR,
+    STAGE4_OUT_DIR, STAGE5_OUT_DIR, OUTPUT_ROOT,
     CONVERSATION_STATE_DIR, DataPassingManager, logger
 )
 from code.utils import list_data_files, list_summary_files, load_dataframe
+from code.guardrails import GuardrailReport, StageGuardrailReport
 
 
 @tool
@@ -668,6 +669,144 @@ def get_visualizations(plan_id: str = None) -> str:
         return f"Error getting visualizations: {e}"
 
 
+@tool
+def get_guardrail_report(plan_id: str = None) -> str:
+    """
+    Get guardrail validation report for a task execution.
+
+    Shows validation results, violations, and warnings from all pipeline stages.
+    Guardrails check data quality, safety, and accuracy at each stage.
+
+    Args:
+        plan_id: Task ID (e.g., 'TSK-001' or 'PLAN-TSK-001'). If not provided, shows available reports.
+
+    Returns:
+        Formatted guardrail report with status and recommendations
+    """
+    try:
+        guardrail_dir = OUTPUT_ROOT / "guardrails_out"
+
+        if plan_id:
+            # Normalize plan_id
+            if not plan_id.startswith("PLAN-"):
+                plan_id = f"PLAN-{plan_id}"
+
+            report_path = guardrail_dir / f"guardrail_report_{plan_id}.json"
+            if not report_path.exists():
+                return f"No guardrail report found for {plan_id}"
+
+            data = DataPassingManager.load_artifact(report_path)
+            report = GuardrailReport(**data)
+
+            result = [f"=== Guardrail Report: {report.plan_id} ==="]
+            result.append(f"Overall Status: {report.overall_status.upper()}")
+            result.append(f"Critical Failures: {report.total_critical_failures}")
+            result.append(f"Warnings: {report.total_warnings}")
+            result.append("")
+
+            # Stage-by-stage breakdown
+            for stage_name, stage_report in report.stage_reports.items():
+                result.append(f"## {stage_name.upper()}: {stage_report.overall_status}")
+
+                failed_checks = [c for c in stage_report.checks if not c.passed]
+                if failed_checks:
+                    for check in failed_checks:
+                        icon = "CRITICAL" if check.severity == "critical" else "WARNING"
+                        result.append(f"  [{icon}] {check.check_name}: {check.message}")
+                else:
+                    result.append("  [PASS] All checks passed")
+                result.append("")
+
+            # Recommendations
+            if report.recommendations:
+                result.append("## Recommendations:")
+                for rec in report.recommendations:
+                    result.append(f"  - {rec}")
+
+            return "\n".join(result)
+
+        else:
+            # List available reports
+            reports = list(guardrail_dir.glob("guardrail_report_PLAN-*.json"))
+
+            if not reports:
+                return "No guardrail reports available. Run a task to generate reports."
+
+            result = ["=== Available Guardrail Reports ===\n"]
+            for r in sorted(reports):
+                try:
+                    data = DataPassingManager.load_artifact(r)
+                    report = GuardrailReport(**data)
+                    result.append(f"{report.plan_id}: {report.overall_status.upper()}")
+                    result.append(f"  Critical: {report.total_critical_failures}, Warnings: {report.total_warnings}")
+                except:
+                    continue
+
+            return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting guardrail reports: {e}"
+
+
+@tool
+def get_stage_guardrail(stage_name: str, plan_id: str = None) -> str:
+    """
+    Get detailed guardrail report for a specific stage.
+
+    Shows individual check results with severity levels and suggestions.
+
+    Args:
+        stage_name: Stage to check (stage1, stage2, stage3, stage4, stage5)
+        plan_id: Optional task ID for task-specific stages
+
+    Returns:
+        Detailed check results for the stage
+    """
+    try:
+        guardrail_dir = OUTPUT_ROOT / "guardrails_out"
+
+        # Try stage-specific report first
+        if plan_id:
+            plan_id = plan_id if plan_id.startswith("PLAN-") else f"PLAN-{plan_id}"
+            stage_report_path = guardrail_dir / f"guardrail_{stage_name}_{plan_id.replace('PLAN-', '')}.json"
+        else:
+            # Look for most recent
+            matches = list(guardrail_dir.glob(f"guardrail_{stage_name}_*.json"))
+            stage_report_path = max(matches, key=lambda p: p.stat().st_mtime) if matches else None
+
+        if not stage_report_path or not stage_report_path.exists():
+            return f"No guardrail report found for {stage_name}"
+
+        data = DataPassingManager.load_artifact(stage_report_path)
+        report = StageGuardrailReport(**data)
+
+        result = [f"=== {stage_name.upper()} Guardrail Report ==="]
+        result.append(f"Status: {report.overall_status.upper()}")
+        result.append(f"Execution Time: {report.execution_time_ms:.2f}ms")
+        result.append(f"Timestamp: {report.timestamp}")
+        result.append("")
+
+        # Group checks by type
+        by_type = {}
+        for check in report.checks:
+            by_type.setdefault(check.check_type, []).append(check)
+
+        for check_type, checks in by_type.items():
+            result.append(f"## {check_type.replace('_', ' ').title()}:")
+            for check in checks:
+                status_icon = "[PASS]" if check.passed else ("[CRITICAL]" if check.severity == "critical" else "[WARNING]")
+                result.append(f"  {status_icon} {check.check_name}")
+                result.append(f"      {check.message}")
+                if check.suggestion:
+                    result.append(f"      Suggestion: {check.suggestion}")
+            result.append("")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting stage guardrail: {e}"
+
+
 # Export tools list
 CONVERSATION_TOOLS = [
     get_available_data,
@@ -678,4 +817,6 @@ CONVERSATION_TOOLS = [
     create_custom_task_from_query,
     get_execution_results,
     get_visualizations,
+    get_guardrail_report,    # NEW: Guardrail access
+    get_stage_guardrail,      # NEW: Stage-specific guardrail details
 ]

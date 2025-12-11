@@ -484,6 +484,12 @@ class PipelineState(BaseModel):
     completed_at: Optional[datetime] = None
     errors: List[str] = Field(default_factory=list)
 
+    # Guardrail tracking
+    guardrail_reports: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Guardrail validation reports for each stage"
+    )
+
     def mark_stage_started(self, stage_name: str):
         """Mark a stage as started."""
         if stage_name not in self.stages:

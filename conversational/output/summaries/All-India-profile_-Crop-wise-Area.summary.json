@@ -1,14 +1,14 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:44:31.291318",
-    "checksum": "892fd39334134b0f",
+    "timestamp": "2025-12-10T11:23:44.996294",
+    "checksum": "5fc92518af37436b",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary"
   },
   "data": {
     "filename": "All-India-profile_-Crop-wise-Area.csv",
-    "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/data/All-India-profile_-Crop-wise-Area.csv",
+    "filepath": "/home/jacob_mathew/scratch/Capstone_Project/conversational/data/All-India-profile_-Crop-wise-Area.csv",
     "n_rows": 104,
     "n_cols": 12,
     "columns": [
@@ -320,7 +320,7 @@
     ],
     "candidate_keys": [],
     "file_size_mb": 0.009455680847167969,
-    "created_at": "2025-12-09 19:44:31.291234",
+    "created_at": "2025-12-10 11:23:44.996194",
     "has_datetime_column": false,
     "has_target_candidates": [
       "Area-2015-16",

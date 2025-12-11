@@ -1,0 +1,150 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T11:23:45.052183",
+    "checksum": "8de9f64fab1c4f3a",
+    "version": "1.0",
+    "stage": "stage1",
+    "type": "dataset_summary"
+  },
+  "data": {
+    "filename": "train.csv",
+    "filepath": "/home/jacob_mathew/scratch/Capstone_Project/conversational/data/train.csv",
+    "n_rows": 5000,
+    "n_cols": 5,
+    "columns": [
+      {
+        "name": "Store",
+        "dtype": "int64",
+        "logical_type": "integer",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.0002,
+        "n_unique": 1,
+        "examples": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "min_value": 1.0,
+        "max_value": 1.0,
+        "mean_value": 1.0,
+        "std_value": 0.0,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      },
+      {
+        "name": "Dept",
+        "dtype": "int64",
+        "logical_type": "integer",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.0072,
+        "n_unique": 36,
+        "examples": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "min_value": 1.0,
+        "max_value": 37.0,
+        "mean_value": 18.6956,
+        "std_value": 10.604462813660732,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      },
+      {
+        "name": "Date",
+        "dtype": "object",
+        "logical_type": "datetime",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.0286,
+        "n_unique": 143,
+        "examples": [
+          "2010-02-05",
+          "2010-02-12",
+          "2010-02-19",
+          "2010-02-26",
+          "2010-03-05"
+        ],
+        "min_value": null,
+        "max_value": null,
+        "mean_value": null,
+        "std_value": null,
+        "min_date": "2010-02-05 00:00:00",
+        "max_date": "2012-10-26 00:00:00",
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      },
+      {
+        "name": "Weekly_Sales",
+        "dtype": "float64",
+        "logical_type": "float",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.9972,
+        "n_unique": 4986,
+        "examples": [
+          24924.5,
+          46039.49,
+          41595.55,
+          19403.54,
+          21827.9
+        ],
+        "min_value": -139.65,
+        "max_value": 166697.72,
+        "mean_value": 14434.363912,
+        "std_value": 13834.518050691217,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      },
+      {
+        "name": "IsHoliday",
+        "dtype": "bool",
+        "logical_type": "boolean",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.0004,
+        "n_unique": 2,
+        "examples": [
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "min_value": null,
+        "max_value": null,
+        "mean_value": null,
+        "std_value": null,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      }
+    ],
+    "candidate_keys": [
+      "Weekly_Sales"
+    ],
+    "file_size_mb": 12.24760627746582,
+    "created_at": "2025-12-10 11:23:45.052097",
+    "has_datetime_column": true,
+    "has_target_candidates": [],
+    "data_quality_score": 1.0
+  }
+}

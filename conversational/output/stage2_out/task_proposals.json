@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-09T19:51:16.376109",
-    "checksum": "2476caac5a0263ce",
+    "timestamp": "2025-12-10T11:28:12.500492",
+    "checksum": "a9baa0e0617c43f0",
     "version": "1.0",
     "stage": "stage2",
     "type": "task_proposals"
@@ -11,11 +11,10 @@
       {
         "id": "TSK-001",
         "category": "forecasting",
-        "title": "Predict Crop Production by Season",
-        "problem_statement": "Forecast annual crop production for different seasons using historical area and yield data. Use Season as a key factor in the analysis.",
+        "title": "Forecast Food Grain Production by Crop and Season",
+        "problem_statement": "Predict future food grain production values using historical area, production, and yield data across different crops and seasons. This will help in planning agricultural policies and resource allocation.",
         "required_datasets": [
-          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-          "All-India-profile_-Crop-wise-Area.csv"
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
         ],
         "target_column": "Production-2024-25",
         "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
@@ -25,36 +24,16 @@
           "Area-2020-21",
           "Area-2021-22",
           "Area-2022-23",
+          "Area-2023-24",
           "Yield-2020-21",
           "Yield-2021-22",
-          "Yield-2022-23"
+          "Yield-2022-23",
+          "Yield-2023-24"
         ],
-        "join_plan": {
-          "datasets": [
-            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
-            "All-India-profile_-Crop-wise-Area.csv"
-          ],
-          "join_keys": {
-            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
-            "All-India-profile_-Crop-wise-Area.csv": "Crop"
-          },
-          "join_type": "inner"
-        },
-        "feasibility_score": 0.85,
-        "filters": {
-          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": [
-            {
-              "column": "Season",
-              "value": "Total"
-            }
-          ],
-          "All-India-profile_-Crop-wise-Area.csv": [
-            {
-              "column": "Season",
-              "value": "Total"
-            }
-          ]
-        },
+        "join_plan": null,
+        "filters": [
+          "Season != 'Total'"
+        ],
         "forecast_horizon": 1,
         "forecast_granularity": "year",
         "forecast_type": "single_step",
@@ -62,94 +41,56 @@
           "mae",
           "rmse",
           "r2"
-        ]
+        ],
+        "feasibility_score": 0.75
       },
       {
         "id": "TSK-002",
         "category": "regression",
-        "title": "Predict Rice Export Quantity to Bangladesh",
-        "problem_statement": "Estimate rice export quantities to Bangladesh using production data and mandi price trends. Analyze how production volumes and price fluctuations impact export decisions.",
+        "title": "Predict Rice Export Quantities Based on Production Data",
+        "problem_statement": "Model the relationship between domestic rice production and export quantities to Bangladesh. This will help in understanding export potential and optimizing supply chains.",
         "required_datasets": [
-          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
         ],
         "target_column": "2024 - 25-Quantity",
         "target_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
         "feature_columns": [
-          "Description",
-          "2020 - 21-Quantity",
-          "2021 - 22-Quantity",
-          "2022 - 23-Quantity",
-          "2023 - 24-Quantity",
-          "2024 - 25-Value (USD)",
-          "January-2023",
-          "January-2024"
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24"
         ],
         "join_plan": {
           "datasets": [
-            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
           ],
           "join_keys": {
-            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Description",
-            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv": "Crop"
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Description"
           },
           "join_type": "inner"
         },
-        "feasibility_score": 0.7,
-        "filters": {
-          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": [
-            {
-              "column": "Description",
-              "value": "Total"
-            }
-          ]
-        },
+        "filters": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv.Crop = 'Rice'"
+        ],
         "evaluation_metrics": [
           "mae",
           "rmse",
           "r2"
-        ]
+        ],
+        "feasibility_score": 0.65
       },
       {
         "id": "TSK-003",
         "category": "classification",
-        "title": "Classify Soil Types Based on Nutrient Levels",
-        "problem_statement": "Identify soil types by analyzing nitrogen, phosphorous, potassium, and pH levels. This classification can help in recommending appropriate crops for different soil conditions.",
-        "required_datasets": [
-          "soil_data_final.xlsx - soil_data_final.csv"
-        ],
-        "target_column": "yeild",
-        "target_dataset": "soil_data_final.xlsx - soil_data_final.csv",
-        "feature_columns": [
-          "Nitrogen - High",
-          "Nitrogen - Medium",
-          "Nitrogen - Low",
-          "Phosphorous - High",
-          "Phosphorous - Medium",
-          "Phosphorous - Low",
-          "Potassium - High",
-          "Potassium - Medium",
-          "Potassium - Low",
-          "pH - Acidic",
-          "pH - Neutral",
-          "pH - Alkaline"
-        ],
-        "join_plan": {},
-        "feasibility_score": 0.8,
-        "filters": {},
-        "evaluation_metrics": [
-          "accuracy",
-          "precision",
-          "recall",
-          "f1"
-        ]
-      },
-      {
-        "id": "TSK-004",
-        "category": "regression",
-        "title": "Predict Crop Yield by Season",
-        "problem_statement": "Analyze how different seasons affect crop yields using historical production and yield data. This factor-based analysis will help in understanding seasonal variations in agricultural output.",
+        "title": "Classify Crops by Yield Potential",
+        "problem_statement": "Categorize crops into high/medium/low yield potential based on historical yield data and production patterns. This will help in prioritizing crops for agricultural development.",
         "required_datasets": [
           "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
         ],
@@ -161,71 +102,97 @@
           "Area-2020-21",
           "Area-2021-22",
           "Area-2022-23",
+          "Area-2023-24",
           "Production-2020-21",
           "Production-2021-22",
-          "Production-2022-23"
+          "Production-2022-23",
+          "Production-2023-24"
         ],
-        "join_plan": {},
-        "feasibility_score": 0.8,
-        "filters": {
-          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": [
-            {
-              "column": "Season",
-              "value": "Total"
-            }
-          ]
-        },
+        "join_plan": null,
+        "filters": [
+          "Season != 'Total'"
+        ],
+        "evaluation_metrics": [
+          "accuracy",
+          "precision",
+          "recall"
+        ],
+        "feasibility_score": 0.8
+      },
+      {
+        "id": "TSK-004",
+        "category": "regression",
+        "title": "Predict Area Under Cultivation by Season",
+        "problem_statement": "Model the area under cultivation for different crops across seasons to optimize resource allocation and planning.",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Area-2024-25",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Crop",
+          "Season",
+          "Area-2020-21",
+          "Area-2021-22",
+          "Area-2022-23",
+          "Area-2023-24",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24"
+        ],
+        "join_plan": null,
+        "filters": [
+          "Season != 'Total'"
+        ],
         "evaluation_metrics": [
           "mae",
           "rmse",
           "r2"
-        ]
+        ],
+        "feasibility_score": 0.7
       },
       {
         "id": "TSK-005",
         "category": "regression",
-        "title": "Predict Export Value by Rice Variety",
-        "problem_statement": "Estimate the export value of different rice varieties to Bangladesh using historical export quantities and mandi prices. This analysis will help in understanding which rice varieties are most valuable in the export market.",
+        "title": "Predict Rice Export Value Based on Production and Market Factors",
+        "problem_statement": "Model the export value of rice to Bangladesh using production data and market factors to optimize pricing and trade strategies.",
         "required_datasets": [
-          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-          "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
         ],
         "target_column": "2024 - 25-Value (USD)",
         "target_dataset": "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
         "feature_columns": [
-          "Description",
-          "2020 - 21-Value (USD)",
-          "2021 - 22-Value (USD)",
-          "2022 - 23-Value (USD)",
-          "2023 - 24-Value (USD)",
-          "January-2023",
-          "January-2024"
+          "Production-2020-21",
+          "Production-2021-22",
+          "Production-2022-23",
+          "Production-2023-24",
+          "Yield-2020-21",
+          "Yield-2021-22",
+          "Yield-2022-23",
+          "Yield-2023-24"
         ],
         "join_plan": {
           "datasets": [
-            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv",
-            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv"
           ],
           "join_keys": {
-            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Description",
-            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv": "Crop"
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
+            "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": "Description"
           },
           "join_type": "inner"
         },
-        "feasibility_score": 0.7,
-        "filters": {
-          "Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv": [
-            {
-              "column": "Description",
-              "value": "Total"
-            }
-          ]
-        },
+        "filters": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv.Crop = 'Rice'"
+        ],
         "evaluation_metrics": [
           "mae",
           "rmse",
           "r2"
-        ]
+        ],
+        "feasibility_score": 0.6
       }
     ]
   }

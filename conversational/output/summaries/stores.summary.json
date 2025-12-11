@@ -1,0 +1,106 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T11:23:45.033362",
+    "checksum": "29e891a69fd9c7c6",
+    "version": "1.0",
+    "stage": "stage1",
+    "type": "dataset_summary"
+  },
+  "data": {
+    "filename": "stores.csv",
+    "filepath": "/home/jacob_mathew/scratch/Capstone_Project/conversational/data/stores.csv",
+    "n_rows": 45,
+    "n_cols": 3,
+    "columns": [
+      {
+        "name": "Store",
+        "dtype": "int64",
+        "logical_type": "integer",
+        "null_fraction": 0.0,
+        "unique_fraction": 1.0,
+        "n_unique": 45,
+        "examples": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "min_value": 1.0,
+        "max_value": 45.0,
+        "mean_value": 23.0,
+        "std_value": 13.133925536563698,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      },
+      {
+        "name": "Type",
+        "dtype": "object",
+        "logical_type": "categorical",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.06666666666666667,
+        "n_unique": 3,
+        "examples": [
+          "A",
+          "A",
+          "B",
+          "A",
+          "B"
+        ],
+        "min_value": null,
+        "max_value": null,
+        "mean_value": null,
+        "std_value": null,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": "category",
+        "unique_values": [
+          "A",
+          "B",
+          "C"
+        ],
+        "value_interpretation": "This column represents 'category' with 3 distinct values: A, B, C. When analyzing by category, consider whether any values represent aggregates or summary rows (like 'Total', 'All', 'Overall') versus individual category values."
+      },
+      {
+        "name": "Size",
+        "dtype": "int64",
+        "logical_type": "integer",
+        "null_fraction": 0.0,
+        "unique_fraction": 0.8888888888888888,
+        "n_unique": 40,
+        "examples": [
+          151315,
+          202307,
+          37392,
+          205863,
+          34875
+        ],
+        "min_value": 34875.0,
+        "max_value": 219622.0,
+        "mean_value": 130287.6,
+        "std_value": 63825.27199115923,
+        "min_date": null,
+        "max_date": null,
+        "date_frequency": null,
+        "semantic_type": null,
+        "unique_values": [],
+        "value_interpretation": null
+      }
+    ],
+    "candidate_keys": [
+      "Store"
+    ],
+    "file_size_mb": 0.000507354736328125,
+    "created_at": "2025-12-10 11:23:45.033290",
+    "has_datetime_column": false,
+    "has_target_candidates": [
+      "Size"
+    ],
+    "data_quality_score": 1.0
+  }
+}

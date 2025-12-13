@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-10T09:30:30.180747",
-    "checksum": "2e978c4d1a38041c",
+    "timestamp": "2025-12-10T11:45:01.925362",
+    "checksum": "132760f32af0388b",
     "version": "1.0"
   },
   "data": {
@@ -236,6 +236,96 @@
         },
         "feasibility_score": 0.7,
         "feasibility_notes": "Custom task created from user query: make a regression task based on the crop rice and factors area and production",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-5764",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Area-2024-25",
+        "problem_statement": "create visualisations for All-India Crop Area Profile",
+        "required_datasets": [
+          "All-India-profile_-Crop-wise-Area.csv"
+        ],
+        "target_column": "Area-2024-25",
+        "target_dataset": "All-India-profile_-Crop-wise-Area.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: create visualisations for All-India Crop Area Profile",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-6141",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Modal_Price_per_kg_INR",
+        "problem_statement": "forecast rice prices for the rest of 2025",
+        "required_datasets": [
+          "daily_mandi_prices_19-25_Sep_2025 (1).csv"
+        ],
+        "target_column": "Modal_Price_per_kg_INR",
+        "target_dataset": "daily_mandi_prices_19-25_Sep_2025 (1).csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Date"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: forecast rice prices for the rest of 2025",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-7301",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Modal_Price_per_kg_INR",
+        "problem_statement": "forecast rice prices for the rest of 2025",
+        "required_datasets": [
+          "daily_mandi_prices_19-25_Sep_2025 (1).csv"
+        ],
+        "target_column": "Modal_Price_per_kg_INR",
+        "target_dataset": "daily_mandi_prices_19-25_Sep_2025 (1).csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "temporal",
+          "date_column": "Date"
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: forecast rice prices for the rest of 2025",
         "forecast_horizon": 1,
         "forecast_granularity": "year",
         "forecast_type": "single_step",

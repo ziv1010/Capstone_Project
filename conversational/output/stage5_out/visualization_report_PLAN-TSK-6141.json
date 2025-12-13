@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T11:58:07.850889",
+    "checksum": "73aee02f37f0e339",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-6141",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-6141_forecast_plot.png",
+        "plot_type": "line",
+        "title": "Rice Price Forecast for 2025",
+        "description": "Comprehensive forecast plot showing historical prices, test predictions, and 2025 forecasts with clear separation between periods.",
+        "columns_used": [
+          "Date",
+          "Modal_Price_per_kg_INR",
+          "predicted",
+          "actual",
+          "prediction_type"
+        ],
+        "filename": "TSK-6141_forecast_plot.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-6141_actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Values (Test Set)",
+        "description": "Scatter plot comparing actual vs predicted prices for the test set with perfect prediction reference line.",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-6141_actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-6141_residuals_analysis.png",
+        "plot_type": "residuals",
+        "title": "Residual Analysis",
+        "description": "Residual analysis showing residuals over time and their distribution across the test set.",
+        "columns_used": [
+          "Date",
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-6141_residuals_analysis.png"
+      }
+    ],
+    "insights": [
+      "Model performance is extremely poor with MAPE of 79.22% and R² of -inf",
+      "Forecast shows flat line at last observed value (Naive Last Value method)",
+      "Test set residuals show large deviations from actual values"
+    ],
+    "summary": "The Naive Last Value model is not suitable for forecasting rice prices in this case. The model's predictions show a 79% average error and fail to capture any meaningful pattern in the data. A more sophisticated forecasting approach is required to generate reliable price predictions for 2025.",
+    "task_answer": "The Naive Last Value model is not suitable for forecasting rice prices in this case. The model's predictions show a 79% average error and fail to capture any meaningful pattern in the data. A more sophisticated forecasting approach is required to generate reliable price predictions for 2025."
+  }
+}

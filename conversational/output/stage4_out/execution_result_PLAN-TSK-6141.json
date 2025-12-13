@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-10T11:54:27.908619",
+    "checksum": "9566dc77e8b6cf03",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-6141",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-6141.parquet"
+    },
+    "metrics": {
+      "mae": 0.34,
+      "rmse": 0.34,
+      "mape": 0.7922,
+      "r2": "-inf"
+    },
+    "method_used": {
+      "method_id": "M1",
+      "method_name": "Naive Last Value",
+      "stage3_5b_benchmark_metrics": {
+        "mae": 0.34,
+        "rmse": 0.34,
+        "mape": 0.7921714818266621
+      }
+    },
+    "summary": "Generated predictions for 2 samples using Naive Last Value",
+    "data_shape": [
+      2,
+      9
+    ]
+  }
+}

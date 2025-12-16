@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T02:38:58.990463",
+    "checksum": "ae64fb0889594fe6",
+    "version": "1.0"
+  },
+  "data": {
+    "test_name": "correlation_analysis",
+    "prediction_actual_correlation": 0.8066583550837395,
+    "threshold_pass": 0.8,
+    "threshold_warning": 0.5,
+    "status": "PASS",
+    "reason": "Correlation of 0.8067 is >= 0.8 threshold, indicating strong linear relationship between predictions and actual values.",
+    "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T02:39:56.286540",
+    "checksum": "eea3dc0d00c349a0",
+    "version": "1.0",
+    "stage": "stage7",
+    "type": "guardrails_report"
+  },
+  "data": {
+    "task_id": "TSK-005",
+    "plan_id": "PLAN-TSK-005",
+    "validity": "INVALID",
+    "validity_icon": "❌",
+    "tests": {
+      "correlation_analysis": {
+        "status": "PASS",
+        "details": {
+          "test_name": "correlation_analysis",
+          "prediction_actual_correlation": 0.8066583550837395,
+          "threshold_pass": 0.8,
+          "threshold_warning": 0.5,
+          "status": "PASS",
+          "reason": "Correlation of 0.8067 is >= 0.8 threshold, indicating strong linear relationship between predictions and actual values.",
+          "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+        }
+      },
+      "propensity_score_analysis": {
+        "status": "PASS",
+        "details": {
+          "test_name": "propensity_score_analysis",
+          "propensity_mean": 0.4842285394982971,
+          "propensity_std": 0.23311458660102904,
+          "extreme_low_pct": 0.042105263157894736,
+          "extreme_high_pct": 0.08421052631578947,
+          "extreme_total_pct": 0.12631578947368421,
+          "threshold_pass": 0.2,
+          "threshold_warning": 0.4,
+          "status": "PASS",
+          "reason": "Only 12.6% of samples have extreme propensity scores (< 0.1 or > 0.9), which is below the 20% threshold. This indicates good covariate balance and no significant selection bias.",
+          "interpretation": "Propensity scores measure the probability of belonging to high/low error groups. Extreme scores indicate certain feature combinations are over-represented in errors."
+        }
+      },
+      "inverse_propensity_weighting": {
+        "status": "FAIL",
+        "details": {
+          "test_name": "inverse_propensity_weighting",
+          "quintile_maes": [
+            16.62470981513785,
+            8.227607219148243,
+            8.557217105003327,
+            12.051801155066988,
+            36.50738290640895
+          ],
+          "mae_range": 28.279775687260706,
+          "mae_cv": 0.6406690183444984,
+          "threshold_pass": 0.15,
+          "threshold_warning": 0.3,
+          "ipw_adjusted_mae": 760.2476612229633,
+          "standard_mae": 16.649282548907955,
+          "status": "FAIL",
+          "reason": "MAE CV of 0.6407 exceeds 0.30 threshold. Error varies significantly across quintiles (range: 28.2798). The model may be overfitting to certain prediction ranges or missing patterns in others.",
+          "interpretation": "IPW validates that the model performs consistently across different prediction ranges. High variation suggests the model may be unreliable for certain value ranges."
+        }
+      },
+      "residual_analysis": {
+        "status": "WARNING",
+        "details": {
+          "test_name": "residual_analysis",
+          "mean": 12.1717795075737,
+          "std": 20.133356610862485,
+          "skewness": 1.1087706945748,
+          "kurtosis": 1.0979861378360085,
+          "outlier_count": 0,
+          "outlier_pct": 0.0,
+          "bias_status": "WARNING",
+          "bias_reason": "Residual mean of 12.1718 is non-zero indicating systematic prediction bias",
+          "normality_status": "WARNING",
+          "normality_reason": "Skewness=1.11, Kurtosis=1.10. Outside normal range, residuals are not normally distributed",
+          "outlier_status": "PASS",
+          "outlier_reason": "0 outliers (0.0%). Acceptable (<1%)",
+          "status": "WARNING",
+          "reason": "Residual analysis has warnings: systematic bias detected (mean=12.1718); non-normal distribution (skew=1.11, kurtosis=1.10)",
+          "interpretation": "Residual analysis validates regression assumptions: zero-mean residuals (unbiased), normality (valid confidence intervals), and few outliers (data quality)."
+        }
+      }
+    },
+    "overall_assessment": "❌ OVERALL VALIDITY: INVALID MODEL\n\nCritical issues detected:\n1. Inverse Propensity Weighting (IPW) test failed - model performance varies significantly across prediction ranges (Q5 MAE = 36.5 vs Q2 MAE = 8.2)\n2. Residual analysis shows systematic bias (mean residual = 12.17) and non-normal residuals\n\nModel exhibits heterogeneous performance and residual bias that could indicate:\n- Selection bias in training data\n- Misspecified relationships in prediction ranges\n- Inadequate feature engineering for extreme values\n\nRecommendations:\n1. Investigate feature distributions in high prediction quintiles\n2. Consider adding interaction terms or polynomial features\n3. Implement residual correction techniques\n4. Collect more data for underrepresented prediction ranges",
+    "visualizations": [
+      {
+        "filename": "TSK-005_guardrails_scatter.png",
+        "api_url": "/api/guardrails/TSK-005/image/TSK-005_guardrails_scatter.png"
+      },
+      {
+        "filename": "TSK-005_guardrails_residual_dist.png",
+        "api_url": "/api/guardrails/TSK-005/image/TSK-005_guardrails_residual_dist.png"
+      },
+      {
+        "filename": "TSK-005_guardrails_quintile.png",
+        "api_url": "/api/guardrails/TSK-005/image/TSK-005_guardrails_quintile.png"
+      }
+    ],
+    "generated_at": "2025-12-17T02:39:56.286472"
+  }
+}

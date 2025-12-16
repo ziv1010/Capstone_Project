@@ -814,12 +814,37 @@ async def list_guardrails():
         for report_file in STAGE7_OUT_DIR.glob("*_guardrails_report.json"):
             try:
                 report_data = DataPassingManager.load_artifact(report_file)
+                
+                # Calculate score if not present (backwards compatibility)
+                validity_score = report_data.get("validity_score")
+                if validity_score is None or validity_score == 0:
+                    score = 0
+                    tests = report_data.get("tests", {})
+                    for test in tests.values():
+                        status = (test.get("status") or "").upper()
+                        if status == "PASS":
+                            score += 25
+                        elif status == "WARNING":
+                            score += 12.5
+                    validity_score = score
+                
+                # Determine label and color
+                if validity_score >= 75:
+                    label = "HIGH"
+                    color = "#10b981"
+                elif validity_score >= 50:
+                    label = "MEDIUM"
+                    color = "#f59e0b"
+                else:
+                    label = "LOW"
+                    color = "#ef4444"
+                
                 reports.append({
                     "task_id": report_data.get("task_id"),
-                    "validity_score": report_data.get("validity_score", 0),
-                    "validity_label": report_data.get("validity_label", "N/A"),
+                    "validity_score": validity_score,
+                    "validity_label": report_data.get("validity_label") or label,
                     "validity_icon": report_data.get("validity_icon"),
-                    "validity_color": report_data.get("validity_color", "#94a3b8"),
+                    "validity_color": report_data.get("validity_color") or color,
                     "generated_at": report_data.get("generated_at"),
                     "filename": report_file.name
                 })

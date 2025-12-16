@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T02:37:34.325239",
+    "checksum": "34177b6f280b8f8c",
+    "version": "1.0"
+  },
+  "data": {
+    "test_name": "correlation_analysis",
+    "prediction_actual_correlation": 0.7932872260153689,
+    "threshold_pass": 0.8,
+    "threshold_warning": 0.5,
+    "status": "WARNING",
+    "reason": "Correlation of 0.7933 is between 0.5-0.8. The model captures some patterns but may miss important relationships. Consider feature engineering or alternative models.",
+    "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+  }
+}

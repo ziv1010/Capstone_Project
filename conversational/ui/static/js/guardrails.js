@@ -191,17 +191,51 @@ async function loadReport(taskId) {
         document.getElementById('reportTaskId').textContent = `Guardrails Report: ${report.task_id}`;
         document.getElementById('reportDate').textContent = `Generated: ${formatTimestamp(report.generated_at)}`;
 
-        // Update big score
-        const score = report.validity_score || 0;
-        const label = report.validity_label || 'N/A';
+        // Calculate score - either from validity_score or from individual tests
+        let score = report.validity_score;
+        if (score === undefined || score === null || score === 0) {
+            // Calculate from individual test scores/status
+            score = 0;
+            if (report.tests) {
+                Object.values(report.tests).forEach(test => {
+                    if (test.score !== undefined) {
+                        score += test.score;
+                    } else {
+                        // Derive from status
+                        const status = (test.status || '').toUpperCase();
+                        if (status === 'PASS') score += 25;
+                        else if (status === 'WARNING') score += 12.5;
+                    }
+                });
+            }
+        }
+
+        // Determine label and color based on score
+        let label, color;
+        if (score >= 75) {
+            label = 'HIGH';
+            color = '#10b981';
+        } else if (score >= 50) {
+            label = 'MEDIUM';
+            color = '#f59e0b';
+        } else {
+            label = 'LOW';
+            color = '#ef4444';
+        }
+
+        // Use report values if available
+        label = report.validity_label || label;
+        color = report.validity_color || color;
+
+        // Update big score display
         const bigScore = document.getElementById('bigScore');
         const validityLabel = document.getElementById('validityLabel');
 
         bigScore.className = `big-score ${score >= 75 ? 'validity-high' : score >= 50 ? 'validity-medium' : 'validity-low'}`;
-        bigScore.style.background = `conic-gradient(${report.validity_color || '#10b981'} ${score * 3.6}deg, var(--bg-tertiary) 0)`;
+        bigScore.style.background = `conic-gradient(${color} ${score * 3.6}deg, var(--bg-tertiary) 0)`;
         bigScore.querySelector('.value').textContent = Math.round(score);
         validityLabel.textContent = label;
-        validityLabel.style.color = report.validity_color || '#10b981';
+        validityLabel.style.color = color;
 
         // Render test cards
         renderTestCards(report.tests);

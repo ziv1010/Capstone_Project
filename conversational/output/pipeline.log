@@ -12944,3 +12944,9 @@ Columns: ['age', 'sex', 'cp', 'trtbps', 'chol', 'fbs', 'restecg', 'thalachh', 'e
 2025-12-17 02:37:13,558 - conversational_pipeline - INFO - Starting Stage 7: Guardrails Validation for PLAN-TSK-2513
 2025-12-17 02:37:14,321 - conversational_pipeline - INFO - Starting Stage 7: Guardrails Validation for PLAN-TSK-9230
 2025-12-17 02:37:16,643 - conversational_pipeline - INFO - Starting Stage 7: Guardrails Validation for PLAN-TSK-005
+2025-12-17 02:38:12,777 - conversational_pipeline - INFO - Guardrails report saved to /scratch/ziv_baretto/llmserve/final_code/conversational/output/stage7_guardrails/TSK-005_guardrails_report.json
+2025-12-17 02:38:17,865 - conversational_pipeline - INFO - Guardrails report saved to /scratch/ziv_baretto/llmserve/final_code/conversational/output/stage7_guardrails/TSK-9230_guardrails_report.json
+2025-12-17 02:38:28,879 - conversational_pipeline - INFO - Guardrails report saved to /scratch/ziv_baretto/llmserve/final_code/conversational/output/stage7_guardrails/TSK-2513_guardrails_report.json
+2025-12-17 02:38:40,245 - conversational_pipeline - INFO - Starting Stage 7: Guardrails Validation for PLAN-TSK-005
+2025-12-17 02:39:56,287 - conversational_pipeline - INFO - Guardrails report saved to /scratch/ziv_baretto/llmserve/final_code/conversational/output/stage7_guardrails/TSK-005_guardrails_report.json
+2025-12-17 02:40:21,184 - conversational_pipeline - INFO - Stage 7 complete: INVALID

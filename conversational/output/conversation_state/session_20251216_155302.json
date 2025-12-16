@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T15:53:16.112691",
+    "checksum": "bacdede370b2297f",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251216_155302",
+    "messages": [
+      {
+        "role": "user",
+        "content": "telll me about which datasets I have available",
+        "timestamp": "2025-12-16 15:53:02.958670",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "<think>\nOkay, the user asked about available datasets, and I used the get_available_data function to list them. Now I need to present the response clearly. Let me check the output. There are seven datasets listed with their filenames and sizes. I should summarize this information in a user-friendly way.\n\nFirst, I'll list each dataset with their names and sizes. The user might be interested in which datasets are larger, like the Wholesale-Mandi_Price file at 0.05 MB. The others are smaller, some even 0.00 MB, which might mean they're empty or not fully uploaded. I should mention that. Also, note the variety of datasets related to agriculture, like crop area, production, rice exports, and mandi prices. The heart.csv and soil_data_final.csv seem to be different topics, so I should highlight that as well. Finally, offer further assistance if they need more details on a specific dataset. Keep it concise but informative.\n</think>\n\nHere are your available datasets:\n\n**Agricultural Data:**\n- 🌾 **All-India Food Grains Estimates** (0.01 MB)  \n  *Area, Production & Yield of Food Grains*\n  \n- 🌾 **All-India Crop-wise Area Profile** (0.01 MB)\n\n- 🚢 **Rice Exports to Bangladesh** (0.00 MB)  \n  *2018-19 to 2024-25*\n\n- 💰 **Wholesale Mandi Prices (2012-2025)** (0.05 MB)  \n  *Largest file at 50KB*\n\n- 📊 **Daily Mandi Prices (Sep 2025)** (0.00 MB)\n\n**Other Data:**\n- ❤️ **Heart Dataset** (0.01 MB)  \n- 🌱 **Soil Data** (0.00 MB)\n\nWould you like me to:\n1. Show more details about any specific dataset?\n2. Check for patterns/relationships in any file?\n3. Propose analytical tasks based on these datasets?",
+        "timestamp": "2025-12-16 15:53:16.112511",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-16 15:53:02.958639",
+    "last_updated": "2025-12-16 15:53:16.112531"
+  }
+}

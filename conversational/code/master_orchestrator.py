@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from code.config import (
     SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
     STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR, STAGE6_OUT_DIR,
-    StageTransition, DataPassingManager, logger
+    EDA_OUT_DIR, StageTransition, DataPassingManager, logger
 )
 from code.models import PipelineState, StageStatus
 
@@ -35,6 +35,7 @@ from code.stage4_agent import stage4_node, run_stage4
 from code.stage5_agent import stage5_node, run_stage5
 from code.stage6_agent import stage6_node, run_stage6
 from code.conversation_agent import ConversationHandler, get_quick_summary
+from code.eda_agent import run_eda
 
 
 # ============================================================================
@@ -343,6 +344,14 @@ class ConversationalOrchestrator:
         """
         # Get conversation response
         result = self.conversation.process_message(user_input)
+        
+        # Check if this is an EDA query that should be handled directly
+        if self._is_eda_query(user_input) and result.get("action") is None:
+            eda_result = self._handle_eda_query(user_input)
+            result["response"] = eda_result.get("response", result.get("response"))
+            result["action"] = "eda_analysis"
+            result["visualizations"] = eda_result.get("visualizations", [])
+            return result
 
         # Check if we need to run pipeline stages
         if result.get("action") == "run_pipeline" and result.get("task_id"):
@@ -396,6 +405,73 @@ class ConversationalOrchestrator:
     def get_summary(self) -> str:
         """Get a summary of available data and tasks."""
         return get_quick_summary()
+    
+    def _is_eda_query(self, query: str) -> bool:
+        """
+        Check if the query should be routed to the EDA agent.
+        
+        EDA queries are about data exploration, not task execution.
+        """
+        query_lower = query.lower()
+        
+        # EDA-specific keywords
+        eda_keywords = [
+            "what columns", "describe the data", "data structure",
+            "statistics for", "mean of", "distribution of", "std of",
+            "correlation between", "relationship between", "correlate",
+            "missing values", "data quality", "nulls in", "null values",
+            "create a plot", "show me a chart", "visualize", "histogram",
+            "patterns in", "trends in", "analyze the", "what's the trend",
+            "compare the datasets", "difference between datasets",
+            "explore", "eda", "exploratory"
+        ]
+        
+        # Check if any EDA keyword is present
+        is_eda = any(kw in query_lower for kw in eda_keywords)
+        
+        # Exclude if it's clearly about running a task
+        task_keywords = ["run task", "execute task", "run tsk", "propose task"]
+        is_task = any(kw in query_lower for kw in task_keywords)
+        
+        return is_eda and not is_task
+    
+    def _handle_eda_query(self, query: str) -> Dict[str, Any]:
+        """
+        Handle an EDA query by routing it to the EDA agent.
+        """
+        try:
+            logger.info(f"Routing to EDA agent: {query[:50]}...")
+            response = run_eda(query, session_id=self.session_id)
+            
+            result = {
+                "response": response.answer,
+                "visualizations": [v.filepath for v in response.visualizations],
+                "insights": response.insights,
+                "new_datasets": response.new_datasets_detected,
+            }
+            
+            # Add visualization info to response
+            if response.visualizations:
+                result["response"] += "\n\n📊 Visualizations created:"
+                for viz in response.visualizations:
+                    result["response"] += f"\n  - {viz.filepath}"
+            
+            # Warn about new datasets
+            if response.new_datasets_detected:
+                result["response"] += "\n\n🆕 New datasets detected:"
+                for ds in response.new_datasets_detected:
+                    result["response"] += f"\n  - {ds}"
+                result["response"] += "\n\nWould you like me to summarize these new datasets?"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"EDA query failed: {e}")
+            return {
+                "response": f"I encountered an error during analysis: {e}",
+                "visualizations": [],
+                "insights": []
+            }
 
 
 # ============================================================================

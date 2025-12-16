@@ -6,6 +6,7 @@ Provides a web interface for:
 - Chatting with the AI assistant
 - Viewing pipeline progress in real-time
 - Inspecting stage outputs and model thoughts
+- EDA (Exploratory Data Analysis) capabilities
 """
 
 import os
@@ -30,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from code.config import (
     SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
     STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE5_OUT_DIR,
+    EDA_OUT_DIR, DATA_DIR,
     logger as pipeline_logger
 )
 
@@ -90,11 +92,14 @@ tracker = PipelineTracker()
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
+    session_id: Optional[str] = None
     pipeline_started: bool = False
     task_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -255,29 +260,46 @@ async def root():
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
+    """Handle chat messages (legacy endpoint)."""
+    return await chat_send(request, background_tasks)
+
+@app.post("/api/chat/send")
+async def chat_send(request: ChatRequest, background_tasks: BackgroundTasks):
     """Handle chat messages."""
+    import uuid
     from code.master_orchestrator import ConversationalOrchestrator
     
-    orchestrator = ConversationalOrchestrator()
-    result = orchestrator.conversation.process_message(request.message)
+    # Generate or use session ID
+    session_id = request.session_id or str(uuid.uuid4())[:8]
     
-    response_text = result.get("response", "I couldn't process that request.")
-    pipeline_started = False
-    task_id = None
+    try:
+        orchestrator = ConversationalOrchestrator()
+        result = orchestrator.process_user_input(request.message)
+        
+        response_text = result.get("response", "I couldn't process that request.")
+        pipeline_started = False
+        task_id = result.get("task_id")
 
-    # Check if pipeline needs to run
-    if result.get("action") == "run_pipeline" and result.get("task_id"):
-        task_id = result["task_id"]
-        if task_id:
+        # Check if pipeline needs to run
+        if result.get("action") == "run_pipeline" and task_id:
             pipeline_started = True
             response_text += f"\n\n🚀 Starting pipeline execution for {task_id}..."
             background_tasks.add_task(run_pipeline_background, task_id)
 
-    return ChatResponse(
-        response=response_text,
-        pipeline_started=pipeline_started,
-        task_id=task_id
-    )
+        return ChatResponse(
+            response=response_text,
+            session_id=session_id,
+            pipeline_started=pipeline_started,
+            task_id=task_id,
+            metadata={"action": result.get("action")}
+        )
+        
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        return ChatResponse(
+            response=f"Sorry, I encountered an error: {str(e)}",
+            session_id=session_id
+        )
 
 @app.get("/api/state")
 async def get_state():
@@ -375,10 +397,332 @@ async def get_visualizations(task_id: str):
         logger.error(f"Failed to load visualizations: {e}")
         return {"visualizations": [], "error": str(e)}
 
+
+# ============================================================================
+# CONVERSATION HISTORY ENDPOINTS
+# ============================================================================
+
+@app.get("/api/conversations")
+async def get_conversations():
+    """List all conversation sessions."""
+    try:
+        from code.config import OUTPUT_ROOT
+        conversations_dir = OUTPUT_ROOT / "conversations"
+        
+        if not conversations_dir.exists():
+            return {"conversations": []}
+        
+        sessions = []
+        for f in conversations_dir.glob("*.json"):
+            try:
+                with open(f, 'r') as fp:
+                    data = json.load(fp)
+                    sessions.append({
+                        "session_id": f.stem,
+                        "created_at": data.get("created_at", ""),
+                        "message_count": len(data.get("messages", []))
+                    })
+            except Exception:
+                pass
+        
+        # Sort by creation time, newest first
+        sessions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return {"conversations": sessions}
+        
+    except Exception as e:
+        logger.error(f"Failed to list conversations: {e}")
+        return {"conversations": [], "error": str(e)}
+
+
+@app.get("/api/conversations/{session_id}")
+async def get_conversation(session_id: str):
+    """Get a specific conversation by session ID."""
+    try:
+        from code.config import OUTPUT_ROOT
+        conversations_dir = OUTPUT_ROOT / "conversations"
+        session_file = conversations_dir / f"{session_id}.json"
+        
+        if not session_file.exists():
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        with open(session_file, 'r') as f:
+            return json.load(f)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# LOGS ENDPOINTS  
+# ============================================================================
+
+@app.get("/logs")
+async def logs_page():
+    """Serve the logs page."""
+    logs_path = Path("ui/static/logs.html")
+    if logs_path.exists():
+        return FileResponse(logs_path)
+    raise HTTPException(status_code=404, detail="Logs page not found")
+
+
+@app.get("/outputs")
+async def outputs_page():
+    """Serve the outputs page."""
+    outputs_path = Path("ui/static/outputs.html")
+    if outputs_path.exists():
+        return FileResponse(outputs_path)
+    raise HTTPException(status_code=404, detail="Outputs page not found")
+
+
+@app.get("/status")
+async def status_page():
+    """Serve the status page."""
+    status_path = Path("ui/static/status.html")
+    if status_path.exists():
+        return FileResponse(status_path)
+    raise HTTPException(status_code=404, detail="Status page not found")
+
+
+@app.get("/api/logs/recent")
+async def get_recent_logs(lines: int = 100):
+    """Get recent log entries."""
+    try:
+        from code.config import OUTPUT_ROOT
+        log_file = OUTPUT_ROOT / "pipeline.log"
+        
+        if not log_file.exists():
+            return {"logs": [], "message": "No log file found"}
+        
+        # Read last N lines
+        with open(log_file, 'r') as f:
+            all_lines = f.readlines()
+            recent = all_lines[-lines:] if len(all_lines) > lines else all_lines
+        
+        return {"logs": [line.strip() for line in recent]}
+        
+    except Exception as e:
+        logger.error(f"Failed to read logs: {e}")
+        return {"logs": [], "error": str(e)}
+
+
+# ============================================================================
+# STAGES ENDPOINTS
+# ============================================================================
+
+@app.get("/api/stages")
+async def get_stages():
+    """Get list of all pipeline stages with their status."""
+    stages = [
+        {"name": "stage1", "title": "Data Profiling", "order": 1},
+        {"name": "stage2", "title": "Task Proposal", "order": 2},
+        {"name": "stage3", "title": "Execution Planning", "order": 3},
+        {"name": "stage3b", "title": "Data Preparation", "order": 4},
+        {"name": "stage3_5a", "title": "Method Proposal", "order": 5},
+        {"name": "stage3_5b", "title": "Benchmarking", "order": 6},
+        {"name": "stage4", "title": "Execution", "order": 7},
+        {"name": "stage5", "title": "Visualization", "order": 8},
+        {"name": "stage6", "title": "Final Report", "order": 9},
+        {"name": "eda", "title": "EDA Output", "order": 10},
+    ]
+    
+    # Add status for each stage
+    for stage in stages:
+        stage["status"] = infer_stage_status(stage["name"])
+    
+    return {"stages": stages}
+
+
+@app.get("/api/stages/{stage_name}/outputs")
+async def get_stage_outputs(stage_name: str):
+    """Get list of output files for a specific stage."""
+    from code.config import OUTPUT_ROOT
+    
+    # Map stage names to their output directories
+    stage_dirs = {
+        "stage1": OUTPUT_ROOT / "summaries",
+        "stage2": OUTPUT_ROOT / "stage2_out",
+        "stage3": OUTPUT_ROOT / "stage3_out",
+        "stage3b": OUTPUT_ROOT / "stage3b_data_prep",
+        "stage3_5a": OUTPUT_ROOT / "stage3_5a_method_proposal",
+        "stage3_5b": OUTPUT_ROOT / "stage3_5b_benchmarking",
+        "stage4": OUTPUT_ROOT / "stage4_out",
+        "stage5": OUTPUT_ROOT / "stage5_out",
+        "stage6": OUTPUT_ROOT / "stage6_out",
+        "eda": OUTPUT_ROOT / "eda_out",
+    }
+    
+    stage_dir = stage_dirs.get(stage_name)
+    if not stage_dir or not stage_dir.exists():
+        return {"stage_name": stage_name, "outputs": []}
+    
+    outputs = []
+    for f in stage_dir.iterdir():
+        if f.is_file():
+            file_type = "json" if f.suffix == ".json" else "parquet" if f.suffix == ".parquet" else "image" if f.suffix in [".png", ".jpg"] else "other"
+            outputs.append({
+                "filename": f.name,
+                "path": str(f.relative_to(OUTPUT_ROOT)),
+                "type": file_type,
+                "size": f.stat().st_size,
+                "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+            })
+    
+    # Sort by modification time, newest first
+    outputs.sort(key=lambda x: x["modified"], reverse=True)
+    
+    return {"stage_name": stage_name, "outputs": outputs}
+
+
+@app.get("/api/tasks/status")
+async def get_all_tasks_status():
+    """Get status of all tasks."""
+    state = tracker.get_state()
+    stages = get_all_stages_status(state.get("task_id"))
+    
+    return {
+        "current_task": state.get("task_id"),
+        "is_running": state.get("is_running"),
+        "stages": stages
+    }
+
+
+@app.get("/api/tasks/{task_id}/status")
+async def get_task_status(task_id: str):
+    """Get status for a specific task."""
+    stages = get_all_stages_status(task_id)
+    return {
+        "task_id": task_id,
+        "stages": stages
+    }
+
+
+# ============================================================================
+# EDA ENDPOINTS
+# ============================================================================
+
+class EDARequest(BaseModel):
+    query: str
+
+@app.post("/api/eda")
+async def run_eda_query(request: EDARequest):
+    """Run an EDA query and return results."""
+    try:
+        from code.eda_agent import run_eda
+        
+        logger.info(f"Running EDA query: {request.query[:50]}...")
+        response = run_eda(request.query)
+        
+        return {
+            "success": True,
+            "answer": response.answer,
+            "visualizations": [
+                {
+                    "filepath": v.filepath,
+                    "title": v.title,
+                    "plot_type": v.plot_type
+                } for v in response.visualizations
+            ] if response.visualizations else [],
+            "new_datasets": response.new_datasets_detected
+        }
+        
+    except Exception as e:
+        logger.error(f"EDA query failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/eda/datasets")
+async def get_eda_datasets():
+    """List all available datasets for EDA."""
+    try:
+        from tools.eda_tools import list_all_datasets
+        result = list_all_datasets.invoke({})
+        return {"success": True, "datasets": result}
+    except Exception as e:
+        logger.error(f"Failed to list datasets: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/eda/visualizations")
+async def get_eda_visualizations():
+    """Get list of EDA visualizations."""
+    try:
+        if not EDA_OUT_DIR.exists():
+            return {"visualizations": []}
+        
+        viz_files = []
+        for f in EDA_OUT_DIR.glob("*.png"):
+            viz_files.append({
+                "filename": f.name,
+                "path": f"/api/eda/image/{f.name}",
+                "size_kb": f.stat().st_size // 1024,
+                "created": datetime.fromtimestamp(f.stat().st_ctime).isoformat()
+            })
+        
+        # Sort by creation time, newest first
+        viz_files.sort(key=lambda x: x["created"], reverse=True)
+        
+        return {"visualizations": viz_files}
+        
+    except Exception as e:
+        logger.error(f"Failed to list EDA visualizations: {e}")
+        return {"visualizations": [], "error": str(e)}
+
+
+@app.get("/api/eda/image/{filename}")
+async def get_eda_image(filename: str):
+    """Serve an EDA visualization image."""
+    image_path = EDA_OUT_DIR / filename
+    
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    return FileResponse(image_path, media_type="image/png")
+
+
+# ============================================================================
+# FILE SERVING ENDPOINTS
+# ============================================================================
+
+@app.get("/api/files/{filepath:path}")
+async def get_file(filepath: str):
+    """Serve output files (JSON content or file download)."""
+    from code.config import OUTPUT_ROOT
+    
+    file_path = OUTPUT_ROOT / filepath
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Ensure file is within OUTPUT_ROOT (security check)
+    try:
+        file_path.resolve().relative_to(OUTPUT_ROOT.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # JSON files: return parsed content
+    if file_path.suffix == ".json":
+        try:
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse JSON: {e}")
+    
+    # Images: serve as response
+    if file_path.suffix in [".png", ".jpg", ".jpeg"]:
+        media_type = "image/png" if file_path.suffix == ".png" else "image/jpeg"
+        return FileResponse(file_path, media_type=media_type)
+    
+    # Other files: download
+    return FileResponse(file_path, filename=file_path.name)
+
+
 # ============================================================================
 # MAIN
 # ============================================================================
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8005, log_level="info")

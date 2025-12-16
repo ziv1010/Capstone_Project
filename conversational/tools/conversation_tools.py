@@ -707,6 +707,55 @@ def get_visualizations(plan_id: str = None) -> str:
         return f"Error getting visualizations: {e}"
 
 
+@tool
+def run_eda_analysis(query: str) -> str:
+    """
+    Run exploratory data analysis for a user query.
+    
+    Use this tool when users ask questions about data that require:
+    - Understanding dataset contents or structure
+    - Computing statistics or correlations
+    - Finding patterns or trends
+    - Creating visualizations
+    - Comparing datasets
+    
+    The EDA agent will intelligently analyze the data and provide insights.
+    
+    Args:
+        query: User's natural language question about the data
+    
+    Returns:
+        Analysis results including insights and any generated visualizations
+    """
+    try:
+        from code.eda_agent import run_eda
+        
+        response = run_eda(query)
+        
+        result = [f"=== EDA Analysis Results ===\n"]
+        result.append(response.answer)
+        
+        if response.visualizations:
+            result.append("\n📊 Visualizations created:")
+            for viz in response.visualizations:
+                result.append(f"  - {viz.filepath}")
+        
+        if response.insights:
+            result.append("\n💡 Key Insights:")
+            for insight in response.insights:
+                result.append(f"  - {insight}")
+        
+        if response.new_datasets_detected:
+            result.append(f"\n🆕 New datasets detected: {response.new_datasets_detected}")
+            result.append("   Ask the user if they want these summarized.")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        import traceback
+        return f"EDA Analysis error: {e}\n{traceback.format_exc()}"
+
+
 # Export tools list
 CONVERSATION_TOOLS = [
     get_available_data,
@@ -717,4 +766,6 @@ CONVERSATION_TOOLS = [
     create_custom_task_from_query,
     get_execution_results,
     get_visualizations,
+    run_eda_analysis,
 ]
+

@@ -36,13 +36,18 @@ STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
 STAGE5_WORKSPACE = OUTPUT_ROOT / "stage5_workspace"
 STAGE6_OUT_DIR = OUTPUT_ROOT / "stage6_out"
 
+# EDA Agent directories
+EDA_OUT_DIR = OUTPUT_ROOT / "eda_out"
+EDA_WORKSPACE = OUTPUT_ROOT / "eda_workspace"
+
 # Conversation state directory
 CONVERSATION_STATE_DIR = OUTPUT_ROOT / "conversation_state"
 
 # Create all directories
 for d in [SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
           STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE,
-          STAGE5_OUT_DIR, STAGE5_WORKSPACE, STAGE6_OUT_DIR, CONVERSATION_STATE_DIR]:
+          STAGE5_OUT_DIR, STAGE5_WORKSPACE, STAGE6_OUT_DIR, EDA_OUT_DIR,
+          EDA_WORKSPACE, CONVERSATION_STATE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
@@ -95,6 +100,15 @@ CONVERSATION_LLM_CONFIG = {
     "max_tokens": 2048,
 }
 
+# EDA Agent LLM config (needs higher token limit for code generation)
+EDA_LLM_CONFIG = {
+    "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
+    "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
+    "model": "llama-3.3-70b-versatile" if USE_GROQ else "Qwen/Qwen3-32B",
+    "temperature": 0.2,
+    "max_tokens": 8192,  # Higher limit for code generation
+}
+
 # Log LLM backend selection
 if USE_GROQ:
     if GROQ_API_KEY:
@@ -119,6 +133,7 @@ STAGE_MAX_ROUNDS = {
     "stage4": 100,    # Execution
     "stage5": 60,     # Visualization
     "stage6": 30,     # Report generation
+    "eda": 40,        # EDA agent exploration
 }
 
 # Stage 1 sampling
@@ -697,9 +712,9 @@ __all__ = [
     "SUMMARIES_DIR", "STAGE2_OUT_DIR", "STAGE3_OUT_DIR",
     "STAGE3B_OUT_DIR", "STAGE3_5A_OUT_DIR", "STAGE3_5B_OUT_DIR",
     "STAGE4_OUT_DIR", "STAGE4_WORKSPACE", "STAGE5_OUT_DIR", "STAGE5_WORKSPACE",
-    "CONVERSATION_STATE_DIR",
+    "EDA_OUT_DIR", "EDA_WORKSPACE", "CONVERSATION_STATE_DIR",
     # LLM configs
-    "PRIMARY_LLM_CONFIG", "SECONDARY_LLM_CONFIG", "CONVERSATION_LLM_CONFIG",
+    "PRIMARY_LLM_CONFIG", "SECONDARY_LLM_CONFIG", "CONVERSATION_LLM_CONFIG", "EDA_LLM_CONFIG",
     "STAGE_MAX_TOKENS", "USE_GROQ", "GROQ_API_KEY", "GROQ_BASE_URL",
     # Parameters
     "STAGE_MAX_ROUNDS", "STAGE1_SAMPLE_ROWS",

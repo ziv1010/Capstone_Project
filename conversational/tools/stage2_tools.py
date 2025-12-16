@@ -647,6 +647,237 @@ Template:
     return explanation + "\n" + json.dumps(template, indent=2)
 
 
+# ============================================================================
+# OPTIONAL EDA TOOLS FOR DEEPER DATA UNDERSTANDING
+# These tools are OPTIONAL - use them when you need deeper insight before proposing tasks
+# The pipeline works fine without them, but they help make better proposals
+# ============================================================================
+
+@tool
+def analyze_column_deeply(dataset_name: str, column_name: str) -> str:
+    """
+    [OPTIONAL] Perform deep analysis on a specific column.
+    
+    Use this BEFORE proposing a task to validate your target column choice.
+    Computes: distribution, outliers, missing patterns, basic statistics.
+    
+    Args:
+        dataset_name: Name of the dataset file (e.g., 'data.csv')
+        column_name: Column to analyze
+    
+    Returns:
+        Comprehensive column analysis
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        
+        # Find the dataset
+        dataset_path = DATA_DIR / dataset_name
+        if not dataset_path.exists():
+            # Try partial match
+            matches = list(DATA_DIR.glob(f"*{dataset_name}*"))
+            if matches:
+                dataset_path = matches[0]
+            else:
+                return f"Dataset '{dataset_name}' not found in {DATA_DIR}"
+        
+        df = pd.read_csv(dataset_path)
+        
+        if column_name not in df.columns:
+            return f"Column '{column_name}' not found. Available: {list(df.columns)}"
+        
+        col = df[column_name]
+        result = [f"=== Deep Analysis: {column_name} ===\n"]
+        
+        # Basic info
+        result.append(f"Data type: {col.dtype}")
+        result.append(f"Non-null: {col.notna().sum()} / {len(col)} ({col.notna().mean()*100:.1f}%)")
+        result.append(f"Unique values: {col.nunique()}")
+        
+        if pd.api.types.is_numeric_dtype(col):
+            result.append(f"\nNumeric Statistics:")
+            result.append(f"  Mean: {col.mean():.4f}")
+            result.append(f"  Std: {col.std():.4f}")
+            result.append(f"  Min: {col.min():.4f}")
+            result.append(f"  Max: {col.max():.4f}")
+            result.append(f"  Median: {col.median():.4f}")
+            result.append(f"  Skewness: {col.skew():.4f}")
+            
+            # Outlier detection
+            Q1, Q3 = col.quantile([0.25, 0.75])
+            IQR = Q3 - Q1
+            outliers = ((col < Q1 - 1.5*IQR) | (col > Q3 + 1.5*IQR)).sum()
+            result.append(f"\nOutliers (IQR method): {outliers} ({outliers/len(col)*100:.1f}%)")
+            
+            # Suitability as target
+            result.append(f"\n--- Target Suitability ---")
+            if col.std() == 0:
+                result.append("❌ NOT suitable: Zero variance")
+            elif col.notna().mean() < 0.5:
+                result.append("⚠️ Caution: Too many missing values")
+            elif col.nunique() < 5:
+                result.append("⚠️ Consider: Low cardinality, maybe classification instead")
+            else:
+                result.append("✅ Good candidate for regression/forecasting target")
+        else:
+            result.append(f"\nCategorical - Top values:")
+            for val, count in col.value_counts().head(10).items():
+                result.append(f"  {val}: {count} ({count/len(col)*100:.1f}%)")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        return f"Error analyzing column: {e}"
+
+
+@tool
+def find_best_target_columns(dataset_name: str) -> str:
+    """
+    [OPTIONAL] Analyze all numeric columns and rank them by suitability as prediction targets.
+    
+    Use this to intelligently choose which columns to predict.
+    
+    Args:
+        dataset_name: Name of the dataset file
+    
+    Returns:
+        Ranked list of columns by target suitability
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        
+        # Find the dataset
+        dataset_path = DATA_DIR / dataset_name
+        if not dataset_path.exists():
+            matches = list(DATA_DIR.glob(f"*{dataset_name}*"))
+            if matches:
+                dataset_path = matches[0]
+            else:
+                return f"Dataset '{dataset_name}' not found"
+        
+        df = pd.read_csv(dataset_path)
+        
+        result = [f"=== Best Target Column Analysis: {dataset_path.name} ===\n"]
+        
+        # Analyze each numeric column
+        rankings = []
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        for col_name in numeric_cols:
+            col = df[col_name]
+            score = 100
+            notes = []
+            
+            # Penalize missing values
+            missing_pct = col.isnull().mean()
+            if missing_pct > 0.3:
+                score -= 40
+                notes.append(f"{missing_pct*100:.0f}% missing")
+            elif missing_pct > 0.1:
+                score -= 20
+                notes.append(f"{missing_pct*100:.0f}% missing")
+            
+            # Penalize zero variance
+            if col.std() == 0:
+                score -= 100
+                notes.append("zero variance")
+            
+            # Penalize very low cardinality
+            if col.nunique() < 5:
+                score -= 20
+                notes.append("low cardinality")
+            
+            # Bonus for good variance
+            if col.std() > 0 and col.std() / (abs(col.mean()) + 1) > 0.1:
+                score += 10
+            
+            rankings.append({
+                'column': col_name,
+                'score': max(0, score),
+                'notes': notes,
+                'missing': missing_pct,
+                'unique': col.nunique()
+            })
+        
+        # Sort by score
+        rankings.sort(key=lambda x: x['score'], reverse=True)
+        
+        result.append("Columns ranked by target suitability:\n")
+        for i, r in enumerate(rankings[:10], 1):
+            status = "✅" if r['score'] >= 70 else "⚠️" if r['score'] >= 40 else "❌"
+            notes_str = f" ({', '.join(r['notes'])})" if r['notes'] else ""
+            result.append(f"{i}. {status} {r['column']}: score={r['score']}{notes_str}")
+        
+        if rankings and rankings[0]['score'] >= 70:
+            result.append(f"\n💡 Recommended target: {rankings[0]['column']}")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        return f"Error finding best targets: {e}"
+
+
+@tool
+def explore_data_with_code(code: str, goal: str = "") -> str:
+    """
+    [OPTIONAL] Execute custom Python code to explore data before proposing tasks.
+    
+    Use this for complex data exploration when the standard tools aren't enough.
+    
+    Available in environment:
+    - pd (pandas), np (numpy)
+    - DATA_DIR: Path to data directory
+    - df = pd.read_csv(DATA_DIR / 'filename.csv')
+    
+    Args:
+        code: Python code to execute
+        goal: Brief description of what you're trying to understand
+    
+    Returns:
+        Code execution output
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        import sys
+        import io
+        
+        # Create execution namespace
+        namespace = {
+            'pd': pd,
+            'np': np,
+            'DATA_DIR': DATA_DIR,
+            'Path': Path,
+        }
+        
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        
+        try:
+            exec(code, namespace)
+            output = sys.stdout.getvalue()
+            
+            result = []
+            if goal:
+                result.append(f"Goal: {goal}\n")
+            result.append("Output:")
+            result.append(output if output else "(No printed output)")
+            
+            return "\n".join(result)
+            
+        except Exception as e:
+            output = sys.stdout.getvalue()
+            return f"Error: {e}\n\nPartial output:\n{output}"
+        finally:
+            sys.stdout = old_stdout
+            
+    except Exception as e:
+        return f"Setup error: {e}"
+
+
 # Export tools list
 STAGE2_TOOLS = [
     list_dataset_summaries,
@@ -656,4 +887,9 @@ STAGE2_TOOLS = [
     evaluate_forecasting_feasibility,
     save_task_proposals,
     get_proposal_template,
+    # Optional EDA tools - don't break pipeline if unused
+    analyze_column_deeply,
+    find_best_target_columns,
+    explore_data_with_code,
 ]
+

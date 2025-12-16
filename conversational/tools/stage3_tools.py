@@ -417,6 +417,171 @@ def get_execution_plan_template() -> str:
     return "Execution Plan Template:\n\n" + json.dumps(template, indent=2)
 
 
+# ============================================================================
+# OPTIONAL EDA TOOLS FOR DEEPER DATA UNDERSTANDING
+# These tools are OPTIONAL - use them when you want to validate your plan
+# The pipeline works fine without them, but they help catch issues early
+# ============================================================================
+
+@tool
+def validate_target_for_modeling(dataset_name: str, target_column: str, task_type: str = "forecasting") -> str:
+    """
+    [OPTIONAL] Validate that a target column is suitable for modeling.
+    
+    Use this to verify your chosen target column before finalizing the execution plan.
+    
+    Args:
+        dataset_name: Dataset file name
+        target_column: Column you plan to predict
+        task_type: Type of task (forecasting, regression, classification)
+    
+    Returns:
+        Validation report with recommendations
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        
+        dataset_path = DATA_DIR / dataset_name
+        if not dataset_path.exists():
+            matches = list(DATA_DIR.glob(f"*{dataset_name}*"))
+            if matches:
+                dataset_path = matches[0]
+            else:
+                return f"Dataset '{dataset_name}' not found"
+        
+        df = pd.read_csv(dataset_path)
+        
+        if target_column not in df.columns:
+            return f"❌ Column '{target_column}' not found. Available: {list(df.columns)}"
+        
+        col = df[target_column]
+        result = [f"=== Target Validation: {target_column} ===\n"]
+        issues = []
+        
+        # Check for missing values
+        missing_pct = col.isnull().mean()
+        result.append(f"Missing values: {missing_pct*100:.1f}%")
+        if missing_pct > 0.3:
+            issues.append(f"High missing values ({missing_pct*100:.0f}%) - needs imputation")
+        
+        # Check data type
+        if not pd.api.types.is_numeric_dtype(col) and task_type != "classification":
+            issues.append("Non-numeric column - not suitable for regression/forecasting")
+            result.append(f"Data type: {col.dtype} (non-numeric)")
+        else:
+            result.append(f"Data type: {col.dtype}")
+        
+        # For numeric targets
+        if pd.api.types.is_numeric_dtype(col):
+            result.append(f"Mean: {col.mean():.4f}")
+            result.append(f"Std: {col.std():.4f}")
+            result.append(f"Unique values: {col.nunique()}")
+            
+            if col.std() == 0:
+                issues.append("Zero variance - cannot predict a constant")
+            
+            if col.nunique() < 5 and task_type != "classification":
+                issues.append("Very few unique values - consider classification instead")
+        
+        # Verdict
+        result.append("\n--- Verdict ---")
+        if not issues:
+            result.append("✅ Target column is VALID for modeling")
+        else:
+            result.append("⚠️ Issues found:")
+            for issue in issues:
+                result.append(f"  - {issue}")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        return f"Error validating target: {e}"
+
+
+@tool  
+def analyze_feature_target_relationships(
+    dataset_name: str,
+    target_column: str,
+    feature_columns: str
+) -> str:
+    """
+    [OPTIONAL] Analyze correlations between features and target.
+    
+    Use this to verify your feature selection before finalizing the plan.
+    
+    Args:
+        dataset_name: Dataset file name
+        target_column: Column to predict
+        feature_columns: Comma-separated feature column names
+    
+    Returns:
+        Correlation analysis and feature ranking
+    """
+    try:
+        import pandas as pd
+        import numpy as np
+        
+        dataset_path = DATA_DIR / dataset_name
+        if not dataset_path.exists():
+            matches = list(DATA_DIR.glob(f"*{dataset_name}*"))
+            if matches:
+                dataset_path = matches[0]
+            else:
+                return f"Dataset '{dataset_name}' not found"
+        
+        df = pd.read_csv(dataset_path)
+        
+        if target_column not in df.columns:
+            return f"Target '{target_column}' not found"
+        
+        features = [f.strip() for f in feature_columns.split(',')]
+        valid_features = [f for f in features if f in df.columns]
+        missing = [f for f in features if f not in df.columns]
+        
+        result = [f"=== Feature-Target Analysis ===\n"]
+        
+        if missing:
+            result.append(f"⚠️ Missing columns: {missing}")
+        
+        if not valid_features:
+            return "No valid feature columns found."
+        
+        result.append(f"Target: {target_column}")
+        result.append(f"Features: {len(valid_features)} columns\n")
+        
+        # Calculate correlations
+        correlations = []
+        for feature in valid_features:
+            if pd.api.types.is_numeric_dtype(df[feature]) and pd.api.types.is_numeric_dtype(df[target_column]):
+                corr = df[feature].corr(df[target_column])
+                if not np.isnan(corr):
+                    correlations.append((feature, corr))
+        
+        # Sort by absolute correlation
+        correlations.sort(key=lambda x: abs(x[1]), reverse=True)
+        
+        result.append("Feature Correlations with Target:")
+        for feat, corr in correlations:
+            strength = "Strong" if abs(corr) > 0.5 else "Moderate" if abs(corr) > 0.3 else "Weak"
+            emoji = "🔥" if abs(corr) > 0.5 else "👍" if abs(corr) > 0.3 else "🤔"
+            result.append(f"  {emoji} {feat}: {corr:.3f} ({strength})")
+        
+        # Recommendations
+        result.append("\n--- Recommendations ---")
+        strong_features = [f for f, c in correlations if abs(c) > 0.3]
+        if strong_features:
+            result.append(f"✅ Good features: {strong_features}")
+        else:
+            result.append("⚠️ No strongly correlated features found")
+            result.append("   Consider adding more features or feature engineering")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        return f"Error analyzing relationships: {e}"
+
+
 # Export tools list
 STAGE3_TOOLS = [
     load_task_proposal,
@@ -428,4 +593,8 @@ STAGE3_TOOLS = [
     python_sandbox_stage3,
     save_stage3_plan,
     get_execution_plan_template,
+    # Optional EDA tools - don't break pipeline if unused
+    validate_target_for_modeling,
+    analyze_feature_target_relationships,
 ]
+

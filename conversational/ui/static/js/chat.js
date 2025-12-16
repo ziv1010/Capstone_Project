@@ -26,10 +26,13 @@ async function init() {
     document.getElementById('sessionBadge').textContent = 'Live Chat';
     document.getElementById('sessionBadge').className = 'badge badge-running';
 
-    // Add welcome message
+    // Add welcome message with EDA info
     liveMessages = [{
         role: 'assistant',
-        content: '👋 Welcome! I\'m your AI pipeline assistant. Ask me anything about your data or request analysis tasks.',
+        content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
+            '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
+            '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
+            'Try the quick actions above or ask me anything about your data!',
         timestamp: new Date().toISOString()
     }];
     displayLiveMessages();
@@ -39,12 +42,22 @@ async function init() {
 }
 
 /**
+ * Send a quick query from the EDA action buttons
+ */
+function sendQuickQuery(query) {
+    const input = document.getElementById('messageInput');
+    input.value = query;
+    sendMessage();
+}
+
+/**
  * Toggle between history and live chat modes
  */
 function toggleChatMode() {
     const toggleBtn = document.getElementById('modeToggle');
     const sessionCard = document.getElementById('sessionSelectorCard');
     const inputContainer = document.getElementById('chatInputContainer');
+    const edaCard = document.getElementById('edaActionsCard');
 
     if (chatMode === 'history') {
         // Switch to live mode
@@ -54,11 +67,15 @@ function toggleChatMode() {
         toggleBtn.classList.remove('btn-secondary');
         sessionCard.style.display = 'none';
         inputContainer.style.display = 'block';
+        if (edaCard) edaCard.style.display = 'block';
 
         // Clear and show welcome message
         liveMessages = [{
             role: 'assistant',
-            content: '👋 Welcome! I\'m your AI pipeline assistant. Ask me anything about your data or request analysis tasks.',
+            content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
+                '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
+                '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
+                'Try the quick actions above or ask me anything about your data!',
             timestamp: new Date().toISOString()
         }];
         displayLiveMessages();
@@ -74,6 +91,7 @@ function toggleChatMode() {
         toggleBtn.classList.add('btn-secondary');
         sessionCard.style.display = 'block';
         inputContainer.style.display = 'none';
+        if (edaCard) edaCard.style.display = 'none';
 
         // Reload conversation history
         loadConversations();
@@ -296,6 +314,9 @@ function createMessageElement(message) {
 
     // Convert line breaks to <br> and escape HTML
     content = escapeHtml(content).replace(/\n/g, '<br>');
+
+    // Basic markdown: **bold** -> <strong>
+    content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
     div.innerHTML = `
         <div class="chat-avatar ${avatarClass}">${avatarText}</div>

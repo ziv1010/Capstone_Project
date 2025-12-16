@@ -259,6 +259,12 @@ async def root():
     """Serve the main UI."""
     return FileResponse("ui/static/index.html")
 
+
+@app.get("/guardrails")
+async def guardrails_page():
+    """Serve the guardrails UI."""
+    return FileResponse("ui/static/guardrails.html")
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     """Handle chat messages (legacy endpoint)."""
@@ -787,6 +793,104 @@ async def get_eda_image(filename: str):
 async def get_stage5_image(filename: str):
     """Serve a Stage 5 visualization image."""
     image_path = STAGE5_OUT_DIR / filename
+    
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    return FileResponse(image_path, media_type="image/png")
+
+
+# ============================================================================
+# GUARDRAILS ENDPOINTS
+# ============================================================================
+
+@app.get("/api/guardrails")
+async def list_guardrails():
+    """List all tasks with guardrails validation results."""
+    from code.config import STAGE7_OUT_DIR, DataPassingManager
+    
+    try:
+        reports = []
+        for report_file in STAGE7_OUT_DIR.glob("*_guardrails_report.json"):
+            try:
+                report_data = DataPassingManager.load_artifact(report_file)
+                reports.append({
+                    "task_id": report_data.get("task_id"),
+                    "validity_score": report_data.get("validity_score", 0),
+                    "validity_label": report_data.get("validity_label", "N/A"),
+                    "validity_icon": report_data.get("validity_icon"),
+                    "validity_color": report_data.get("validity_color", "#94a3b8"),
+                    "generated_at": report_data.get("generated_at"),
+                    "filename": report_file.name
+                })
+            except Exception as e:
+                logger.error(f"Error loading guardrails report {report_file}: {e}")
+        
+        # Sort by generated_at, newest first
+        reports.sort(key=lambda x: x.get("generated_at", ""), reverse=True)
+        
+        return {"guardrails": reports}
+        
+    except Exception as e:
+        logger.error(f"Failed to list guardrails: {e}")
+        return {"guardrails": [], "error": str(e)}
+
+
+@app.get("/api/guardrails/{task_id}")
+async def get_guardrails(task_id: str):
+    """Get guardrails validation report for a task."""
+    from code.config import STAGE7_OUT_DIR, DataPassingManager
+    
+    task_id_clean = task_id.replace("PLAN-", "").replace("TSK-", "")
+    if not task_id_clean.startswith("TSK-"):
+        task_id_clean = f"TSK-{task_id_clean}" if task_id_clean.isdigit() else task_id_clean
+    
+    report_path = STAGE7_OUT_DIR / f"{task_id_clean}_guardrails_report.json"
+    
+    if not report_path.exists():
+        # Try without TSK- prefix
+        report_path = STAGE7_OUT_DIR / f"{task_id}_guardrails_report.json"
+    
+    if not report_path.exists():
+        return {"status": "not_found", "message": f"Guardrails report not found for {task_id}"}
+    
+    try:
+        report_data = DataPassingManager.load_artifact(report_path)
+        return {"status": "found", "report": report_data}
+    except Exception as e:
+        logger.error(f"Failed to load guardrails report: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/api/guardrails/{task_id}/run")
+async def run_guardrails(task_id: str, background_tasks: BackgroundTasks):
+    """Trigger guardrails validation for a task."""
+    from code.stage7_guardrails_agent import run_stage7_guardrails
+    
+    plan_id = f"PLAN-{task_id}" if not task_id.startswith("PLAN-") else task_id
+    
+    def run_in_background(plan_id: str):
+        try:
+            result = run_stage7_guardrails(plan_id)
+            logger.info(f"Guardrails completed for {plan_id}: {result.get('validity', 'UNKNOWN')}")
+        except Exception as e:
+            logger.error(f"Guardrails failed for {plan_id}: {e}")
+    
+    background_tasks.add_task(run_in_background, plan_id)
+    
+    return {
+        "status": "started",
+        "message": f"Guardrails validation started for {plan_id}",
+        "task_id": task_id
+    }
+
+
+@app.get("/api/guardrails/{task_id}/image/{filename}")
+async def get_guardrails_image(task_id: str, filename: str):
+    """Serve a guardrails visualization image."""
+    from code.config import STAGE7_OUT_DIR
+    
+    image_path = STAGE7_OUT_DIR / filename
     
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")

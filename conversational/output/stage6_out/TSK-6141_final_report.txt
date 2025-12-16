@@ -1,0 +1,30 @@
+════════════════════════════════════════════════════════════════════════════════
+FINAL ANALYSIS REPORT: TSK-6141
+════════════════════════════════════════════════════════════════════════════════
+
+EXECUTIVE SUMMARY
+--------------------------------------------------------------------------------
+This report evaluates the forecasting of rice prices for 2025 using the Naive Last Value model. Despite the model's simplicity, it produced a 79.22% average error (MAPE) and failed to capture any meaningful patterns in the data. The R² score of -inf indicates complete failure to explain variance in the target variable.
+
+METHODOLOGY
+--------------------------------------------------------------------------------
+The analysis used historical rice price data (Modal_Price_per_kg_INR) with a Naive Last Value forecasting approach. The model was evaluated using MAE, RMSE, MAPE, and R² metrics. Predictions were generated for 2 samples with a single-step forecast horizon.
+
+RESULTS ANALYSIS
+--------------------------------------------------------------------------------
+Performance metrics revealed severe limitations: MAE=0.34, RMSE=0.34, MAPE=79.22%, and R²=-inf. Prediction statistics showed minimal variance (mean=42.75, std=0.24) with forecasts matching the last observed value. Visualizations confirmed the model's inability to track price trends, with residuals showing large deviations from actual values.
+
+CONCLUSIONS
+--------------------------------------------------------------------------------
+The Naive Last Value model is unsuitable for forecasting rice prices in this context. The 79% average error and flat forecast line demonstrate the need for more sophisticated modeling approaches to generate reliable 2025 price predictions.
+
+RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Implement advanced models like Random Forest or XGBoost as originally planned
+2. Conduct feature engineering to capture seasonality and market trends
+3. Validate with cross-validation to avoid overfitting
+4. Monitor data quality and update forecasts with new information
+
+════════════════════════════════════════════════════════════════════════════════
+Report generated for TSK-6141
+════════════════════════════════════════════════════════════════════════════════

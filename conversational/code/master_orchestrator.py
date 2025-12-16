@@ -305,7 +305,7 @@ def run_pipeline_stages(
 
 def run_forecasting_pipeline(task_id: str, resume: bool = True) -> PipelineState:
     """
-    Run the forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5
+    Run the forecasting pipeline: 3 → 3B → 3.5A → 3.5B → 4 → 5 → 6
 
     Args:
         task_id: Task ID to run the pipeline for
@@ -315,7 +315,7 @@ def run_forecasting_pipeline(task_id: str, resume: bool = True) -> PipelineState
         Final pipeline state
     """
     return run_pipeline_stages(
-        ["stage3", "stage3b", "stage3_5a", "stage3_5b", "stage4", "stage5"],
+        ["stage3", "stage3b", "stage3_5a", "stage3_5b", "stage4", "stage5", "stage6"],
         task_id=task_id,
         resume_from_checkpoint=resume
     )
@@ -367,7 +367,7 @@ class ConversationalOrchestrator:
             # Add pipeline execution info to response
             result["pipeline_started"] = True
             result["response"] += f"\n\n🚀 Starting pipeline execution for {task_id}..."
-            result["response"] += "\n   Stages: 3 → 3B → 3.5A → 3.5B → 4 → 5"
+            result["response"] += "\n   Stages: 3 → 3B → 3.5A → 3.5B → 4 → 5 → 6"
 
             # Run the forecasting pipeline
             try:
@@ -375,12 +375,42 @@ class ConversationalOrchestrator:
                 result["pipeline_completed"] = True
                 result["response"] += "\n\n✅ Pipeline completed successfully!"
 
-                # Add summary of results
-                if self.pipeline_state.stage5_output:
-                    result["response"] += f"\n\n📊 Visualization report created with insights."
-                elif self.pipeline_state.stage4_output:
-                    metrics = self.pipeline_state.stage4_output.metrics or {}
-                    result["response"] += f"\n\n📈 Execution completed. Metrics: {metrics}"
+                # Load Stage 6 report with visualizations for frontend display
+                plan_id = f"PLAN-{task_id}"
+                report = self._load_final_report(task_id, plan_id)
+                if report:
+                    result["final_report"] = report
+                    result["visualizations"] = report.get("visualization_paths", [])
+                    
+                    # Format report for display
+                    result["response"] += "\n\n" + "═" * 60
+                    result["response"] += f"\n📋 **FINAL REPORT: {task_id}**"
+                    result["response"] += "\n" + "═" * 60
+                    
+                    # Executive Summary
+                    result["response"] += f"\n\n**📊 Executive Summary**\n{report.get('executive_summary', 'N/A')}"
+                    
+                    # Results
+                    result["response"] += f"\n\n**📈 Results Analysis**\n{report.get('results_analysis', 'N/A')}"
+                    
+                    # Conclusions
+                    result["response"] += f"\n\n**✅ Conclusions**\n{report.get('conclusions', 'N/A')}"
+                    
+                    # Recommendations
+                    result["response"] += f"\n\n**💡 Recommendations**\n{report.get('recommendations', 'N/A')}"
+                    
+                    # Thought Process
+                    if report.get('thought_process'):
+                        result["response"] += f"\n\n**🧠 Thought Process (How We Got Here)**\n{report.get('thought_process')}"
+                    
+                    result["response"] += "\n\n" + "═" * 60
+                else:
+                    # Fallback if Stage 6 didn't generate report
+                    if self.pipeline_state.stage5_output:
+                        result["response"] += f"\n\n📊 Visualization report created with insights."
+                    elif self.pipeline_state.stage4_output:
+                        metrics = self.pipeline_state.stage4_output.metrics or {}
+                        result["response"] += f"\n\n📈 Execution completed. Metrics: {metrics}"
 
             except Exception as e:
                 result["pipeline_completed"] = False
@@ -472,6 +502,38 @@ class ConversationalOrchestrator:
                 "visualizations": [],
                 "insights": []
             }
+    
+    def _load_final_report(self, task_id: str, plan_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load the Stage 6 final report with visualization paths.
+        
+        Args:
+            task_id: Task ID (e.g., TSK-001)
+            plan_id: Plan ID (e.g., PLAN-TSK-001)
+            
+        Returns:
+            Report data dictionary or None if not found
+        """
+        try:
+            # Try to load the Stage 6 report
+            report_path = STAGE6_OUT_DIR / f"{task_id}_final_report.json"
+            if not report_path.exists():
+                logger.warning(f"Stage 6 report not found at: {report_path}")
+                return None
+            
+            report_data = DataPassingManager.load_artifact(report_path)
+            
+            # Convert visualization paths to API URLs
+            viz_paths = report_data.get("visualization_paths", [])
+            for viz in viz_paths:
+                if isinstance(viz, dict) and viz.get("filename"):
+                    viz["api_url"] = f"/api/stage5/image/{viz['filename']}"
+            
+            return report_data
+            
+        except Exception as e:
+            logger.error(f"Failed to load final report: {e}")
+            return None
 
 
 # ============================================================================

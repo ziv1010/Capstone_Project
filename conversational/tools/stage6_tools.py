@@ -260,16 +260,50 @@ def load_task_answer(plan_id: str) -> str:
 
 
 @tool
+def get_visualization_paths(plan_id: str) -> str:
+    """
+    Get the paths to all visualization files from Stage 5.
+
+    Args:
+        plan_id: Plan ID (e.g., PLAN-TSK-001)
+
+    Returns:
+        List of visualization file paths and their details
+    """
+    try:
+        task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
+        viz_path = STAGE5_OUT_DIR / f"visualization_report_{plan_id}.json"
+        
+        if not viz_path.exists():
+            return f"No visualization report found for {plan_id}"
+        
+        viz_report = DataPassingManager.load_artifact(viz_path)
+        visualizations = viz_report.get('visualizations', [])
+        
+        result = [f"Found {len(visualizations)} visualizations:\n"]
+        for viz in visualizations:
+            result.append(f"- {viz.get('filename')}: {viz.get('title')}")
+            result.append(f"  Path: {viz.get('filepath')}")
+            result.append(f"  Type: {viz.get('plot_type')}")
+        
+        return "\n".join(result)
+    
+    except Exception as e:
+        return f"Error getting visualization paths: {e}"
+
+
+@tool
 def generate_final_report(
     plan_id: str,
     executive_summary: str,
     methodology: str,
     results_analysis: str,
     conclusions: str,
-    recommendations: str
+    recommendations: str,
+    thought_process: str = ""
 ) -> str:
     """
-    Generate and save the final comprehensive report.
+    Generate and save the final comprehensive report with thought process.
 
     Args:
         plan_id: Plan ID (e.g., PLAN-TSK-001)
@@ -278,6 +312,7 @@ def generate_final_report(
         results_analysis: Detailed analysis of results based on actual data
         conclusions: Final conclusions answering the original task
         recommendations: Actionable recommendations
+        thought_process: Stage-by-stage summary of how the task was processed
 
     Returns:
         Path to saved report
@@ -330,6 +365,22 @@ def generate_final_report(
         with open(txt_path, 'w') as f:
             f.write(report_content)
 
+        # Collect visualization paths from Stage 5
+        visualization_paths = []
+        viz_path = STAGE5_OUT_DIR / f"visualization_report_{plan_id}.json"
+        if viz_path.exists():
+            viz_report = DataPassingManager.load_artifact(viz_path)
+            for viz in viz_report.get('visualizations', []):
+                filename = viz.get('filename', '')
+                if filename:
+                    visualization_paths.append({
+                        'filename': filename,
+                        'title': viz.get('title', ''),
+                        'description': viz.get('description', ''),
+                        'plot_type': viz.get('plot_type', ''),
+                        'api_url': f"/api/stage5/image/{filename}"
+                    })
+
         # Also save as JSON for programmatic access
         report_data = {
             "task_id": task_id,
@@ -339,6 +390,8 @@ def generate_final_report(
             "results_analysis": results_analysis,
             "conclusions": conclusions,
             "recommendations": recommendations,
+            "thought_process": thought_process,
+            "visualization_paths": visualization_paths,
             "generated_at": str(pd.Timestamp.now())
         }
 
@@ -365,5 +418,6 @@ STAGE6_TOOLS = [
     load_prediction_data,
     load_visualization_report,
     load_task_answer,
+    get_visualization_paths,
     generate_final_report,
 ]

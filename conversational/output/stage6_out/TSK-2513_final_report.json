@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T00:58:49.520910",
+    "checksum": "4b051ce3d84c01f1",
+    "version": "1.0",
+    "stage": "stage6",
+    "type": "final_report"
+  },
+  "data": {
+    "task_id": "TSK-2513",
+    "plan_id": "PLAN-TSK-2513",
+    "executive_summary": "This report presents the results of a regression task to predict heart disease output using the Random Forest Regressor. The model achieved an R² score of 0.5977 (59.8% variance explained) with a mean absolute error of 0.2003. Key findings include moderate predictive accuracy, systematic underprediction bias, and opportunities for model improvement through feature engineering.",
+    "methodology": "The analysis used the heart disease dataset with 'output' as the target variable. We evaluated three regression models (Linear Regression, Random Forest, Gradient Boosting) using MAE, RMSE, MAPE, and R2 metrics. The Random Forest Regressor was selected for final deployment based on its performance on validation data. Feature engineering and hyperparameter tuning were not performed in this initial analysis.",
+    "results_analysis": "The Random Forest Regressor achieved:\n- R² score: 0.5977 (59.8% variance explained)\n- MAE: 0.2003\n- RMSE: 0.3130\n- Mean residual: +0.0874 (systematic underprediction)\n- Residual standard deviation: 0.3055\n- 1 outlier sample (>3σ in residuals)\n\nPredictions showed a mean of 0.4853 with 0.3868 standard deviation. Visualizations revealed:\n1. Actual vs Predicted plot showing moderate alignment\n2. Residuals plot highlighting underprediction bias\n3. Residual distribution showing positive skew\n4. Feature correlation matrix identifying 'thalachh' and 'oldpeak' as most predictive features",
+    "conclusions": "The Random Forest Regressor achieved moderate predictive accuracy for heart disease output prediction. While the model explains nearly 60% of variance, the 0.20 MAE and systematic underprediction bias indicate room for improvement. The model provides a reasonable baseline but would benefit from feature engineering and hyperparameter optimization to address prediction bias and reduce error.",
+    "recommendations": "1. Investigate feature engineering opportunities for 'thalachh' and 'oldpeak' based on correlation analysis\n2. Perform outlier analysis on the 3.1% extreme residual case\n3. Test alternative regression algorithms for potential performance gains\n4. Implement model calibration to address prediction bias\n5. Consider ensemble approaches to combine predictions from multiple models",
+    "thought_process": "1. Stage 1 - Data Profiling: Analyzed heart disease dataset with 13 features and 'output' target\n2. Stage 2 - Task Proposal: Identified regression task with moderate feasibility (0.7 score)\n3. Stage 3 - Planning: Designed execution plan with three regression models and four evaluation metrics\n4. Stage 3B - Data Prep: Prepared dataset for modeling with default preprocessing\n5. Stage 3.5A - Method Selection: Proposed Linear Regression, Random Forest, and Gradient Boosting\n6. Stage 3.5B - Benchmarking: Selected Random Forest for best R² score (0.5977)\n7. Stage 4 - Execution: Trained and evaluated Random Forest model on 32 samples\n8. Stage 5 - Visualization: Created four visualizations showing model performance and error patterns",
+    "visualization_paths": [
+      {
+        "filename": "TSK-2513_actual_vs_predicted.png",
+        "title": "Actual vs Predicted Values (Heart Disease Output)",
+        "description": "Scatter plot comparing actual vs predicted heart disease output values with perfect prediction line. Shows model performance on both training and test data.",
+        "plot_type": "scatter",
+        "api_url": "/api/stage5/image/TSK-2513_actual_vs_predicted.png"
+      },
+      {
+        "filename": "TSK-2513_residuals_plot.png",
+        "title": "Residuals Plot (Actual - Predicted) by Prediction Type",
+        "description": "Residuals plot showing actual-predicted differences against predicted values. Highlights model errors for training vs test data with a zero-line reference.",
+        "plot_type": "residuals",
+        "api_url": "/api/stage5/image/TSK-2513_residuals_plot.png"
+      },
+      {
+        "filename": "TSK-2513_residuals_distribution.png",
+        "title": "Residuals Distribution (Actual - Predicted)",
+        "description": "Histogram with KDE showing the distribution of residuals (actual-predicted values). Highlights error distribution symmetry and magnitude with zero-line reference.",
+        "plot_type": "histogram",
+        "api_url": "/api/stage5/image/TSK-2513_residuals_distribution.png"
+      },
+      {
+        "filename": "TSK-2513_feature_correlation.png",
+        "title": "Feature Correlation Matrix with Heart Disease Output",
+        "description": "Heatmap showing correlation coefficients between input features and heart disease output. Highlights relationships that may influence model predictions.",
+        "plot_type": "heatmap",
+        "api_url": "/api/stage5/image/TSK-2513_feature_correlation.png"
+      }
+    ],
+    "generated_at": "2025-12-17 00:58:49.520787"
+  }
+}

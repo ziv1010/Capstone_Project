@@ -54,6 +54,8 @@ Generate a comprehensive final report that answers the original task question us
 from the execution results and visualizations. Do NOT make up values, statistics, or conclusions
 that are not supported by the actual data.
 
+Your report will be displayed directly in the chat interface WITH visualizations, so make it clear and user-friendly.
+
 ## WORKFLOW
 
 ### Step 1: GATHER ALL CONTEXT
@@ -63,6 +65,7 @@ that are not supported by the actual data.
 4. Call `load_prediction_data` to get actual prediction statistics
 5. Call `load_visualization_report` to see what visualizations were created
 6. Call `load_task_answer` to check if Stage 5 generated an answer
+7. Call `get_visualization_paths` to get the image paths for the report
 
 ### Step 2: ANALYZE THE DATA
 Review all the loaded information carefully:
@@ -104,19 +107,34 @@ Call `generate_final_report` with these sections:
 - Mention potential improvements
 - Highlight any concerns or caveats
 
+**thought_process** (IMPORTANT - this will be displayed to the user):
+Summarize the entire pipeline process stage-by-stage:
+1. **Stage 1 - Data Profiling**: What datasets were analyzed
+2. **Stage 2 - Task Proposal**: What task was identified and why
+3. **Stage 3 - Planning**: How the execution plan was designed
+4. **Stage 3B - Data Prep**: How data was prepared 
+5. **Stage 3.5A - Method Selection**: Which methods were proposed
+6. **Stage 3.5B - Benchmarking**: How methods were tested and which won
+7. **Stage 4 - Execution**: How the winning method was applied
+8. **Stage 5 - Visualization**: What visualizations were generated and what they show
+
+Write 1-2 sentences per stage summarizing the key decisions and outcomes.
+
 ## CRITICAL RULES
 1. **USE ONLY ACTUAL DATA**: Never make up metrics, statistics, or findings
 2. **BE SPECIFIC**: Quote exact metric values from the execution results
 3. **REFERENCE WHAT EXISTS**: Only mention visualizations that were actually created
 4. **ANSWER THE QUESTION**: The report must directly answer the original task
 5. **NO HALLUCINATION**: If data is missing, state that explicitly rather than inventing it
+6. **INCLUDE THOUGHT PROCESS**: Always provide the stage-by-stage thought process
 
 ## EXAMPLE WORKFLOW
 ```
 1. Load task proposal -> "Predict crop area for 2022-23"
 2. Load execution results -> "MAE: 245.67, RMSE: 312.45, R2: 0.89"
 3. Load prediction data -> "Mean prediction: 1234.56, 50 forecast points"
-4. Generate report with THESE EXACT VALUES in results_analysis
+4. Get visualization paths -> ["actual_vs_predicted.png", "forecast_trend.png"]
+5. Generate report with THESE EXACT VALUES and include thought_process
 ```
 
 ## OUTPUT FORMAT
@@ -126,6 +144,7 @@ Generate a well-structured, professional report that:
 - Cites actual numbers from the data
 - Provides actionable insights
 - Directly addresses the original task question
+- Includes the thought process summary for transparency
 """
 
 

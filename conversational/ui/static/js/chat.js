@@ -268,16 +268,9 @@ async function sendMessage() {
         saveChatToStorage();  // Persist chat
         displayLiveMessages();
 
-        // Show info if a task was created
-        if (response.task_id) {
-            const infoMsg = {
-                role: 'system',
-                content: `🚀 Task ${response.task_id} created. Monitor progress in the Status page.`,
-                timestamp: new Date().toISOString()
-            };
-            liveMessages.push(infoMsg);
-            saveChatToStorage();  // Persist chat
-            displayLiveMessages();
+        // If pipeline started, poll for final report
+        if (response.task_id && response.metadata?.action === 'run_pipeline') {
+            pollForFinalReport(response.task_id);
         }
 
     } catch (error) {
@@ -297,6 +290,119 @@ async function sendMessage() {
         document.getElementById('sendButton').disabled = false;
         document.getElementById('sendButton').innerHTML = '<span>Send</span> <span>✉️</span>';
     }
+}
+
+/**
+ * Poll for final report completion
+ */
+async function pollForFinalReport(taskId, maxAttempts = 120, intervalMs = 5000) {
+    let attempts = 0;
+
+    // Add a status message
+    const statusMsg = {
+        role: 'system',
+        content: `⏳ Pipeline running for ${taskId}... Waiting for final report (this may take a few minutes).`,
+        timestamp: new Date().toISOString()
+    };
+    liveMessages.push(statusMsg);
+    saveChatToStorage();
+    displayLiveMessages();
+
+    const poll = async () => {
+        attempts++;
+        try {
+            const response = await APIClient.get(`/api/report/${taskId}`);
+
+            if (response.status === 'completed') {
+                // Remove the status message
+                liveMessages = liveMessages.filter(m =>
+                    !(m.role === 'system' && m.content.includes('Pipeline running'))
+                );
+
+                // Add the final report as an assistant message
+                const reportMsg = {
+                    role: 'assistant',
+                    content: formatFinalReport(response),
+                    timestamp: new Date().toISOString(),
+                    visualizations: response.visualizations || [],
+                    isReport: true
+                };
+                liveMessages.push(reportMsg);
+                saveChatToStorage();
+                displayLiveMessages();
+                return;
+            }
+
+            if (response.status === 'running' && attempts < maxAttempts) {
+                // Update status message
+                const lastStatusIdx = liveMessages.findIndex(m =>
+                    m.role === 'system' && m.content.includes('Pipeline running')
+                );
+                if (lastStatusIdx !== -1) {
+                    liveMessages[lastStatusIdx].content =
+                        `⏳ Pipeline running for ${taskId}... Stage: ${response.current_stage || 'processing'} (attempt ${attempts}/${maxAttempts})`;
+                    displayLiveMessages();
+                }
+                setTimeout(poll, intervalMs);
+                return;
+            }
+
+            if (attempts >= maxAttempts) {
+                liveMessages = liveMessages.filter(m =>
+                    !(m.role === 'system' && m.content.includes('Pipeline running'))
+                );
+                liveMessages.push({
+                    role: 'system',
+                    content: `⚠️ Report polling timed out for ${taskId}. Check the Outputs page for results.`,
+                    timestamp: new Date().toISOString()
+                });
+                saveChatToStorage();
+                displayLiveMessages();
+            }
+
+        } catch (error) {
+            console.error('Error polling for report:', error);
+            if (attempts < maxAttempts) {
+                setTimeout(poll, intervalMs);
+            }
+        }
+    };
+
+    // Start polling after initial delay
+    setTimeout(poll, intervalMs);
+}
+
+/**
+ * Format final report for display
+ */
+function formatFinalReport(response) {
+    const report = response.report;
+    let content = '';
+
+    content += '═'.repeat(50) + '\n';
+    content += `📋 **FINAL REPORT: ${response.task_id}**\n`;
+    content += '═'.repeat(50) + '\n\n';
+
+    content += '**📊 Executive Summary**\n';
+    content += (report.executive_summary || 'N/A') + '\n\n';
+
+    content += '**📈 Results Analysis**\n';
+    content += (report.results_analysis || 'N/A') + '\n\n';
+
+    content += '**✅ Conclusions**\n';
+    content += (report.conclusions || 'N/A') + '\n\n';
+
+    content += '**💡 Recommendations**\n';
+    content += (report.recommendations || 'N/A') + '\n\n';
+
+    if (report.thought_process) {
+        content += '**🧠 Thought Process (How We Got Here)**\n';
+        content += report.thought_process + '\n\n';
+    }
+
+    content += '═'.repeat(50);
+
+    return content;
 }
 
 /**

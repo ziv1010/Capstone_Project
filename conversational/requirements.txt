@@ -1,0 +1,49 @@
+# AI Pipeline Requirements
+# Core dependencies for the conversational AI pipeline
+
+# LLM & AI Framework
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-openai>=0.1.0
+langgraph>=0.1.0
+openai>=1.0.0
+
+# Data Science
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+statsmodels>=0.14.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# Data validation & types
+pydantic>=2.0.0
+
+# Web Server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+websockets>=11.0
+
+# File handling
+openpyxl>=3.1.0
+pyarrow>=12.0.0
+
+# Utilities
+python-multipart>=0.0.6
+httpx>=0.24.0
+aiofiles>=23.0.0
+
+# Optional: Prophet for time series (requires special installation)
+# prophet>=1.1.0
+
+# Optional: Deep Learning (if using neural network methods)
+# torch>=2.0.0
+# tensorflow>=2.13.0

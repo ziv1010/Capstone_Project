@@ -287,17 +287,36 @@ async def chat_send(request: ChatRequest, background_tasks: BackgroundTasks):
             result = await loop.run_in_executor(executor, process_in_thread, request.message)
         
         response_text = result.get("response", "I couldn't process that request.")
-        pipeline_started = False
+        pipeline_started = result.get("pipeline_started", False)
+        pipeline_completed = result.get("pipeline_completed", False)
         task_id = result.get("task_id")
         
         # Extract visualization paths from response
         visualizations = []
-        if result.get("visualizations"):
+        
+        # First, check for final_report visualizations from Stage 6
+        final_report = result.get("final_report")
+        if final_report and final_report.get("visualization_paths"):
+            for viz in final_report["visualization_paths"]:
+                if isinstance(viz, dict) and viz.get("filename"):
+                    visualizations.append(f"/api/stage5/image/{viz['filename']}")
+                elif isinstance(viz, str):
+                    filename = Path(viz).name
+                    visualizations.append(f"/api/stage5/image/{filename}")
+        
+        # Then check for direct visualizations in result (from EDA or other)
+        if result.get("visualizations") and not visualizations:
             for viz_path in result["visualizations"]:
                 # Convert file path to API URL
-                if isinstance(viz_path, str) and viz_path.endswith('.png'):
+                if isinstance(viz_path, dict) and viz_path.get("api_url"):
+                    visualizations.append(viz_path["api_url"])
+                elif isinstance(viz_path, str) and viz_path.endswith('.png'):
                     filename = Path(viz_path).name
-                    visualizations.append(f"/api/eda/image/{filename}")
+                    # Check if it's a stage5 output or EDA output
+                    if 'stage5' in viz_path or STAGE5_OUT_DIR.name in viz_path:
+                        visualizations.append(f"/api/stage5/image/{filename}")
+                    else:
+                        visualizations.append(f"/api/eda/image/{filename}")
         
         # Also check for recent EDA visualizations in the response text
         if not visualizations and ".png" in response_text:
@@ -310,19 +329,17 @@ async def chat_send(request: ChatRequest, background_tasks: BackgroundTasks):
                     if (EDA_OUT_DIR / filename).exists():
                         visualizations.append(f"/api/eda/image/{filename}")
 
-        # Check if pipeline needs to run
-        if result.get("action") == "run_pipeline" and task_id:
-            pipeline_started = True
-            response_text += f"\n\n🚀 Starting pipeline execution for {task_id}..."
-            background_tasks.add_task(run_pipeline_background, task_id)
-
         return ChatResponse(
             response=response_text,
             session_id=session_id,
             pipeline_started=pipeline_started,
             task_id=task_id,
             visualizations=visualizations,
-            metadata={"action": result.get("action")}
+            metadata={
+                "action": result.get("action"),
+                "pipeline_completed": pipeline_completed,
+                "final_report": final_report is not None
+            }
         )
         
     except Exception as e:
@@ -427,6 +444,59 @@ async def get_visualizations(task_id: str):
     except Exception as e:
         logger.error(f"Failed to load visualizations: {e}")
         return {"visualizations": [], "error": str(e)}
+
+
+@app.get("/api/report/{task_id}")
+async def get_final_report(task_id: str):
+    """Get the Stage 6 final report for a task with visualizations for chat display."""
+    from code.config import STAGE6_OUT_DIR, DataPassingManager
+    
+    # Handle task_id formatting
+    task_id_clean = task_id.replace("PLAN-", "") if task_id.startswith("PLAN-") else task_id
+    report_path = STAGE6_OUT_DIR / f"{task_id_clean}_final_report.json"
+    
+    if not report_path.exists():
+        # Check if pipeline is still running
+        state = tracker.get_state()
+        if state["is_running"] and state["task_id"] == task_id_clean:
+            return {
+                "status": "running",
+                "message": f"Pipeline is still running for {task_id_clean}. Current stage: {state.get('current_stage', 'unknown')}",
+                "current_stage": state.get("current_stage")
+            }
+        return {
+            "status": "not_found",
+            "message": f"No report found for task {task_id_clean}. Pipeline may not have completed Stage 6."
+        }
+    
+    try:
+        report_data = DataPassingManager.load_artifact(report_path)
+        
+        # Build visualization URLs
+        viz_urls = []
+        for viz in report_data.get("visualization_paths", []):
+            if isinstance(viz, dict) and viz.get("filename"):
+                viz_urls.append(f"/api/stage5/image/{viz['filename']}")
+        
+        return {
+            "status": "completed",
+            "task_id": task_id_clean,
+            "report": {
+                "executive_summary": report_data.get("executive_summary", ""),
+                "methodology": report_data.get("methodology", ""),
+                "results_analysis": report_data.get("results_analysis", ""),
+                "conclusions": report_data.get("conclusions", ""),
+                "recommendations": report_data.get("recommendations", ""),
+                "thought_process": report_data.get("thought_process", ""),
+            },
+            "visualizations": viz_urls,
+            "visualization_details": report_data.get("visualization_paths", []),
+            "generated_at": report_data.get("generated_at", "")
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to load report: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 # ============================================================================
@@ -706,6 +776,17 @@ async def get_eda_visualizations():
 async def get_eda_image(filename: str):
     """Serve an EDA visualization image."""
     image_path = EDA_OUT_DIR / filename
+    
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    return FileResponse(image_path, media_type="image/png")
+
+
+@app.get("/api/stage5/image/{filename}")
+async def get_stage5_image(filename: str):
+    """Serve a Stage 5 visualization image."""
+    image_path = STAGE5_OUT_DIR / filename
     
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")

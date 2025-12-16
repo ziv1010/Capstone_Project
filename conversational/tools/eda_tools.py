@@ -261,11 +261,16 @@ def execute_analysis_code(code: str, description: str = "") -> str:
             # Execute the code
             exec(code, namespace)
             
-            # Check for any figures and save them
+            # Check for any figures and save them with descriptive names
             if plt.get_fignums():
+                from datetime import datetime
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                # Create descriptive base name from description
+                desc_slug = description[:30].lower().replace(' ', '_').replace('/', '_') if description else 'analysis'
+                desc_slug = ''.join(c for c in desc_slug if c.isalnum() or c == '_')
+                
                 for fig_num in plt.get_fignums():
-                    timestamp = int(time.time())
-                    plot_path = EDA_OUT_DIR / f"eda_plot_{timestamp}_{fig_num}.png"
+                    plot_path = EDA_OUT_DIR / f"{desc_slug}_{timestamp}_{fig_num}.png"
                     plt.figure(fig_num).savefig(plot_path, dpi=150, bbox_inches='tight')
                     artifacts.append(str(plot_path))
                 plt.close('all')
@@ -669,9 +674,12 @@ def create_visualization(
         ax.set_title(title, fontsize=14, fontweight='bold')
         plt.tight_layout()
         
-        # Save the plot
-        timestamp = int(time.time())
-        plot_filename = f"eda_{plot_type}_{timestamp}.png"
+        # Save the plot with descriptive name
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        dataset_slug = dataset_path.stem[:20].lower().replace(' ', '_')
+        col_slug = (y_column or x_column or 'data')[:15].lower().replace(' ', '_')
+        plot_filename = f"{dataset_slug}_{plot_type}_{col_slug}_{timestamp}.png"
         plot_path = EDA_OUT_DIR / plot_filename
         plt.savefig(plot_path, dpi=150, bbox_inches='tight')
         plt.close()

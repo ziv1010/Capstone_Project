@@ -99,6 +99,7 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = None
     pipeline_started: bool = False
     task_id: Optional[str] = None
+    visualizations: List[str] = []  # URLs for inline display
     metadata: Optional[Dict[str, Any]] = None
 
 # ============================================================================
@@ -267,18 +268,47 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
 async def chat_send(request: ChatRequest, background_tasks: BackgroundTasks):
     """Handle chat messages."""
     import uuid
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
     from code.master_orchestrator import ConversationalOrchestrator
     
     # Generate or use session ID
     session_id = request.session_id or str(uuid.uuid4())[:8]
     
-    try:
+    def process_in_thread(message: str):
+        """Run orchestrator in separate thread to not block server."""
         orchestrator = ConversationalOrchestrator()
-        result = orchestrator.process_user_input(request.message)
+        return orchestrator.process_user_input(message)
+    
+    try:
+        # Run the blocking orchestrator call in a thread pool
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(executor, process_in_thread, request.message)
         
         response_text = result.get("response", "I couldn't process that request.")
         pipeline_started = False
         task_id = result.get("task_id")
+        
+        # Extract visualization paths from response
+        visualizations = []
+        if result.get("visualizations"):
+            for viz_path in result["visualizations"]:
+                # Convert file path to API URL
+                if isinstance(viz_path, str) and viz_path.endswith('.png'):
+                    filename = Path(viz_path).name
+                    visualizations.append(f"/api/eda/image/{filename}")
+        
+        # Also check for recent EDA visualizations in the response text
+        if not visualizations and ".png" in response_text:
+            import re
+            # Find PNG paths in response
+            png_paths = re.findall(r'([^\s]+\.png)', response_text)
+            for p in png_paths:
+                if EDA_OUT_DIR.name in p or 'eda' in p.lower():
+                    filename = Path(p).name
+                    if (EDA_OUT_DIR / filename).exists():
+                        visualizations.append(f"/api/eda/image/{filename}")
 
         # Check if pipeline needs to run
         if result.get("action") == "run_pipeline" and task_id:
@@ -291,6 +321,7 @@ async def chat_send(request: ChatRequest, background_tasks: BackgroundTasks):
             session_id=session_id,
             pipeline_started=pipeline_started,
             task_id=task_id,
+            visualizations=visualizations,
             metadata={"action": result.get("action")}
         )
         
@@ -717,6 +748,93 @@ async def get_file(filepath: str):
     
     # Other files: download
     return FileResponse(file_path, filename=file_path.name)
+
+
+# ============================================================================
+# DATA REFRESH ENDPOINT
+# ============================================================================
+
+@app.post("/api/data/refresh")
+async def refresh_data(background_tasks: BackgroundTasks):
+    """
+    Scan for new datasets and auto-summarize them.
+    This runs Stage 1 (data profiling) for any datasets without summaries.
+    """
+    try:
+        from code.utils import list_data_files, list_summary_files, profile_csv
+        from code.config import DATA_DIR, SUMMARIES_DIR, DataPassingManager
+        
+        # Get all data files
+        all_files = list_data_files(DATA_DIR)
+        
+        # Get existing summaries
+        summary_files = list_summary_files(SUMMARIES_DIR)
+        summarized_stems = {
+            Path(sf).stem.replace('.summary', '') 
+            for sf in summary_files
+        }
+        
+        # Find new files
+        new_files = []
+        for f in all_files:
+            stem = Path(f).stem
+            if stem not in summarized_stems:
+                new_files.append(f)
+        
+        if not new_files:
+            return {
+                "success": True,
+                "message": "All datasets are already summarized",
+                "new_datasets": [],
+                "total_datasets": len(all_files)
+            }
+        
+        # Summarize new datasets
+        summarized = []
+        errors = []
+        
+        for filename in new_files:
+            try:
+                dataset_path = DATA_DIR / filename
+                logger.info(f"Auto-summarizing new dataset: {filename}")
+                
+                # Profile the dataset
+                summary = profile_csv(dataset_path)
+                
+                # Save the summary
+                summary_dict = summary.model_dump()
+                output_name = f"{dataset_path.stem}.summary.json"
+                
+                DataPassingManager.save_artifact(
+                    data=summary_dict,
+                    output_dir=SUMMARIES_DIR,
+                    filename=output_name,
+                    metadata={"stage": "stage1", "type": "dataset_summary", "source": "auto_refresh"}
+                )
+                
+                summarized.append({
+                    "filename": filename,
+                    "rows": summary.n_rows,
+                    "columns": summary.n_cols,
+                    "summary_path": str(SUMMARIES_DIR / output_name)
+                })
+                logger.info(f"Successfully summarized: {filename}")
+                
+            except Exception as e:
+                logger.error(f"Failed to summarize {filename}: {e}")
+                errors.append({"filename": filename, "error": str(e)})
+        
+        return {
+            "success": True,
+            "message": f"Summarized {len(summarized)} new dataset(s)",
+            "new_datasets": summarized,
+            "errors": errors if errors else None,
+            "total_datasets": len(all_files)
+        }
+        
+    except Exception as e:
+        logger.error(f"Data refresh failed: {e}")
+        return {"success": False, "error": str(e)}
 
 
 # ============================================================================

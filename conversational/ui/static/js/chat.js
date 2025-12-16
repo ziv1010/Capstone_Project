@@ -8,6 +8,55 @@ let conversations = [];
 let chatMode = 'live'; // Default to live
 let liveMessages = [];
 
+// Storage key for persisting chat
+const CHAT_STORAGE_KEY = 'ai_pipeline_chat_messages';
+
+/**
+ * Save messages to sessionStorage
+ */
+function saveChatToStorage() {
+    try {
+        sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(liveMessages));
+    } catch (e) {
+        console.warn('Failed to save chat to storage:', e);
+    }
+}
+
+/**
+ * Load messages from sessionStorage
+ */
+function loadChatFromStorage() {
+    try {
+        const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch (e) {
+        console.warn('Failed to load chat from storage:', e);
+    }
+    return null;
+}
+
+/**
+ * Start a new chat session
+ */
+function startNewChat() {
+    liveMessages = [{
+        role: 'assistant',
+        content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
+            '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
+            '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
+            'Try the quick actions above or ask me anything about your data!',
+        timestamp: new Date().toISOString()
+    }];
+    saveChatToStorage();
+    displayLiveMessages();
+
+    // Scroll to top
+    const container = document.getElementById('chatMessages');
+    container.scrollTop = 0;
+}
+
 /**
  * Initialize the chat page
  */
@@ -26,15 +75,20 @@ async function init() {
     document.getElementById('sessionBadge').textContent = 'Live Chat';
     document.getElementById('sessionBadge').className = 'badge badge-running';
 
-    // Add welcome message with EDA info
-    liveMessages = [{
-        role: 'assistant',
-        content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
-            '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
-            '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
-            'Try the quick actions above or ask me anything about your data!',
-        timestamp: new Date().toISOString()
-    }];
+    // Try to restore chat from storage, or show welcome message
+    const storedMessages = loadChatFromStorage();
+    if (storedMessages && storedMessages.length > 0) {
+        liveMessages = storedMessages;
+    } else {
+        liveMessages = [{
+            role: 'assistant',
+            content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
+                '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
+                '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
+                'Try the quick actions above or ask me anything about your data!',
+            timestamp: new Date().toISOString()
+        }];
+    }
     displayLiveMessages();
 
     // Load conversations in background for history mode
@@ -69,15 +123,20 @@ function toggleChatMode() {
         inputContainer.style.display = 'block';
         if (edaCard) edaCard.style.display = 'block';
 
-        // Clear and show welcome message
-        liveMessages = [{
-            role: 'assistant',
-            content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
-                '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
-                '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
-                'Try the quick actions above or ask me anything about your data!',
-            timestamp: new Date().toISOString()
-        }];
+        // Restore from storage instead of resetting
+        const storedMessages = loadChatFromStorage();
+        if (storedMessages && storedMessages.length > 0) {
+            liveMessages = storedMessages;
+        } else {
+            liveMessages = [{
+                role: 'assistant',
+                content: '👋 Welcome! I\'m your AI pipeline assistant with **EDA capabilities**.\n\n' +
+                    '🔍 **EDA Queries:** Ask about columns, statistics, correlations, or create visualizations\n' +
+                    '📊 **Pipeline Tasks:** Request analysis or run forecasting tasks\n\n' +
+                    'Try the quick actions above or ask me anything about your data!',
+                timestamp: new Date().toISOString()
+            }];
+        }
         displayLiveMessages();
 
         document.getElementById('sessionBadge').textContent = 'Live Chat';
@@ -112,6 +171,55 @@ function handleKeyPress(event) {
 }
 
 /**
+ * Refresh datasets - scan for new data and auto-summarize
+ */
+async function refreshDatasets() {
+    const btn = document.getElementById('refreshDataBtn');
+    const originalText = btn.innerHTML;
+
+    btn.innerHTML = '🔄 Scanning...';
+    btn.disabled = true;
+
+    try {
+        const response = await APIClient.post('/api/data/refresh', {});
+
+        let resultMsg;
+        if (response.success) {
+            if (response.new_datasets && response.new_datasets.length > 0) {
+                const datasetList = response.new_datasets.map(d =>
+                    `  • ${d.filename} (${d.rows} rows, ${d.columns} cols)`
+                ).join('\n');
+                resultMsg = `✅ **${response.message}**\n\n${datasetList}\n\nYou can now query these datasets!`;
+            } else {
+                resultMsg = `✅ ${response.message}\n\nTotal datasets available: ${response.total_datasets}`;
+            }
+        } else {
+            resultMsg = `❌ Refresh failed: ${response.error}`;
+        }
+
+        // Add result to chat
+        liveMessages.push({
+            role: 'system',
+            content: resultMsg,
+            timestamp: new Date().toISOString()
+        });
+        displayLiveMessages();
+
+    } catch (error) {
+        console.error('Refresh error:', error);
+        liveMessages.push({
+            role: 'system',
+            content: `❌ Error: ${error.message}`,
+            timestamp: new Date().toISOString()
+        });
+        displayLiveMessages();
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+/**
  * Send a message to the pipeline
  */
 async function sendMessage() {
@@ -127,6 +235,7 @@ async function sendMessage() {
         timestamp: new Date().toISOString()
     };
     liveMessages.push(userMsg);
+    saveChatToStorage();  // Save immediately so it persists if user navigates away
     displayLiveMessages();
 
     // Clear input and disable
@@ -147,14 +256,16 @@ async function sendMessage() {
             currentSessionId = response.session_id;
         }
 
-        // Add assistant response
+        // Add assistant response with visualizations
         const assistantMsg = {
             role: 'assistant',
             content: response.response,
             timestamp: new Date().toISOString(),
-            metadata: response.metadata
+            metadata: response.metadata,
+            visualizations: response.visualizations || []
         };
         liveMessages.push(assistantMsg);
+        saveChatToStorage();  // Persist chat
         displayLiveMessages();
 
         // Show info if a task was created
@@ -165,6 +276,7 @@ async function sendMessage() {
                 timestamp: new Date().toISOString()
             };
             liveMessages.push(infoMsg);
+            saveChatToStorage();  // Persist chat
             displayLiveMessages();
         }
 
@@ -318,15 +430,58 @@ function createMessageElement(message) {
     // Basic markdown: **bold** -> <strong>
     content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
+    // Build visualization gallery HTML if present
+    let vizHtml = '';
+    if (message.visualizations && message.visualizations.length > 0) {
+        vizHtml = '<div class="chat-viz-gallery">';
+        message.visualizations.forEach((vizUrl, index) => {
+            vizHtml += `<div class="chat-viz-item">
+                <img src="${vizUrl}" alt="Visualization ${index + 1}" onclick="openImageModal('${vizUrl}')" />
+            </div>`;
+        });
+        vizHtml += '</div>';
+    }
+
     div.innerHTML = `
         <div class="chat-avatar ${avatarClass}">${avatarText}</div>
         <div class="chat-bubble">
             <div>${content}</div>
+            ${vizHtml}
             <div class="chat-timestamp">${formatTimestamp(message.timestamp)}</div>
         </div>
     `;
 
     return div;
+}
+
+/**
+ * Open image in modal for full-size viewing
+ */
+function openImageModal(imageUrl) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('imageModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'imageModal';
+        modal.className = 'image-modal';
+        modal.innerHTML = `
+            <div class="image-modal-content">
+                <span class="image-modal-close" onclick="closeImageModal()">&times;</span>
+                <img id="modalImage" src="" alt="Full size visualization" />
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById('modalImage').src = imageUrl;
+    modal.style.display = 'flex';
+}
+
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 /**

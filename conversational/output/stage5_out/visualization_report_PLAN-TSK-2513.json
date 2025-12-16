@@ -1,0 +1,88 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T19:28:07.788290",
+    "checksum": "6ee20c84a58940b2",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-2513",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-2513_actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Values (Heart Disease Output)",
+        "description": "Scatter plot comparing actual vs predicted heart disease output values with perfect prediction line. Shows model performance on both training and test data.",
+        "columns_used": [
+          "actual",
+          "predicted",
+          "prediction_type"
+        ],
+        "filename": "TSK-2513_actual_vs_predicted.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-2513_residuals_plot.png",
+        "plot_type": "residuals",
+        "title": "Residuals Plot (Actual - Predicted) by Prediction Type",
+        "description": "Residuals plot showing actual-predicted differences against predicted values. Highlights model errors for training vs test data with a zero-line reference.",
+        "columns_used": [
+          "predicted",
+          "actual",
+          "prediction_type"
+        ],
+        "filename": "TSK-2513_residuals_plot.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-2513_residuals_distribution.png",
+        "plot_type": "histogram",
+        "title": "Residuals Distribution (Actual - Predicted)",
+        "description": "Histogram with KDE showing the distribution of residuals (actual-predicted values). Highlights error distribution symmetry and magnitude with zero-line reference.",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-2513_residuals_distribution.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-2513_feature_correlation.png",
+        "plot_type": "heatmap",
+        "title": "Feature Correlation Matrix with Heart Disease Output",
+        "description": "Heatmap showing correlation coefficients between input features and heart disease output. Highlights relationships that may influence model predictions.",
+        "columns_used": [
+          "age",
+          "sex",
+          "cp",
+          "trtbps",
+          "chol",
+          "fbs",
+          "restecg",
+          "thalachh",
+          "exng",
+          "oldpeak",
+          "slp",
+          "caa",
+          "thall",
+          "output"
+        ],
+        "filename": "TSK-2513_feature_correlation.png"
+      }
+    ],
+    "insights": [
+      "Model Performance:",
+      "- Average prediction error (MAE): 0.2003",
+      "- Root mean squared error: 0.3130",
+      "- R-squared: 0.5977 (59.8% variance explained)",
+      "Error Analysis:",
+      "- Mean residual: 0.0874",
+      "- Residual std: 0.3055",
+      "- Model tends to UNDERPREDICT (positive bias)",
+      "- Outliers (>3 std): 1 (3.1%)",
+      "Data Summary:",
+      "- Total predictions: 32",
+      "- Date range: nan to nan"
+    ],
+    "summary": "The Random Forest Regressor achieved moderate predictive accuracy (R²=0.60) for heart disease output prediction. While the model shows reasonable performance, the systematic underprediction bias and 0.20 MAE suggest there is room for improvement through feature engineering or model optimization.",
+    "task_answer": "The Random Forest Regressor achieved moderate predictive accuracy (R²=0.60) for heart disease output prediction. While the model shows reasonable performance, the systematic underprediction bias and 0.20 MAE suggest there is room for improvement through feature engineering or model optimization."
+  }
+}

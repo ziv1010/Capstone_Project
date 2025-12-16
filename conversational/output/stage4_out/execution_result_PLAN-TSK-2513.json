@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T19:25:01.741489",
+    "checksum": "b662a043d48d684c",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-2513",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-2513.parquet"
+    },
+    "metrics": {
+      "mae": 0.20032258064516129,
+      "rmse": 0.312982530688422,
+      "r2": 0.5977021367521369
+    },
+    "method_used": {
+      "method_id": "M3",
+      "method_name": "Random Forest Regressor",
+      "stage3_5b_benchmark_metrics": {
+        "mae": null,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 32 samples using Random Forest Regressor",
+    "data_shape": [
+      32,
+      17
+    ]
+  }
+}

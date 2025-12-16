@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T18:56:14.544211",
+    "checksum": "9d5583babc667b8b",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251216_185602",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What datasets are available?",
+        "timestamp": "2025-12-16 18:56:02.365102",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "<think>\nOkay, the user asked about available datasets, and I provided the list. Now I need to present this information clearly. Let me check the response from the tool. The datasets are listed with their filenames and sizes. I should format this in a user-friendly way.\n\nFirst, list each dataset with a bullet point. Mention the filename and size. Note that some files have very small sizes, like 0.00 MB, which might be empty or placeholder files. Maybe mention that. Also, highlight the total number of datasets. Keep it concise but informative. Make sure the user knows they can ask for more details about any specific dataset. Alright, that should cover it.\n</think>\n\nHere are the available datasets in your data directory:\n\n**Datasets:**\n- 📁 All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv (0.01 MB)\n- 📁 All-India-profile_-Crop-wise-Area.csv (0.01 MB)\n- 📁 Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv (0.00 MB)\n- 📁 Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv (0.05 MB)\n- 📁 daily_mandi_prices_19-25_Sep_2025 (1).csv (0.00 MB)\n- 📁 heart.csv (0.01 MB)\n- 📁 soil_data_final.xlsx - soil_data_final.csv (0.00 MB)\n\n**Total:** 7 datasets  \n*(Note: Files marked 0.00 MB may be empty or placeholder files)*\n\nWould you like to explore any of these datasets in more detail? I can show summaries, check for data quality, or help create forecasting tasks.",
+        "timestamp": "2025-12-16 18:56:14.543987",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-16 18:56:02.365056",
+    "last_updated": "2025-12-16 18:56:14.544003"
+  }
+}

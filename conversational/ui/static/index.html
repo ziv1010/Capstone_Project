@@ -37,6 +37,9 @@
                     </div>
                     <div class="flex gap-2 items-center">
                         <span class="badge badge-info" id="sessionBadge">Starting...</span>
+                        <button class="btn btn-success" onclick="startNewChat()" title="Start a new conversation">
+                            ➕ New Chat
+                        </button>
                         <button class="btn btn-secondary" id="modeToggle" onclick="toggleChatMode()">
                             📜 History
                         </button>
@@ -55,7 +58,8 @@
                         <button class="btn btn-secondary" onclick="sendQuickQuery('What datasets are available?')">
                             📂 List Datasets
                         </button>
-                        <button class="btn btn-secondary" onclick="sendQuickQuery('What are the columns in the dataset?')">
+                        <button class="btn btn-secondary"
+                            onclick="sendQuickQuery('What are the columns in the dataset?')">
                             📊 Show Columns
                         </button>
                         <button class="btn btn-secondary" onclick="sendQuickQuery('Show me statistics for the data')">
@@ -64,11 +68,12 @@
                         <button class="btn btn-secondary" onclick="sendQuickQuery('Show correlations between columns')">
                             🔗 Find Correlations
                         </button>
-                        <button class="btn btn-secondary" onclick="sendQuickQuery('Create a histogram of the target column')">
+                        <button class="btn btn-secondary"
+                            onclick="sendQuickQuery('Create a histogram of the target column')">
                             📉 Create Plot
                         </button>
-                        <button class="btn btn-secondary" onclick="sendQuickQuery('Are there any new datasets that need summarizing?')">
-                            🆕 Check New Data
+                        <button class="btn btn-primary" onclick="refreshDatasets()" id="refreshDataBtn">
+                            🔄 Refresh Data
                         </button>
                     </div>
                 </div>
@@ -100,7 +105,8 @@
                         <div class="flex gap-2 items-center"
                             style="padding: var(--spacing-md); border-top: 1px solid var(--glass-border);">
                             <input type="text" id="messageInput" class="form-input"
-                                placeholder="Ask about your data, run EDA queries, or manage pipeline tasks..." onkeypress="handleKeyPress(event)" />
+                                placeholder="Ask about your data, run EDA queries, or manage pipeline tasks..."
+                                onkeypress="handleKeyPress(event)" />
                             <button class="btn btn-primary" onclick="sendMessage()" id="sendButton">
                                 <span>Send</span>
                                 <span>✉️</span>

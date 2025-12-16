@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T19:23:04.412915",
+    "checksum": "7961f8aa160c0619",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-2513",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "iterations": [
+          {
+            "mae": 0.5806451612903226,
+            "rmse": 0.762000762001143,
+            "r2": -1.3846153846153841
+          }
+        ],
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "iterations": [
+          {
+            "mae": 0.26121498703232,
+            "rmse": 0.3531996577210685,
+            "r2": 0.487672015880671
+          }
+        ],
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "iterations": [
+          {
+            "mae": 0.20032258064516129,
+            "rmse": 0.312982530688422,
+            "r2": 0.5977021367521369
+          }
+        ],
+        "valid": true
+      }
+    ],
+    "selected_method_id": "M3",
+    "selected_method_name": "Random Forest Regressor",
+    "selection_rationale": "Lowest average MAE (0.200323) with valid consistency (CV=0.0000)",
+    "method_comparison_summary": "M3: 0.200323 (BEST)\nM2: 0.261215 (+30.4%)\nM1: 0.580645 (+189.9%)",
+    "winning_method_code": "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score\n\n# Load data\ndf = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-2513.parquet')\n\n# Split data\ntrain_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)\nval_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)\n\n# Features and target\ntarget = 'output'\nfeatures = [col for col in df.columns if col != target]\n\n# Train model\nmodel = RandomForestRegressor(random_state=42)\nmodel.fit(train_df[features], train_df[target])\n\n# Predict test\ny_true = test_df[target]\ny_pred = model.predict(test_df[features])\n\n# Calculate metrics\nmae = mean_absolute_error(y_true, y_pred)\nrmse = np.sqrt(mean_squared_error(y_true, y_pred))\nr2 = r2_score(y_true, y_pred)\n\n# Output results\nprint(json.dumps({\n    'mae': float(mae),\n    'rmse': float(rmse),\n    'r2': float(r2)\n}))",
+    "data_split_strategy": "random\n  Train: Random 80% sample\n  Validation: Random 10% sample\n  Test: Random 10% sample",
+    "benchmark_metrics": {
+      "mae": null,
+      "rmse": null,
+      "mape": null
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-10T11:45:01.925362",
-    "checksum": "132760f32af0388b",
+    "timestamp": "2025-12-16T19:11:53.049732",
+    "checksum": "2313c422d342be33",
     "version": "1.0"
   },
   "data": {
@@ -326,6 +326,66 @@
         },
         "feasibility_score": 0.7,
         "feasibility_notes": "Custom task created from user query: forecast rice prices for the rest of 2025",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-2430",
+        "category": "forecasting",
+        "title": "Custom Forecasting: output",
+        "problem_statement": "create a forecasting task using the heart dataset",
+        "required_datasets": [
+          "heart.csv"
+        ],
+        "target_column": "output",
+        "target_dataset": "heart.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: create a forecasting task using the heart dataset",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-2513",
+        "category": "forecasting",
+        "title": "Custom Forecasting: output",
+        "problem_statement": "regression task on the heart dataset",
+        "required_datasets": [
+          "heart.csv"
+        ],
+        "target_column": "output",
+        "target_dataset": "heart.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: regression task on the heart dataset",
         "forecast_horizon": 1,
         "forecast_granularity": "year",
         "forecast_type": "single_step",

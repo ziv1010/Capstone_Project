@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-16T19:17:33.777491",
+    "checksum": "13e13f842c959190",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-2513",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Mean Baseline",
+        "category": "baseline",
+        "description": "Predicts the mean value of the target from training data as a simple baseline for regression tasks.",
+        "implementation_code": "def predict_mean_baseline(train_df, test_df, target_col, **params):\n    import pandas as pd\n    mean_value = train_df[target_col].mean()\n    predictions = pd.DataFrame({'predicted': [mean_value] * len(test_df)}, index=test_df.index)\n    return predictions",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple and fast",
+          "Establishes baseline performance"
+        ],
+        "expected_weaknesses": [
+          "Ignores all features",
+          "Poor predictive power"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Linear Regression",
+        "category": "statistical/traditional",
+        "description": "Ordinary Least Squares regression using all available features to predict the target. Good for linear relationships and interpretability.",
+        "implementation_code": "def predict_linear_regression(train_df, test_df, target_col, feature_cols=None, **params):\n    from sklearn.linear_model import LinearRegression\n    import pandas as pd\n    if feature_cols is None:\n        feature_cols = [col for col in train_df.columns if col != target_col]\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n    model = LinearRegression()\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.linear_model",
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Interpretable coefficients",
+          "Handles linear relationships"
+        ],
+        "expected_weaknesses": [
+          "Assumes linearity",
+          "Sensitive to outliers"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest Regressor",
+        "category": "ml",
+        "description": "Ensemble of decision trees that handles non-linear relationships and feature interactions. Good for complex patterns in tabular data.",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, feature_cols=None, **params):\n    from sklearn.ensemble import RandomForestRegressor\n    import pandas as pd\n    if feature_cols is None:\n        feature_cols = [col for col in train_df.columns if col != target_col]\n    X_train = train_df[feature_cols].fillna(0)\n    y_train = train_df[target_col]\n    X_test = test_df[feature_cols].fillna(0)\n    model = RandomForestRegressor(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.ensemble",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "random_state": 42
+        },
+        "expected_strengths": [
+          "Handles non-linear relationships",
+          "Robust to overfitting with default settings"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Higher computational cost"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "random",
+      "date_column": null,
+      "target_column": "output",
+      "train_period": "Random 80% sample",
+      "validation_period": "Random 10% sample",
+      "test_period": "Random 10% sample"
+    },
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "date_column": null,
+    "target_column": "output"
+  }
+}

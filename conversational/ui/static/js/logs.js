@@ -1,83 +1,102 @@
 /**
  * Logs Viewer Logic
- * Handles real-time log streaming and filtering
+ * Uses API polling to fetch logs (WebSocket not implemented)
  */
 
-let logsWebSocket = null;
 let logEntries = [];
 let currentFilter = 'ALL';
+let pollingInterval = null;
 
 /**
  * Initialize the logs page
  */
 function init() {
-    connectToLogStream();
+    loadLogs();
+    // Poll every 3 seconds
+    pollingInterval = setInterval(loadLogs, 3000);
 }
 
 /**
- * Connect to log WebSocket stream
+ * Load logs from API
  */
-function connectToLogStream() {
+async function loadLogs() {
     try {
-        logsWebSocket = APIClient.connectLogsWebSocket(
-            handleLogMessage,
-            handleLogError
-        );
+        const response = await APIClient.getRecentLogs(200);
 
-        logsWebSocket.onopen = () => {
+        if (response.logs && response.logs.length > 0) {
             updateStatusBadge('Live', 'badge-running');
-        };
 
-        logsWebSocket.onclose = () => {
-            updateStatusBadge('Disconnected', 'badge-error');
-            // Try to reconnect after 5 seconds
-            setTimeout(connectToLogStream, 5000);
-        };
+            // Parse logs and update display
+            const newEntries = response.logs.map(log => parseLogLine(log)).filter(e => e);
 
+            // Only update if we have new logs
+            if (JSON.stringify(newEntries) !== JSON.stringify(logEntries)) {
+                logEntries = newEntries;
+                renderLogs();
+            }
+        } else if (response.error) {
+            updateStatusBadge('Error', 'badge-error');
+            showMessage(response.error);
+        } else {
+            updateStatusBadge('Live', 'badge-running');
+            showMessage('No logs available yet. Start a pipeline to see logs.');
+        }
     } catch (error) {
-        console.error('Error connecting to log stream:', error);
-        updateStatusBadge('Error', 'badge-error');
+        console.error('Error loading logs:', error);
+        updateStatusBadge('Disconnected', 'badge-error');
     }
 }
 
 /**
- * Handle incoming log message
+ * Parse a log line into structured format
  */
-function handleLogMessage(data) {
-    if (data.type === 'log') {
-        const logEntry = {
-            level: data.level || 'INFO',
-            timestamp: data.timestamp,
-            message: data.message
+function parseLogLine(line) {
+    if (!line || !line.trim()) return null;
+
+    // Try to parse structured log format: "2025-12-16 15:53:37,777 - name - LEVEL - message"
+    const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}),?\d*\s*-\s*(\S+)\s*-\s*(\w+)\s*-\s*(.*)$/);
+
+    if (match) {
+        return {
+            timestamp: match[1],
+            source: match[2],
+            level: match[3].toUpperCase(),
+            message: match[4]
         };
-
-        addLogEntry(logEntry);
     }
+
+    // Fallback: simple format
+    return {
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        message: line
+    };
 }
 
 /**
- * Handle log error
+ * Render all logs with current filter
  */
-function handleLogError(error) {
-    console.error('Log stream error:', error);
-    updateStatusBadge('Error', 'badge-error');
-}
+function renderLogs() {
+    const container = document.getElementById('logContainer');
+    container.innerHTML = '';
 
-/**
- * Add a log entry to the display
- */
-function addLogEntry(entry) {
-    logEntries.push(entry);
+    const filteredLogs = logEntries.filter(entry =>
+        currentFilter === 'ALL' || entry.level === currentFilter
+    );
 
-    // Keep only last 1000 entries
-    if (logEntries.length > 1000) {
-        logEntries.shift();
+    if (filteredLogs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted" style="padding: 2rem;">
+                <p>No ${currentFilter === 'ALL' ? '' : currentFilter} logs found.</p>
+            </div>
+        `;
+        return;
     }
 
-    // Only display if it matches current filter
-    if (currentFilter === 'ALL' || entry.level === currentFilter) {
-        displayLogEntry(entry);
-    }
+    filteredLogs.forEach(entry => displayLogEntry(entry));
+
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
 }
 
 /**
@@ -85,27 +104,30 @@ function addLogEntry(entry) {
  */
 function displayLogEntry(entry) {
     const container = document.getElementById('logContainer');
-
-    // Remove loading message if present
-    if (container.querySelector('.spinner')) {
-        container.innerHTML = '';
-    }
-
     const logDiv = document.createElement('div');
     logDiv.className = `log-entry ${entry.level}`;
 
-    const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+    const time = entry.timestamp ? entry.timestamp.split(' ').pop() || entry.timestamp : '';
 
     logDiv.innerHTML = `
-        <span class="log-timestamp">${timestamp}</span>
+        <span class="log-timestamp">${time}</span>
         <span class="log-level ${entry.level}">${entry.level}</span>
         <span class="log-message">${escapeHtml(entry.message)}</span>
     `;
 
     container.appendChild(logDiv);
+}
 
-    // Auto-scroll to bottom
-    container.scrollTop = container.scrollHeight;
+/**
+ * Show a message in the log container
+ */
+function showMessage(msg) {
+    const container = document.getElementById('logContainer');
+    container.innerHTML = `
+        <div class="text-center text-muted" style="padding: 2rem;">
+            <p>${msg}</p>
+        </div>
+    `;
 }
 
 /**
@@ -122,15 +144,7 @@ function filterLogs(level) {
         }
     });
 
-    // Re-render logs
-    const container = document.getElementById('logContainer');
-    container.innerHTML = '';
-
-    logEntries.forEach(entry => {
-        if (level === 'ALL' || entry.level === level) {
-            displayLogEntry(entry);
-        }
-    });
+    renderLogs();
 }
 
 /**
@@ -139,7 +153,7 @@ function filterLogs(level) {
 function clearLogs() {
     logEntries = [];
     document.getElementById('logContainer').innerHTML = `
-        <div class="text-center text-muted">
+        <div class="text-center text-muted" style="padding: 2rem;">
             <p>Logs cleared. Waiting for new logs...</p>
         </div>
     `;
@@ -154,5 +168,21 @@ function updateStatusBadge(text, badgeClass) {
     badge.innerHTML = `<span>● ${text}</span>`;
 }
 
+/**
+ * Helper: escape HTML
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Initialize when page loads
 window.addEventListener('DOMContentLoaded', init);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+});

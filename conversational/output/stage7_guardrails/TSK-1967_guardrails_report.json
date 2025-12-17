@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-17T18:50:31.031182",
-    "checksum": "7af9c2b3da43860e",
+    "timestamp": "2025-12-17T22:37:22.927050",
+    "checksum": "97a6b61379720b3d",
     "version": "1.0",
     "stage": "stage7",
     "type": "guardrails_report"
@@ -96,7 +96,7 @@
         }
       }
     },
-    "overall_assessment": "Model fails guardrails validation due to significant covariate imbalance (propensity score FAIL) and inconsistent performance across prediction ranges (IPW FAIL). While residuals are valid, the model shows selection bias and heterogeneous performance that require investigation. Recommend checking for data imbalances and retraining with better covariate balance.",
+    "overall_assessment": "Model fails guardrails validation due to significant selection bias (propensity score analysis) and inconsistent performance across prediction ranges (IPW validation). While residuals are well-behaved, the model shows clear signs of non-causal relationships and subgroup performance disparities. Requires substantial rework before deployment.",
     "visualizations": [
       {
         "filename": "TSK-1967_guardrails_scatter.png",
@@ -111,6 +111,6 @@
         "api_url": "/api/guardrails/TSK-1967/image/TSK-1967_guardrails_residual_dist.png"
       }
     ],
-    "generated_at": "2025-12-17T18:50:31.031121"
+    "generated_at": "2025-12-17T22:37:22.926961"
   }
 }

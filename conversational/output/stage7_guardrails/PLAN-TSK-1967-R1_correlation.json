@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T22:36:36.135898",
+    "checksum": "d41e3cce747ed386",
+    "version": "1.0"
+  },
+  "data": {
+    "test_name": "correlation_analysis",
+    "prediction_actual_correlation": 0.47371150357749997,
+    "threshold_pass": 0.8,
+    "threshold_warning": 0.5,
+    "status": "FAIL",
+    "reason": "Correlation of 0.4737 is below 0.5 threshold. The model is not effectively predicting the target. Investigate data quality, feature selection, or model choice.",
+    "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+  }
+}

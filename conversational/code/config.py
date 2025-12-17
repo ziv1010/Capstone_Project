@@ -95,7 +95,7 @@ STAGE_MAX_TOKENS = {
     "stage5": 4096,       # Visualization - standard
     "stage6": 4096,       # Report generation - standard
     "stage7": 2048,       # Guardrails - further reduced
-    "stage8": 2048,       # Feedback loop - further reduced (context fills up fast)
+    "stage8": 1024,       # Feedback loop - minimal (context fills fast with history)
 }
 
 # Conversation LLM config (for user interaction)

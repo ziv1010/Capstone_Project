@@ -476,8 +476,8 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
         # Save model checkpoint if found
         if trained_model is not None:
             try:
-                # Extract plan_id from code or method_name
-                plan_match = re.search(r'PLAN-TSK-\d+', code)
+                # Extract plan_id from code or method_name (including -R1 suffix for reruns)
+                plan_match = re.search(r'PLAN-TSK-\d+(?:-R\d+)?', code)
                 if plan_match:
                     plan_id = plan_match.group()
                 else:

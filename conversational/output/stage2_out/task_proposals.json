@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-17T17:16:07.626622",
-    "checksum": "ec8109e460db772e",
+    "timestamp": "2025-12-17T21:40:13.635716",
+    "checksum": "dcc777422a29a972",
     "version": "1.0"
   },
   "data": {
@@ -36,6 +36,21 @@
           "r2"
         ]
       }
-    ]
+    ],
+    "tasks": [
+      {
+        "id": "TSK-1967-R1",
+        "task_id": "TSK-1967-R1",
+        "title": "[RERUN] Analyze guardrails results and apply remediations ...",
+        "description": "RERUN WITH IMPROVEMENTS:\n1. Added target decile balancing feature for propensity issues\n2. Trimmed 1% extreme outliers from target\n3. Applied log transformation to stabilize variance\n\nOriginal: Analyze guardrails results and apply remediations for plan: PLAN-TSK-1967",
+        "target_column": "target",
+        "complexity": "medium",
+        "is_rerun": true,
+        "original_plan_id": "PLAN-TSK-1967",
+        "improvements": "1. Added target decile balancing feature for propensity issues\n2. Trimmed 1% extreme outliers from target\n3. Applied log transformation to stabilize variance",
+        "status": "ready_to_run"
+      }
+    ],
+    "timestamp": "2025-12-17T21:40:13.635614"
   }
 }

@@ -188,10 +188,57 @@ def create_stage8_agent():
         return "agent"
     
     def agent_node(state: Stage8State):
-        """Run the agent."""
-        messages = state.messages
-        response = llm.invoke(messages)
-        return {"messages": [response]}
+        """Run the agent with message truncation to prevent token overflow."""
+        messages = list(state.messages)  # Make a copy
+        
+        logger.info(f"[Stage8] agent_node called, {len(messages)} messages in state")
+        
+        # Truncate to prevent token overflow
+        # Keep system message + last N messages
+        MAX_MESSAGES = 6  # Reduced further
+        MAX_CONTENT_LEN = 2000  # Max chars per message
+        
+        if len(messages) > MAX_MESSAGES:
+            # Keep first message (system) and last N-1 messages
+            messages = [messages[0]] + messages[-(MAX_MESSAGES-1):]
+            logger.info(f"[Stage8] Truncated to {len(messages)} messages")
+        
+        # Also truncate individual message content (except system message)
+        # Simpler approach: just skip the content-based truncation for complex messages
+        truncated_messages = []
+        for i, msg in enumerate(messages):
+            content = str(msg.content) if hasattr(msg, 'content') else str(msg)
+            if i > 0 and len(content) > MAX_CONTENT_LEN:
+                # For simplicity, just keep the message as-is but log it
+                # The message count truncation is the main protection
+                logger.info(f"[Stage8] Large message {i}: {len(content)} chars (kept as-is)")
+            truncated_messages.append(msg)
+        
+        messages = truncated_messages
+        
+        # Estimate token count (rough: 4 chars = 1 token)
+        total_chars = sum(len(str(m.content) if hasattr(m, 'content') else str(m)) for m in messages)
+        estimated_tokens = total_chars // 4
+        logger.info(f"[Stage8] Estimated input tokens: ~{estimated_tokens}")
+        
+        if estimated_tokens > 25000:
+            logger.warning(f"[Stage8] Token count still high ({estimated_tokens}), further truncating...")
+            # Keep only system + last 3 messages
+            messages = [messages[0]] + messages[-2:]
+            total_chars = sum(len(str(m.content) if hasattr(m, 'content') else str(m)) for m in messages)
+            estimated_tokens = total_chars // 4
+            logger.info(f"[Stage8] After aggressive truncation: ~{estimated_tokens} tokens")
+        
+        try:
+            response = llm.invoke(messages)
+            logger.info(f"[Stage8] LLM response received, tool_calls: {bool(hasattr(response, 'tool_calls') and response.tool_calls)}")
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                for tc in response.tool_calls:
+                    logger.info(f"[Stage8] Tool call: {tc.get('name', 'unknown')}")
+            return {"messages": [response]}
+        except Exception as e:
+            logger.error(f"[Stage8] LLM invoke failed: {e}")
+            raise
     
     def tools_node(state: Stage8State):
         """Execute tools."""
@@ -299,12 +346,13 @@ Be thoughtful - understand WHY tests failed before applying fixes.""")
         "recursion_limit": RECURSION_LIMIT
     }
     
-    max_rounds = STAGE_MAX_ROUNDS.get("stage8", 60)
+    max_rounds = 20  # Limited rounds to avoid getting stuck
     final_state = None
     
     for step in agent.stream(initial_state, config):
         final_state = step
         max_rounds -= 1
+        logger.info(f"[Stage8] Rounds remaining: {max_rounds}")
         if max_rounds <= 0:
             logger.warning("Stage 8 reached max rounds limit")
             break
@@ -317,7 +365,39 @@ Be thoughtful - understand WHY tests failed before applying fixes.""")
         logger.info(f"Stage 8 complete: {report.get('remediations_applied', 'none')}")
         return report
     
-    return {"status": "completed", "plan_id": plan_id, "message": "Feedback loop completed"}
+    # Auto-save a basic report if none was created
+    logger.info("[Stage8] No report saved by agent, creating auto-generated report")
+    try:
+        from tools.stage8_feedback_tools import load_guardrails_for_feedback
+        guardrails_result = load_guardrails_for_feedback.invoke({"plan_id": plan_id})
+        
+        # Parse validity score
+        import re
+        score_match = re.search(r"Overall Validity: ([\d.]+)%", guardrails_result)
+        validity_score = float(score_match.group(1)) if score_match else 0.0
+        
+        auto_report = {
+            "task_id": task_id,
+            "plan_id": plan_id,
+            "validity_score": validity_score,
+            "analysis": "Auto-generated report - agent did not complete normally",
+            "remediations_applied": [],
+            "stages_for_rerun": [],
+            "status": "completed_with_timeout",
+            "message": "Stage 8 timed out. Please review guardrails manually."
+        }
+        
+        STAGE8_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        import json
+        with open(report_path, 'w') as f:
+            json.dump({"_meta": {"stage": "stage8", "type": "feedback_report"}, "data": auto_report}, f, indent=2)
+        
+        logger.info(f"[Stage8] Auto-saved report to {report_path}")
+        return auto_report
+    except Exception as e:
+        logger.error(f"[Stage8] Failed to auto-save report: {e}")
+    
+    return {"status": "timeout", "plan_id": plan_id, "message": "Feedback loop timed out"}
 
 
 def stage8_node(state: PipelineState) -> PipelineState:

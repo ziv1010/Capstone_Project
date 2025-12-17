@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T22:18:19.133258",
+    "checksum": "d12349affde43c58",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1967-R1",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-1967-R1.parquet"
+    },
+    "metrics": {
+      "accuracy": 0.8264,
+      "precision": 0.83,
+      "recall": 0.82,
+      "f1": 0.82
+    },
+    "method_used": {
+      "method_id": "M1",
+      "method_name": "Logistic Regression",
+      "stage3_5b_benchmark_metrics": {
+        "mae": null,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 46 samples using Logistic Regression",
+    "data_shape": [
+      46,
+      3
+    ]
+  }
+}

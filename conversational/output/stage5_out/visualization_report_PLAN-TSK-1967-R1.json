@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T22:21:25.504371",
+    "checksum": "5bd6470e090e6de3",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1967-R1",
+    "visualizations": [
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-1967-R1_confusion_matrix.png",
+        "plot_type": "confusion_matrix",
+        "title": "Confusion Matrix - Logistic Regression",
+        "description": "Confusion matrix showing actual vs predicted classifications for the test set.",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-1967-R1_confusion_matrix.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-1967-R1_class_distribution.png",
+        "plot_type": "bar_chart",
+        "title": "Class Distribution Comparison",
+        "description": "Comparison of class distributions between historical data, test set actuals, and model predictions.",
+        "columns_used": [
+          "output",
+          "actual",
+          "predicted"
+        ],
+        "filename": "TSK-1967-R1_class_distribution.png"
+      },
+      {
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-1967-R1_model_metrics.png",
+        "plot_type": "bar_chart",
+        "title": "Model Performance Metrics",
+        "description": "Bar chart showing key performance metrics (accuracy, precision, recall, f1) for the Logistic Regression model.",
+        "columns_used": [
+          "accuracy",
+          "precision",
+          "recall",
+          "f1"
+        ],
+        "filename": "TSK-1967-R1_model_metrics.png"
+      }
+    ],
+    "insights": [
+      "Model shows consistent performance across metrics (82-83% accuracy)",
+      "Negative bias detected (-0.087 mean residual)",
+      "Class distribution matches historical patterns",
+      "No significant outliers in residuals"
+    ],
+    "summary": "The Logistic Regression model demonstrates reliable performance with strong alignment to historical patterns. The slight overprediction bias should be monitored in production environments.",
+    "task_answer": "The Logistic Regression model achieved 82.64% accuracy with consistent precision/recall. Predictions align with historical class distributions but show slight overprediction bias. Model performs reliably within expected ranges."
+  }
+}

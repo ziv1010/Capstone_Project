@@ -390,7 +390,7 @@ async def get_stage_details(stage_name: str):
 
 @app.get("/api/tasks")
 async def get_available_tasks():
-    """Get list of available tasks from stage 2 output."""
+    """Get list of available tasks from stage 2 output (includes rerun tasks)."""
     proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
     
     if not proposals_path.exists():
@@ -404,15 +404,34 @@ async def get_available_tasks():
         if "data" in data:
             data = data["data"]
         
+        # Get BOTH proposals and tasks (rerun tasks are in 'tasks' array)
         proposals = data.get("proposals", [])
+        rerun_tasks = data.get("tasks", [])
+        
         tasks = []
+        
+        # Add regular proposals
         for p in proposals:
             tasks.append({
                 "id": p.get("id"),
                 "title": p.get("title"),
                 "category": p.get("category"),
                 "target_column": p.get("target_column"),
-                "feasibility_score": p.get("feasibility_score")
+                "feasibility_score": p.get("feasibility_score"),
+                "is_rerun": False
+            })
+        
+        # Add rerun tasks
+        for t in rerun_tasks:
+            tasks.append({
+                "id": t.get("id") or t.get("task_id"),
+                "title": t.get("title"),
+                "category": "rerun",
+                "target_column": t.get("target_column"),
+                "feasibility_score": None,
+                "is_rerun": True,
+                "status": t.get("status"),
+                "improvements": t.get("improvements")
             })
         
         return {"tasks": tasks}

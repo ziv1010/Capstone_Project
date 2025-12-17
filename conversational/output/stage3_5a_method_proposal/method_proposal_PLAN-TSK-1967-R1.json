@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T21:49:33.812691",
+    "checksum": "25a0dd0194b2fdff",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1967-R1",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Logistic Regression",
+        "category": "baseline",
+        "description": "Simple linear classifier using all available features",
+        "implementation_code": "def predict_logistic_regression(train_df, test_df, target_col='output', **params):\n    from sklearn.linear_model import LogisticRegression\n    from sklearn.preprocessing import StandardScaler\n    import pandas as pd\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    scaler = StandardScaler()\n    X_train_scaled = scaler.fit_transform(X_train)\n    X_test_scaled = scaler.transform(X_test)\n\n    model = LogisticRegression(**params)\n    model.fit(X_train_scaled, y_train)\n    preds = model.predict(X_test_scaled)\n\n    return pd.DataFrame({'predicted': preds}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.linear_model",
+          "sklearn.preprocessing"
+        ],
+        "hyperparameters": {
+          "C": 1.0,
+          "solver": "liblinear"
+        },
+        "expected_strengths": [
+          "Simple and interpretable",
+          "Works well with small datasets"
+        ],
+        "expected_weaknesses": [
+          "Assumes linear relationships"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Random Forest",
+        "category": "statistical/traditional",
+        "description": "Ensemble of decision trees with feature importance",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col='output', **params):\n    from sklearn.ensemble import RandomForestClassifier\n    import pandas as pd\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    model = RandomForestClassifier(**params)\n    model.fit(X_train, y_train)\n    preds = model.predict(X_test)\n\n    return pd.DataFrame({'predicted': preds}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.ensemble"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "max_depth": 5
+        },
+        "expected_strengths": [
+          "Handles non-linear relationships",
+          "Robust to overfitting"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable",
+          "Computationally intensive"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "XGBoost",
+        "category": "ml",
+        "description": "Gradient boosting with tree-based models",
+        "implementation_code": "def predict_xgboost(train_df, test_df, target_col='output', **params):\n    import xgboost as xgb\n    import pandas as pd\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    model = xgb.XGBClassifier(**params)\n    model.fit(X_train, y_train)\n    preds = model.predict(X_test)\n\n    return pd.DataFrame({'predicted': preds}, index=test_df.index)",
+        "required_libraries": [
+          "xgboost"
+        ],
+        "hyperparameters": {
+          "n_estimators": 200,
+          "learning_rate": 0.1,
+          "max_depth": 4
+        },
+        "expected_strengths": [
+          "High predictive accuracy",
+          "Handles complex patterns"
+        ],
+        "expected_weaknesses": [
+          "Requires careful tuning",
+          "More data hungry"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "stratified",
+      "date_column": null,
+      "target_column": "output",
+      "train_period": "70% of data",
+      "validation_period": "15% of data",
+      "test_period": "15% of data"
+    },
+    "evaluation_metrics": [
+      "Accuracy",
+      "Precision",
+      "Recall",
+      "F1-Score",
+      "AUC-ROC"
+    ],
+    "target_column": "output"
+  }
+}

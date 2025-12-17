@@ -722,8 +722,19 @@ def load_model_checkpoint(plan_id: str) -> str:
             # Try to find it manually
             selected_id = tester.get('selected_method_id', 'M1')
             checkpoint_path = STAGE3_5B_OUT_DIR / f"model_{plan_id}_{selected_id}.pkl"
+            
+            # If not found, try without the -R suffix (for rerun tasks)
+            # This is a fallback for checkpoints saved before the regex fix
+            if not checkpoint_path.exists() and '-R' in plan_id:
+                import re
+                base_plan_id = re.sub(r'-R\d+$', '', plan_id)  # Remove -R1, -R2, etc.
+                alt_path = STAGE3_5B_OUT_DIR / f"model_{base_plan_id}_{selected_id}.pkl"
+                logger.info(f"Checkpoint not found, trying base plan_id: {alt_path}")
+                if alt_path.exists():
+                    checkpoint_path = alt_path
+            
             if not checkpoint_path.exists():
-                return f"Model checkpoint not found. Path tried: {checkpoint_path}\nFalling back to retrain approach."
+                return f"Model checkpoint not found. Paths tried: {checkpoint_path}\nFalling back to retrain approach."
         else:
             checkpoint_path = Path(checkpoint_path)
             if not checkpoint_path.exists():

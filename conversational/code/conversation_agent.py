@@ -297,15 +297,21 @@ class ConversationHandler:
             # Try to extract task ID with flexible parsing
             import re
             
-            # Try to match TSK-digits pattern
-            task_match = re.search(r'tsk[- ]?(\d+)', user_lower)
+            # Try to match TSK-digits or TSK-digits-R# pattern for rerun tasks
+            task_match = re.search(r'tsk[- ]?(\d+)(?:-r(\d+))?', user_lower)
             if task_match:
                 task_num = task_match.group(1)
+                rerun_num = task_match.group(2)  # None if no -R suffix
+                
                 # Normalize to TSK-XXX format (zero-padded to 3 digits if <=999)
                 if len(task_num) <= 3:
                     task_id = f"TSK-{int(task_num):03d}"
                 else:
                     task_id = f"TSK-{task_num}"
+                
+                # Add rerun suffix if present
+                if rerun_num:
+                    task_id = f"{task_id}-R{rerun_num}"
                 
                 # Validate task exists by checking task_proposals.json
                 task_id = self._validate_task_id(task_id, task_num)
@@ -333,14 +339,15 @@ class ConversationHandler:
         Validate that a task ID exists in task proposals.
         
         Args:
-            task_id: Normalized task ID (e.g., "TSK-001")
-            task_num: Raw number from user input (e.g., "1", "001", "9586")
+            task_id: Normalized task ID (e.g., "TSK-001", "TSK-1967-R1")
+            task_num: Raw number from user input (e.g., "1", "001", "1967")
             
         Returns:
             Valid task ID or None if not found
         """
         from code.config import STAGE2_OUT_DIR
         import json
+        import re
         
         proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
         if not proposals_path.exists():
@@ -352,25 +359,42 @@ class ConversationHandler:
             with open(proposals_path, 'r') as f:
                 proposals_data = json.load(f)
             
-            available_tasks = proposals_data.get("data", {}).get("proposals", [])
+            # Check BOTH proposals and tasks arrays (tasks contains rerun tasks)
+            proposals_list = proposals_data.get("data", {}).get("proposals", [])
+            tasks_list = proposals_data.get("data", {}).get("tasks", [])
             
-            # Build map of task IDs
-            task_ids = {task["id"] for task in available_tasks}
+            # Build map of all task IDs from both arrays
+            all_tasks = proposals_list + tasks_list
+            task_ids = set()
+            for task in all_tasks:
+                task_ids.add(task.get("id", ""))
+                task_ids.add(task.get("task_id", ""))
+            task_ids.discard("")  # Remove empty strings
+            
+            logger.info(f"[Validation] Checking task_id={task_id}, available={sorted(task_ids)}")
             
             # Direct match
             if task_id in task_ids:
-                logger.info(f"Task {task_id} validated")
+                logger.info(f"Task {task_id} validated (direct match)")
                 return task_id
             
-            # Try alternate formats
+            # Extract rerun suffix if present (e.g., "-R1" from "TSK-1967-R1")
+            rerun_suffix = ""
+            rerun_match = re.search(r'(-R\d+)$', task_id)
+            if rerun_match:
+                rerun_suffix = rerun_match.group(1)
+            
+            # Try alternate formats (with and without rerun suffix)
             alternates = [
-                f"TSK-{task_num}",  # Raw number
-                f"TSK-{int(task_num)}",  # Unpadded
+                f"TSK-{task_num}{rerun_suffix}",  # TSK-1967-R1
+                f"TSK-{int(task_num)}{rerun_suffix}",  # TSK-1967-R1 (stripped leading zeros)
+                f"TSK-{task_num}",  # TSK-1967 (without suffix)
+                f"TSK-{int(task_num)}",  # TSK-1967 (without suffix)
             ]
             
             for alt in alternates:
                 if alt in task_ids:
-                    logger.info(f"Task {task_num} matched to {alt}")
+                    logger.info(f"Task {task_id} matched to {alt}")
                     return alt
             
             # No match found

@@ -140,17 +140,15 @@ def setup_ml_namespace(required_libraries: List[str] = None) -> Dict[str, Any]:
         'load_dataframe': load_dataframe,
     }
 
-    # Define core libraries to always try importing
+    # Define core libraries to always try importing (only sklearn - always available)
     core_libraries = [
         ('sklearn.metrics', 'mean_absolute_error', 'scikit-learn'),
         ('sklearn.metrics', 'mean_squared_error', 'scikit-learn'),
         ('sklearn.ensemble', 'RandomForestRegressor', 'scikit-learn'),
         ('sklearn.linear_model', 'LinearRegression', 'scikit-learn'),
-        ('statsmodels.tsa.arima.model', 'ARIMA', 'statsmodels'),
-        ('statsmodels.tsa.holtwinters', 'ExponentialSmoothing', 'statsmodels'),
     ]
 
-    # Extended libraries that might be requested
+    # Extended libraries that might be requested (will be auto-installed)
     extended_libraries = {
         'xgboost': [('xgboost', 'XGBRegressor', 'xgboost')],
         'lightgbm': [('lightgbm', 'LGBMRegressor', 'lightgbm')],
@@ -160,6 +158,8 @@ def setup_ml_namespace(required_libraries: List[str] = None) -> Dict[str, Any]:
         'keras': [('keras', 'keras', 'keras')],
         'torch': [('torch', 'torch', 'torch')],
         'pytorch': [('torch', 'torch', 'torch')],
+        'statsmodels': [('statsmodels.tsa.arima.model', 'ARIMA', 'statsmodels'),
+                        ('statsmodels.tsa.holtwinters', 'ExponentialSmoothing', 'statsmodels')],
     }
 
     # Import core libraries (always available)
@@ -396,6 +396,7 @@ def record_thought_3_5b(thought: str, next_action: str) -> str:
 def run_benchmark_code(code: str, method_name: str, required_libraries: str = None) -> str:
     """
     Execute benchmarking code for a method with automatic dependency installation.
+    Also saves trained model checkpoints for Stage 4 to load.
 
     The code should:
     1. Load the prepared data
@@ -414,6 +415,8 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
     """
     import sys
     from io import StringIO
+    import joblib
+    import re
 
     # Parse required libraries
     libs = []
@@ -435,6 +438,7 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
     start_time = time.time()
     success = True
     output = ""
+    saved_model_path = None
 
     try:
         exec(code, namespace)
@@ -442,6 +446,58 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
         stderr = sys.stderr.getvalue()
         if stderr:
             output += f"\n[STDERR]\n{stderr}"
+        
+        # ============================================================
+        # CRITICAL: Extract and save trained model after execution
+        # ============================================================
+        trained_model = None
+        model_names = ['model', 'clf', 'regressor', 'classifier', 'estimator', 
+                       'rf', 'lr', 'xgb', 'lgb', 'forest', 'tree', 'svm']
+        
+        # First, look for common model variable names
+        for name in model_names:
+            if name in namespace:
+                obj = namespace[name]
+                if hasattr(obj, 'fit') and hasattr(obj, 'predict'):
+                    trained_model = obj
+                    logger.info(f"Found trained model as '{name}'")
+                    break
+        
+        # If not found, scan for any sklearn-like estimator
+        if trained_model is None:
+            for name, obj in namespace.items():
+                if name.startswith('_'):
+                    continue
+                if hasattr(obj, 'fit') and hasattr(obj, 'predict') and hasattr(obj, 'get_params'):
+                    trained_model = obj
+                    logger.info(f"Found trained estimator as '{name}'")
+                    break
+        
+        # Save model checkpoint if found
+        if trained_model is not None:
+            try:
+                # Extract plan_id from code or method_name
+                plan_match = re.search(r'PLAN-TSK-\d+', code)
+                if plan_match:
+                    plan_id = plan_match.group()
+                else:
+                    plan_id = "UNKNOWN"
+                
+                # Extract method_id (M1, M2, M3) from method_name
+                method_match = re.search(r'M(\d+)', method_name)
+                if method_match:
+                    method_id = f"M{method_match.group(1)}"
+                else:
+                    method_id = method_name.replace(' ', '_')[:10]
+                
+                model_filename = f"model_{plan_id}_{method_id}.pkl"
+                model_path = STAGE3_5B_OUT_DIR / model_filename
+                joblib.dump(trained_model, model_path)
+                saved_model_path = str(model_path)
+                logger.info(f"✅ Saved model checkpoint to: {model_path}")
+            except Exception as e:
+                logger.warning(f"Failed to save model checkpoint: {e}")
+
     except Exception as e:
         success = False
         import traceback
@@ -457,10 +513,16 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
         f"Execution time: {execution_time:.2f}s",
         f"Status: {'SUCCESS' if success else 'FAILED'}",
         f"Libraries used: {libs if libs else 'default'}",
+    ]
+    
+    if saved_model_path:
+        result.append(f"Model checkpoint: {saved_model_path}")
+    
+    result.extend([
         "",
         "Output:",
         output
-    ]
+    ])
 
     return "\n".join(result)
 
@@ -778,6 +840,20 @@ def save_tester_output(output_json: str) -> str:
                 logger.info(f"Stored benchmark metrics for Stage 4 verification: {output['benchmark_metrics']}")
                 break
 
+        # ============================================================
+        # CRITICAL: Store model checkpoint path for Stage 4 to load
+        # This ensures Stage 4 uses the exact same trained model
+        # ============================================================
+        plan_id = output['plan_id']
+        model_checkpoint_filename = f"model_{plan_id}_{selected_id}.pkl"
+        model_checkpoint_path = STAGE3_5B_OUT_DIR / model_checkpoint_filename
+        if model_checkpoint_path.exists():
+            output['model_checkpoint_path'] = str(model_checkpoint_path)
+            logger.info(f"Model checkpoint found and stored: {model_checkpoint_path}")
+        else:
+            output['model_checkpoint_path'] = None
+            logger.warning(f"Model checkpoint not found at {model_checkpoint_path}")
+
         # Ensure output directory exists
         STAGE3_5B_OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -929,6 +1005,7 @@ def get_method_implementation(plan_id: str, method_id: str) -> str:
 def test_single_method(plan_id: str, method_id: str) -> str:
     """
     Test a single method's implementation with the prepared data.
+    Also saves the trained model as a checkpoint for Stage 4 to load.
 
     Args:
         plan_id: Plan ID
@@ -939,6 +1016,7 @@ def test_single_method(plan_id: str, method_id: str) -> str:
     """
     import sys
     from io import StringIO
+    import joblib
 
     try:
         # Load method proposal
@@ -1016,10 +1094,42 @@ def test_single_method(plan_id: str, method_id: str) -> str:
             f"Functions found: {predict_funcs}",
         ]
 
+        trained_model = None
+        model_path = None
+
         if predict_funcs:
             func = namespace[predict_funcs[0]]
             try:
                 predictions = func(train_df, test_df, target_col, date_col)
+
+                # Try to extract the trained model from namespace
+                # Look for common model variable names
+                model_names = ['model', 'clf', 'regressor', 'classifier', 'estimator', 'rf', 'lr', 'xgb', 'lgb']
+                for name in model_names:
+                    if name in namespace and hasattr(namespace[name], 'predict'):
+                        trained_model = namespace[name]
+                        logger.info(f"Found trained model as '{name}' in namespace")
+                        break
+                
+                # If not found, look for any sklearn-like estimator
+                if trained_model is None:
+                    for name, obj in namespace.items():
+                        if hasattr(obj, 'fit') and hasattr(obj, 'predict') and not callable(obj):
+                            trained_model = obj
+                            logger.info(f"Found trained model as '{name}' in namespace")
+                            break
+
+                # Save model checkpoint if found
+                if trained_model is not None:
+                    model_filename = f"model_{plan_id}_{method_id}.pkl"
+                    model_path = STAGE3_5B_OUT_DIR / model_filename
+                    joblib.dump(trained_model, model_path)
+                    logger.info(f"Saved model checkpoint to: {model_path}")
+                    result.append(f"\n✅ Model checkpoint saved: {model_filename}")
+                else:
+                    result.append(f"\n⚠️ Could not extract trained model from namespace")
+                    # Still try to save the namespace for diagnostics
+                    logger.warning(f"Available namespace keys: {[k for k in namespace.keys() if not k.startswith('_')]}")
 
                 # Calculate metrics
                 actual = test_df[target_col].values
@@ -1038,6 +1148,9 @@ def test_single_method(plan_id: str, method_id: str) -> str:
                 result.append(f"  RMSE: {rmse:.4f}")
                 result.append(f"  MAPE: {mape:.2f}%")
                 result.append(f"  Predictions: {len(pred)} values")
+                
+                if model_path:
+                    result.append(f"\nModel checkpoint: {model_path}")
 
             except Exception as e:
                 result.append(f"\nPrediction failed: {e}")

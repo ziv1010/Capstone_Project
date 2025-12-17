@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T18:40:43.391872",
+    "checksum": "c150f8613f36b0b2",
+    "version": "1.0",
+    "stage": "stage3_5b",
+    "type": "tester_output"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1967",
+    "methods_tested": [
+      {
+        "method_id": "M1",
+        "avg_accuracy": 0.5579706811594204,
+        "avg_precision": 0.5579706811594204,
+        "avg_recall": 1.0,
+        "avg_f1": 0.716249665111707,
+        "valid": true
+      },
+      {
+        "method_id": "M2",
+        "avg_accuracy": 0.8116242028985506,
+        "avg_precision": 0.8307693673025973,
+        "avg_recall": 0.8323046920410155,
+        "avg_f1": 0.831322272832043,
+        "valid": true
+      },
+      {
+        "method_id": "M3",
+        "avg_accuracy": 0.7971014492753623,
+        "avg_precision": 0.818369278514206,
+        "avg_recall": 0.8184605383500049,
+        "avg_f1": 0.81696382423273,
+        "valid": true
+      }
+    ],
+    "selected_method_id": "M2",
+    "selected_method_name": "M2: Linear Regression",
+    "selection_rationale": "Highest average F1-score (0.831) across 3 consistent runs",
+    "method_comparison_summary": "M2 outperformed M3 in F1-score and accuracy, while M1 was significantly worse across all metrics. M2's precision and recall were most balanced.",
+    "winning_method_code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score\nimport json\nimport numpy as np\n\n# Load data\ndf = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-1967.parquet')\n\n# Split data\ntrain_df, temp_df = train_test_split(df, test_size=0.3, random_state=42)\nval_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)\n\n# Train: Logistic Regression\nX_train = train_df.drop('output', axis=1)\ny_train = train_df['output']\nmodel = LogisticRegression(max_iter=1000).fit(X_train, y_train)\n\n# Predict\nX_test = test_df.drop('output', axis=1)\ny_true = test_df['output']\ny_pred = model.predict(X_test)\n\n# Calculate metrics\naccuracy = accuracy_score(y_true, y_pred)\nprecision = precision_score(y_true, y_pred)\nrecall = recall_score(y_true, y_pred)\nf1 = f1_score(y_true, y_pred)\n\nprint(json.dumps({\n    'accuracy': float(accuracy),\n    'precision': float(precision),\n    'recall': float(recall),\n    'f1': float(f1)\n}))",
+    "data_split_strategy": "random split: 70% train, 15% validation, 15% test",
+    "benchmark_metrics": {
+      "mae": null,
+      "rmse": null,
+      "mape": null
+    },
+    "model_checkpoint_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3_5b_benchmarking/model_PLAN-TSK-1967_M2.pkl"
+  }
+}

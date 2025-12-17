@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-17T18:42:26.731735",
+    "checksum": "583167985cfcd6a0",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-1967",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-1967.parquet"
+    },
+    "metrics": {
+      "mae": 0.2391304347826087,
+      "rmse": 0.48900964692182575,
+      "accuracy": 0.7608695652173914,
+      "precision": 0.8,
+      "recall": 0.7692307692307693,
+      "f1": 0.7843137254901961
+    },
+    "method_used": {
+      "method_id": "M2",
+      "method_name": "M2: Linear Regression",
+      "stage3_5b_benchmark_metrics": {
+        "mae": null,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 47 samples using M2: Linear Regression",
+    "data_shape": [
+      47,
+      17
+    ]
+  }
+}

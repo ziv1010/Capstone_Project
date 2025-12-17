@@ -1,10 +1,11 @@
 {
   "_meta": {
-    "timestamp": "2025-12-10T09:14:50.985888",
-    "checksum": "22ddada1e3ab94a1",
+    "timestamp": "2025-12-17T17:14:51.915087",
+    "checksum": "5608602880049403",
     "version": "1.0",
     "stage": "stage1",
-    "type": "dataset_summary"
+    "type": "dataset_summary",
+    "source": "eda_agent"
   },
   "data": {
     "filename": "soil_data_final.xlsx - soil_data_final.csv",
@@ -374,7 +375,7 @@
       "pH - Neutral"
     ],
     "file_size_mb": 0.0032024383544921875,
-    "created_at": "2025-12-10 09:14:50.985803",
+    "created_at": "2025-12-17 17:14:51.914931",
     "has_datetime_column": false,
     "has_target_candidates": [
       "Nitrogen - High",

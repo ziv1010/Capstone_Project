@@ -689,3 +689,188 @@ STAGE4_TOOLS = [
     list_stage4_results,
     verify_execution,
 ]
+
+
+@tool
+def load_model_checkpoint(plan_id: str) -> str:
+    """
+    Load the trained model checkpoint from Stage 3.5B and generate predictions.
+    
+    This tool loads the exact model that was trained in Stage 3.5B, ensuring
+    identical results without needing to retrain. This is the PREFERRED method
+    for Stage 4 execution.
+    
+    Args:
+        plan_id: Plan ID
+    
+    Returns:
+        Predictions and metrics using the loaded model
+    """
+    import joblib
+    
+    try:
+        # Load tester output to get checkpoint path and method info
+        tester_path = STAGE3_5B_OUT_DIR / f"tester_{plan_id}.json"
+        if not tester_path.exists():
+            return f"Tester output not found for {plan_id}"
+        
+        tester = DataPassingManager.load_artifact(tester_path)
+        
+        # Get model checkpoint path
+        checkpoint_path = tester.get('model_checkpoint_path')
+        if not checkpoint_path:
+            # Try to find it manually
+            selected_id = tester.get('selected_method_id', 'M1')
+            checkpoint_path = STAGE3_5B_OUT_DIR / f"model_{plan_id}_{selected_id}.pkl"
+            if not checkpoint_path.exists():
+                return f"Model checkpoint not found. Path tried: {checkpoint_path}\nFalling back to retrain approach."
+        else:
+            checkpoint_path = Path(checkpoint_path)
+            if not checkpoint_path.exists():
+                return f"Model checkpoint not found at {checkpoint_path}\nFalling back to retrain approach."
+        
+        # Load the model
+        logger.info(f"Loading model checkpoint from {checkpoint_path}")
+        model = joblib.load(checkpoint_path)
+        logger.info(f"Model loaded successfully: {type(model).__name__}")
+        
+        # Load prepared data
+        prepared_path = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
+        if not prepared_path.exists():
+            return f"Prepared data not found at {prepared_path}"
+        
+        df = pd.read_parquet(prepared_path)
+        
+        # Get column info
+        target_col = tester.get('target_column', 'target')
+        date_col = tester.get('date_column')
+        feature_columns = tester.get('feature_columns', [])
+        
+        # Parse dates if needed
+        if date_col and date_col in df.columns:
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            df = df.sort_values(date_col)
+        
+        # Split data same as Stage 3.5B
+        train_size = int(len(df) * 0.7)
+        val_size = int(len(df) * 0.15)
+        
+        test_df = df.iloc[train_size + val_size:].copy()
+        
+        # Prepare features
+        if feature_columns and len(feature_columns) > 0:
+            X_test = test_df[feature_columns]
+        else:
+            X_test = test_df.drop(columns=[target_col], errors='ignore')
+            if date_col and date_col in X_test.columns:
+                X_test = X_test.drop(columns=[date_col])
+        
+        y_test = test_df[target_col].values
+        
+        # Generate predictions using loaded model
+        logger.info(f"Generating predictions for {len(X_test)} samples")
+        predictions = model.predict(X_test)
+        
+        # Calculate metrics
+        mae = np.mean(np.abs(y_test - predictions))
+        rmse = np.sqrt(np.mean((y_test - predictions) ** 2))
+        mask = y_test != 0
+        mape = np.mean(np.abs((y_test[mask] - predictions[mask]) / y_test[mask])) * 100 if mask.sum() > 0 else float('inf')
+        
+        # Calculate R² if sklearn is available
+        try:
+            from sklearn.metrics import r2_score
+            r2 = r2_score(y_test, predictions)
+        except:
+            r2 = None
+        
+        # Get benchmark metrics for comparison
+        benchmark = tester.get('benchmark_metrics', {})
+        
+        # Create results DataFrame
+        results_df = test_df.copy()
+        results_df['predicted'] = predictions
+        
+        # Save predictions
+        predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
+        results_df.to_parquet(predictions_path, index=False)
+        
+        # Save execution result
+        result = {
+            "plan_id": plan_id,
+            "status": "success",
+            "outputs": {
+                "predictions": str(predictions_path)
+            },
+            "metrics": {
+                "mae": float(mae),
+                "rmse": float(rmse),
+                "mape": float(mape),
+                "r2": float(r2) if r2 else None
+            },
+            "method_used": {
+                "method_id": tester.get('selected_method_id'),
+                "method_name": tester.get('selected_method_name'),
+                "loaded_from_checkpoint": True,
+                "checkpoint_path": str(checkpoint_path),
+                "stage3_5b_benchmark_metrics": benchmark
+            },
+            "summary": f"Generated predictions for {len(results_df)} samples using loaded model checkpoint",
+            "data_shape": list(results_df.shape),
+        }
+        
+        result_path = DataPassingManager.save_artifact(
+            data=result,
+            output_dir=STAGE4_OUT_DIR,
+            filename=f"execution_result_{plan_id}.json",
+            metadata={"stage": "stage4", "type": "execution_result"}
+        )
+        
+        # Format output
+        output = [
+            f"=== Model Checkpoint Loaded Successfully ===",
+            f"Model Type: {type(model).__name__}",
+            f"Checkpoint: {checkpoint_path.name}",
+            "",
+            "=== Predictions Generated ===",
+            f"Test Samples: {len(predictions)}",
+            f"Predictions saved to: {predictions_path}",
+            "",
+            "=== Metrics ===",
+            f"  MAE:  {mae:.4f}",
+            f"  RMSE: {rmse:.4f}",
+            f"  MAPE: {mape:.2f}%",
+        ]
+        if r2:
+            output.append(f"  R²:   {r2:.4f}")
+        
+        output.extend([
+            "",
+            "=== Comparison with Stage 3.5B Benchmark ===",
+        ])
+        if benchmark:
+            output.append(f"  Expected MAE: {benchmark.get('mae', 'N/A')}")
+            output.append(f"  Expected RMSE: {benchmark.get('rmse', 'N/A')}")
+            output.append(f"  Expected MAPE: {benchmark.get('mape', 'N/A')}")
+        else:
+            output.append("  (No benchmark metrics available)")
+        
+        output.extend([
+            "",
+            f"Execution result saved to: {result_path}",
+            "",
+            "✅ SUCCESS: Stage 4 execution complete using model checkpoint!"
+        ])
+        
+        logger.info(f"Stage 4 complete for {plan_id}: MAE={mae:.4f}, RMSE={rmse:.4f}")
+        return "\n".join(output)
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"Error in load_model_checkpoint: {e}")
+        return f"Error loading model checkpoint: {e}\n{traceback.format_exc()}"
+
+
+# Add load_model_checkpoint to the tools list
+STAGE4_TOOLS.append(load_model_checkpoint)
+

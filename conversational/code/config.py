@@ -36,6 +36,8 @@ STAGE5_OUT_DIR = OUTPUT_ROOT / "stage5_out"
 STAGE5_WORKSPACE = OUTPUT_ROOT / "stage5_workspace"
 STAGE6_OUT_DIR = OUTPUT_ROOT / "stage6_out"
 STAGE7_OUT_DIR = OUTPUT_ROOT / "stage7_guardrails"
+STAGE3C_OUT_DIR = OUTPUT_ROOT / "stage3c_features"  # Feature engineering
+STAGE8_OUT_DIR = OUTPUT_ROOT / "stage8_feedback"    # Feedback loop
 
 # EDA Agent directories
 EDA_OUT_DIR = OUTPUT_ROOT / "eda_out"
@@ -48,6 +50,7 @@ CONVERSATION_STATE_DIR = OUTPUT_ROOT / "conversation_state"
 for d in [SUMMARIES_DIR, STAGE2_OUT_DIR, STAGE3_OUT_DIR, STAGE3B_OUT_DIR,
           STAGE3_5A_OUT_DIR, STAGE3_5B_OUT_DIR, STAGE4_OUT_DIR, STAGE4_WORKSPACE,
           STAGE5_OUT_DIR, STAGE5_WORKSPACE, STAGE6_OUT_DIR, STAGE7_OUT_DIR,
+          STAGE3C_OUT_DIR, STAGE8_OUT_DIR,
           EDA_OUT_DIR, EDA_WORKSPACE, CONVERSATION_STATE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
@@ -85,12 +88,14 @@ SECONDARY_LLM_CONFIG = {
 # Stage-specific max_tokens overrides (for stages that need more/less)
 STAGE_MAX_TOKENS = {
     "stage3b": 3072,      # Data prep - less verbose
+    "stage3c": 6144,      # Feature engineering - needs code generation
     "stage3_5a": 3072,    # Method proposal - less verbose
     "stage3_5b": 3072,    # Benchmarking - less verbose
     "stage4": 6144,       # Execution + forecasting - needs more tokens
     "stage5": 4096,       # Visualization - standard
     "stage6": 4096,       # Report generation - standard
-    "stage7": 8192,       # Guardrails - needs more for code generation
+    "stage7": 2048,       # Guardrails - further reduced
+    "stage8": 2048,       # Feedback loop - further reduced (context fills up fast)
 }
 
 # Conversation LLM config (for user interaction)
@@ -130,12 +135,14 @@ STAGE_MAX_ROUNDS = {
     "stage2": 15,     # Exploration steps
     "stage3": 100,    # Planning rounds (increased to handle complex wide-format data)
     "stage3b": 100,   # Data preparation
+    "stage3c": 50,    # Feature engineering
     "stage3_5a": 35,  # Method proposal
     "stage3_5b": 120, # Benchmarking (3 methods x 3 iterations each)
     "stage4": 100,    # Execution
     "stage5": 60,     # Visualization
     "stage6": 30,     # Report generation
     "stage7": 50,     # Guardrails validation
+    "stage8": 60,     # Feedback loop
     "eda": 40,        # EDA agent exploration
 }
 

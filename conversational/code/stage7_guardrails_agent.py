@@ -168,6 +168,7 @@ def create_stage7_agent():
         
         results = []
         validation_results = dict(state.validation_results)
+        completed = False
         
         for tool_call in last_message.tool_calls:
             tool_name = tool_call["name"]
@@ -213,13 +214,25 @@ def create_stage7_agent():
                         content=str(result),
                         tool_call_id=tool_call["id"]
                     ))
+                    
+                    # Mark completed when report is saved
+                    if "save_guardrails_report" in tool_name and "saved" in str(result).lower():
+                        logger.info("[Stage7] Report saved - marking completed!")
+                        completed = True
                 except Exception as e:
                     results.append(ToolMessage(
                         content=f"Error: {e}",
                         tool_call_id=tool_call["id"]
                     ))
         
-        return {"messages": results, "validation_results": validation_results}
+        return {"messages": results, "validation_results": validation_results, "completed": completed}
+    
+    def should_continue_after_tools(state: Stage7State):
+        """Check if we should continue after tools or end."""
+        if state.completed:
+            logger.info("[Stage7] Completed flag is True - ending!")
+            return END
+        return "agent"
     
     # Build graph
     workflow = StateGraph(Stage7State)
@@ -228,7 +241,7 @@ def create_stage7_agent():
     
     workflow.set_entry_point("agent")
     workflow.add_conditional_edges("agent", should_continue, {"agent": "agent", "tools": "tools", END: END})
-    workflow.add_edge("tools", "agent")
+    workflow.add_conditional_edges("tools", should_continue_after_tools, {"agent": "agent", END: END})
     
     return workflow.compile(checkpointer=MemorySaver())
 
@@ -280,10 +293,22 @@ Be thorough and provide honest assessments.""")
     
     max_rounds = STAGE_MAX_ROUNDS.get("stage7", 50)
     final_state = None
+    report_path = STAGE7_OUT_DIR / f"{task_id}_guardrails_report.json"
+    
+    # Track initial file state to detect when it's saved/modified
+    initial_mtime = report_path.stat().st_mtime if report_path.exists() else 0
     
     for step in agent.stream(initial_state, config):
         final_state = step
         max_rounds -= 1
+        
+        # HARD STOP: Check if report was saved/modified during this run
+        if report_path.exists():
+            current_mtime = report_path.stat().st_mtime
+            if current_mtime > initial_mtime:
+                logger.info(f"[Stage7 HARD STOP] Report saved/modified, exiting loop!")
+                break
+        
         if max_rounds <= 0:
             logger.warning("Stage 7 reached max rounds limit")
             break

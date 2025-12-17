@@ -50,12 +50,33 @@ class Stage4State(BaseModel):
 STAGE4_SYSTEM_PROMPT = """You are an Execution Agent responsible for running the selected forecasting method.
 
 ## Your Role
-1. Load the execution context (plan, data, selected method)
-2. Execute the selected method from Stage 3.5B
-3. Generate predictions for the test set (for validation)
-4. **FOR FORECASTING**: Generate future forecasts if forecast_horizon > 0
-5. Calculate evaluation metrics
-6. Save comprehensive results
+1. Load the model checkpoint from Stage 3.5B (PREFERRED) or retrain if no checkpoint
+2. Generate predictions for the test set
+3. **FOR FORECASTING**: Generate future forecasts if forecast_horizon > 0
+4. Calculate evaluation metrics
+5. Save comprehensive results
+
+## ⭐ PREFERRED APPROACH: LOAD MODEL CHECKPOINT ⭐
+
+**Use `load_model_checkpoint` tool FIRST!** This is the PREFERRED approach because:
+- Loads the EXACT trained model from Stage 3.5B
+- Guarantees IDENTICAL results (same model weights = same predictions)
+- Much faster (no retraining needed)
+- No risk of code differences affecting metrics
+
+```
+Step 1: Try load_model_checkpoint(plan_id)
+Step 2: If SUCCESS → Execution complete! The tool saves results automatically.
+Step 3: If FAILED (no checkpoint) → Fall back to retrain approach below.
+```
+
+## FALLBACK APPROACH: Retrain (only if no checkpoint)
+
+Only use this if load_model_checkpoint fails:
+1. Load the execution context
+2. Get the selected method code
+3. Execute the code to retrain the model
+4. Generate predictions and save results
 
 ## CRITICAL: TWO TYPES OF PREDICTIONS
 
@@ -68,30 +89,16 @@ STAGE4_SYSTEM_PROMPT = """You are an Execution Agent responsible for running the
 ### 2. FUTURE FORECASTS (Required if forecast_horizon > 0)
 - Check the plan for `forecast_horizon` and `forecast_type`
 - If forecast_horizon > 0: Generate predictions for the NEXT N periods
-- forecast_type can be:
-  - "single_step": Predict next period only
-  - "multi_step": Predict next N periods directly
-  - "recursive": Use each prediction as input for the next
-
-**IMPORTANT**: Future forecasts have NO actual values (they're in the future!)
-Save them separately with a 'forecast_type' column to distinguish from test predictions.
-
-## Your Goals
-- Execute the winning method from benchmarking
-- Generate test set predictions with actual vs predicted values
-- Generate future forecasts if specified in the plan
-- Calculate final metrics (MAE, RMSE, MAPE, R²) that MATCH benchmark
-- Save results in a format suitable for visualization
 
 ## Available Tools
+- **load_model_checkpoint**: ⭐ PRIMARY TOOL - Load saved model and generate predictions
 - load_execution_context: Get plan, data info, and selected method
 - load_prepared_data: Load and inspect the prepared data
-- get_selected_method_code: Get implementation code for winner (INCLUDES benchmark metrics)
-- execute_python_code: Run Python for model execution
+- get_selected_method_code: Get implementation code for winner
+- execute_python_code: Run Python for model execution (fallback only)
 - save_predictions: Save predictions to parquet
 - save_execution_result: Save execution metadata
 - verify_execution: Verify outputs are correct
-- list_stage4_results: List existing results
 
 ## CRITICAL: File Path Variables (DO NOT HARDCODE PATHS)
 When using execute_python_code, these variables are available in the namespace:
@@ -102,46 +109,22 @@ When using execute_python_code, these variables are available in the namespace:
 **NEVER hardcode paths like '/scratch/.../stage3b_out/' or '/scratch/.../data/'**
 **ALWAYS use the provided variables: STAGE3B_OUT_DIR, STAGE4_OUT_DIR, DATA_DIR**
 
-Example (CORRECT):
-```python
-df = pd.read_parquet(STAGE3B_OUT_DIR / 'prepared_PLAN-TSK-001.parquet')
-```
-
-Example (WRONG - DO NOT DO THIS):
-```python
-df = pd.read_parquet('/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_out/prepared_PLAN-TSK-001.parquet')
-```
-
 ## Execution Workflow
+
+### RECOMMENDED (Try First):
+1. Call `load_model_checkpoint(plan_id="{plan_id}")` 
+2. If returns SUCCESS → You're done! Results are saved.
+3. If returns ERROR about checkpoint not found → Continue with fallback.
+
+### FALLBACK (Only if checkpoint not found):
 1. Load execution context for the plan
-2. **CRITICAL**: Call get_selected_method_code to get:
-   - The winning method's implementation code
-   - The EXACT data split strategy used in benchmarking
-   - The benchmark metrics (your results should match these)
-3. Load prepared data and VERIFY the column names match what's expected
-4. **CRITICAL**: Check if forecast_horizon > 0 in the plan
-5. **STEP A: TEST SET PREDICTIONS** (validation)
-   - **MUST USE**: Copy the EXACT winning_method_code from get_selected_method_code
-   - **MUST USE**: The EXACT data split strategy from Stage 3.5B
-   - **DO NOT MODIFY** the method code - use it verbatim!
-   - Execute the method using the code exactly as provided
-   - Calculate metrics - they MUST match benchmark (±5%)
-   - Create test results DataFrame with actual vs predicted
-6. **STEP B: FUTURE FORECASTS** (if forecast_horizon > 0)
-   - Generate forecasts for the next N periods
-   - Use recursive/multi-step approach as specified
-   - Create forecast DataFrame with predicted values (no actuals)
-   - Add 'forecast_type' column to distinguish from test predictions
-7. **COMBINE RESULTS**:
-   - Concatenate test predictions + future forecasts
-   - Mark each row with 'prediction_type': 'test' or 'forecast'
-8. Save predictions and execution result
-9. Verify the outputs
+2. Call get_selected_method_code
+3. Execute the winning method code
+4. Save predictions and verify results
 
 **CRITICAL VALIDATION**:
 - Your test MAE MUST be within ±5% of the Stage 3.5B benchmark MAE
-- If metrics differ significantly, you are NOT using the same code or split strategy
-- DO NOT proceed if validation fails - debug the issue first
+- If metrics differ significantly, debug the issue first
 
 ## DATA SPLIT STRATEGY (MUST FOLLOW EXACTLY)
 The get_selected_method_code tool returns the data_split_strategy JSON.
@@ -327,17 +310,38 @@ def create_stage4_agent():
     def agent_node(state: Stage4State) -> Dict[str, Any]:
         """Main agent reasoning node."""
         messages = state.messages
+        
+        logger.info(f"[Stage4 Debug] agent_node called, iteration={state.iteration}, messages={len(messages)}")
 
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=STAGE4_SYSTEM_PROMPT)] + list(messages)
 
         if state.iteration >= STAGE_MAX_ROUNDS.get("stage4", 100):
+            logger.warning("[Stage4 Debug] Maximum iterations reached!")
             return {
                 "messages": [AIMessage(content="Maximum iterations reached. Finalizing.")],
                 "complete": True
             }
 
-        response = llm_with_tools.invoke(messages)
+        try:
+            response = llm_with_tools.invoke(messages)
+            
+            # Log response details
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                for tc in response.tool_calls:
+                    logger.info(f"[Stage4 Debug] Tool call: {tc.get('name', 'unknown')} with args keys: {list(tc.get('args', {}).keys())}")
+            else:
+                content_preview = str(response.content)[:200] if response.content else "EMPTY"
+                logger.info(f"[Stage4 Debug] No tool calls, response preview: {content_preview}")
+                
+        except Exception as e:
+            logger.error(f"[Stage4 Debug] LLM invoke error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                "messages": [AIMessage(content=f"LLM error: {e}")],
+                "complete": True
+            }
 
         return {
             "messages": [response],

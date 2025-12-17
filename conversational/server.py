@@ -924,6 +924,103 @@ async def get_guardrails_image(task_id: str, filename: str):
 
 
 # ============================================================================
+# FEATURE ENGINEERING ENDPOINTS
+# ============================================================================
+
+@app.post("/api/features/{task_id}/run")
+async def run_feature_engineering(task_id: str, background_tasks: BackgroundTasks):
+    """Trigger feature engineering for a task."""
+    from code.stage3c_feature_agent import run_stage3c_features
+    
+    plan_id = f"PLAN-{task_id}" if not task_id.startswith("PLAN-") else task_id
+    
+    def run_in_background(plan_id: str):
+        try:
+            result = run_stage3c_features(plan_id)
+            logger.info(f"Feature engineering completed for {plan_id}: {result.get('new_features', 0)} features")
+        except Exception as e:
+            logger.error(f"Feature engineering failed for {plan_id}: {e}")
+    
+    background_tasks.add_task(run_in_background, plan_id)
+    
+    return {
+        "status": "started",
+        "message": f"Feature engineering started for {plan_id}",
+        "task_id": task_id
+    }
+
+
+@app.get("/api/features/{task_id}")
+async def get_feature_report(task_id: str):
+    """Get feature engineering report for a task."""
+    from code.config import STAGE3C_OUT_DIR, DataPassingManager
+    
+    plan_id = f"PLAN-{task_id}" if not task_id.startswith("PLAN-") else task_id
+    report_path = STAGE3C_OUT_DIR / f"{plan_id}_feature_report.json"
+    
+    if not report_path.exists():
+        return {"status": "not_found", "message": f"Feature report not found for {task_id}"}
+    
+    try:
+        report_data = DataPassingManager.load_artifact(report_path)
+        return {"status": "found", "report": report_data}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ============================================================================
+# FEEDBACK LOOP ENDPOINTS
+# ============================================================================
+
+@app.post("/api/feedback/{task_id}/run")
+async def run_feedback_loop(task_id: str, background_tasks: BackgroundTasks):
+    """Trigger feedback loop for a task with low guardrails score."""
+    from code.stage8_feedback_agent import run_stage8_feedback
+    
+    plan_id = f"PLAN-{task_id}" if not task_id.startswith("PLAN-") else task_id
+    
+    def run_in_background(plan_id: str):
+        try:
+            result = run_stage8_feedback(plan_id)
+            logger.info(f"Feedback loop completed for {plan_id}: {result.get('status', 'done')}")
+        except Exception as e:
+            logger.error(f"Feedback loop failed for {plan_id}: {e}")
+    
+    background_tasks.add_task(run_in_background, plan_id)
+    
+    return {
+        "status": "started",
+        "message": f"Feedback loop started for {plan_id}",
+        "task_id": task_id
+    }
+
+
+@app.get("/api/feedback/{task_id}")
+async def get_feedback_report(task_id: str):
+    """Get feedback loop report for a task."""
+    from code.config import STAGE8_OUT_DIR, DataPassingManager
+    
+    task_id_clean = task_id.replace("PLAN-", "").replace("TSK-", "")
+    if task_id_clean.isdigit():
+        task_id_clean = f"TSK-{task_id_clean}"
+    
+    report_path = STAGE8_OUT_DIR / f"{task_id_clean}_feedback_report.json"
+    
+    if not report_path.exists():
+        # Try with original task_id
+        report_path = STAGE8_OUT_DIR / f"{task_id}_feedback_report.json"
+    
+    if not report_path.exists():
+        return {"status": "not_found", "message": f"Feedback report not found for {task_id}"}
+    
+    try:
+        report_data = DataPassingManager.load_artifact(report_path)
+        return {"status": "found", "report": report_data}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ============================================================================
 # FILE SERVING ENDPOINTS
 # ============================================================================
 

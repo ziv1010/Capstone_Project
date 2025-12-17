@@ -246,6 +246,9 @@ async function loadReport(taskId) {
         // Render assessment
         document.getElementById('assessmentText').textContent = report.overall_assessment || 'No assessment provided.';
 
+        // Update action buttons based on score
+        updateActionButtons(score, taskId);
+
         // Scroll to report
         panel.scrollIntoView({ behavior: 'smooth' });
 
@@ -336,3 +339,220 @@ function formatVizName(filename) {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }
+
+/**
+ * Show/hide action buttons based on validity score
+ */
+function updateActionButtons(score, taskId) {
+    const featuresBtn = document.getElementById('runFeaturesBtn');
+    const feedbackBtn = document.getElementById('runFeedbackBtn');
+    const rerunBtn = document.getElementById('rerunGuardrailsBtn');
+
+    // Always show features button (can be run anytime)
+    featuresBtn.style.display = 'inline-block';
+    featuresBtn.setAttribute('data-task-id', taskId);
+
+    // Show feedback button only for LOW/MEDIUM scores
+    if (score < 75) {
+        feedbackBtn.style.display = 'inline-block';
+        feedbackBtn.setAttribute('data-task-id', taskId);
+    } else {
+        feedbackBtn.style.display = 'none';
+    }
+
+    // Always show re-run button
+    rerunBtn.style.display = 'inline-block';
+    rerunBtn.setAttribute('data-task-id', taskId);
+}
+
+/**
+ * Run feature engineering for current task
+ */
+async function runFeatureEngineering() {
+    const btn = document.getElementById('runFeaturesBtn');
+    const taskId = btn.getAttribute('data-task-id') || selectedTaskId;
+
+    if (!taskId) {
+        alert('No task selected');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Running...';
+
+    try {
+        const response = await fetch(`/api/features/${taskId}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+
+        if (result.status === 'started') {
+            // Poll for completion
+            pollForFeatureCompletion(taskId, btn);
+        }
+    } catch (error) {
+        console.error('Error running feature engineering:', error);
+        btn.disabled = false;
+        btn.innerHTML = '❌ Failed';
+    }
+}
+
+/**
+ * Poll for feature engineering completion
+ */
+async function pollForFeatureCompletion(taskId, btn, attempts = 0) {
+    if (attempts >= 60) {
+        btn.disabled = false;
+        btn.innerHTML = '⚠️ Timeout';
+        return;
+    }
+
+    try {
+        const response = await APIClient.get(`/api/features/${taskId}`);
+        if (response.status === 'found') {
+            btn.disabled = false;
+            btn.innerHTML = '✅ Features Added';
+            alert(`Feature engineering complete. ${response.report.new_features || 0} new features added.`);
+            return;
+        }
+        setTimeout(() => pollForFeatureCompletion(taskId, btn, attempts + 1), 3000);
+    } catch (error) {
+        setTimeout(() => pollForFeatureCompletion(taskId, btn, attempts + 1), 3000);
+    }
+}
+
+/**
+ * Run feedback loop for current task
+ */
+async function runFeedbackLoop() {
+    const btn = document.getElementById('runFeedbackBtn');
+    const taskId = btn.getAttribute('data-task-id') || selectedTaskId;
+
+    if (!taskId) {
+        alert('No task selected');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Analyzing & Fixing...';
+
+    try {
+        const response = await fetch(`/api/feedback/${taskId}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+
+        if (result.status === 'started') {
+            pollForFeedbackCompletion(taskId, btn);
+        }
+    } catch (error) {
+        console.error('Error running feedback loop:', error);
+        btn.disabled = false;
+        btn.innerHTML = '❌ Failed';
+    }
+}
+
+/**
+ * Poll for feedback loop completion
+ */
+async function pollForFeedbackCompletion(taskId, btn, attempts = 0) {
+    if (attempts >= 90) {
+        btn.disabled = false;
+        btn.innerHTML = '⚠️ Timeout';
+        return;
+    }
+
+    try {
+        const response = await APIClient.get(`/api/feedback/${taskId}`);
+        if (response.status === 'found') {
+            btn.disabled = false;
+            btn.innerHTML = '✅ Fixes Applied';
+            showFeedbackReport(response.report);
+            return;
+        }
+        setTimeout(() => pollForFeedbackCompletion(taskId, btn, attempts + 1), 3000);
+    } catch (error) {
+        setTimeout(() => pollForFeedbackCompletion(taskId, btn, attempts + 1), 3000);
+    }
+}
+
+/**
+ * Show feedback report
+ */
+function showFeedbackReport(report) {
+    const container = document.getElementById('feedbackReport');
+    const content = document.getElementById('feedbackContent');
+
+    container.style.display = 'block';
+    content.innerHTML = `
+        <p><strong>Original Score:</strong> ${report.original_validity_score || 0}%</p>
+        <p><strong>Issues Found:</strong> ${report.issues_found || 'None'}</p>
+        <p><strong>Remediations Applied:</strong> ${report.remediations_applied || 'None'}</p>
+        <p><strong>Stages to Re-run:</strong> ${report.stages_to_rerun || 'None'}</p>
+        <p><strong>Expected Improvement:</strong> ${report.expected_improvement || 'TBD'}</p>
+        <p style="margin-top: 12px; color: var(--success-color);">
+            ✅ Fixes applied. Click "Re-Run Guardrails" to verify improvement.
+        </p>
+    `;
+}
+
+/**
+ * Re-run guardrails for current task
+ */
+async function rerunGuardrails() {
+    const btn = document.getElementById('rerunGuardrailsBtn');
+    const taskId = btn.getAttribute('data-task-id') || selectedTaskId;
+
+    if (!taskId) {
+        alert('No task selected');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Re-validating...';
+
+    try {
+        const response = await fetch(`/api/guardrails/${taskId}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+
+        if (result.status === 'started') {
+            pollForGuardrailsRerun(taskId, btn);
+        }
+    } catch (error) {
+        console.error('Error re-running guardrails:', error);
+        btn.disabled = false;
+        btn.innerHTML = '❌ Failed';
+    }
+}
+
+/**
+ * Poll for guardrails re-run completion
+ */
+async function pollForGuardrailsRerun(taskId, btn, attempts = 0) {
+    if (attempts >= 60) {
+        btn.disabled = false;
+        btn.innerHTML = '⚠️ Timeout';
+        return;
+    }
+
+    try {
+        const response = await APIClient.get(`/api/guardrails/${taskId}`);
+        if (response.status === 'found') {
+            btn.disabled = false;
+            btn.innerHTML = '✅ Complete';
+            // Reload the report
+            loadGuardrails();
+            loadReport(taskId);
+            return;
+        }
+        setTimeout(() => pollForGuardrailsRerun(taskId, btn, attempts + 1), 5000);
+    } catch (error) {
+        setTimeout(() => pollForGuardrailsRerun(taskId, btn, attempts + 1), 5000);
+    }
+}
+

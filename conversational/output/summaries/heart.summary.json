@@ -1,11 +1,11 @@
 {
   "_meta": {
-    "timestamp": "2025-12-16T16:28:18.727121",
-    "checksum": "9f999ce754db0e70",
+    "timestamp": "2025-12-17T17:14:48.384979",
+    "checksum": "3c9c50fd785942bf",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary",
-    "source": "auto_refresh"
+    "source": "eda_agent"
   },
   "data": {
     "filename": "heart.csv",
@@ -366,7 +366,7 @@
     ],
     "candidate_keys": [],
     "file_size_mb": 0.010798454284667969,
-    "created_at": "2025-12-16 16:28:18.726871",
+    "created_at": "2025-12-17 17:14:48.384827",
     "has_datetime_column": false,
     "has_target_candidates": [
       "age",

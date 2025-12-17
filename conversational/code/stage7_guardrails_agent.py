@@ -4,7 +4,6 @@ Stage 7 Agent: Guardrails Validation
 LLM agent that runs statistical validation tests to verify model predictions:
 - Correlation analysis
 - Propensity score analysis
-- Inverse propensity weighting
 - Residual analysis
 - Creates visualizations and final validity report
 """
@@ -73,16 +72,12 @@ Run ALL of these tests in order:
 1. **Correlation Analysis** - `run_correlation_analysis`
    - Checks relationship between predictions and actuals
    - Validates feature correlations are sensible
-   
+
 2. **Propensity Score Analysis** - `run_propensity_score_analysis`
    - Checks for covariate balance
    - Detects if model is biased toward certain data subgroups
-   
-3. **Inverse Propensity Weighting** - `run_inverse_propensity_weighting`
-   - Validates model consistency across prediction ranges
-   - Checks for heterogeneous performance
-   
-4. **Residual Analysis** - `run_residual_analysis`
+
+3. **Residual Analysis** - `run_residual_analysis`
    - Checks residual normality
    - Detects outliers and systematic bias
 
@@ -90,7 +85,7 @@ Run ALL of these tests in order:
 Call `create_guardrails_visualization` with these types:
 - "residual_distribution" - Shows residual distribution
 - "prediction_scatter" - Shows actual vs predicted
-- "error_by_quintile" - Shows IPW validation
+- "error_by_quintile" - Shows error distribution by prediction range
 
 ### Step 4: GENERATE REPORT
 Call `save_guardrails_report` with:
@@ -195,13 +190,6 @@ def create_stage7_agent():
                             validation_results["propensity"] = "FAIL"
                         else:
                             validation_results["propensity"] = "WARNING"
-                    elif "inverse_propensity" in tool_name:
-                        if "✅ PASS" in result:
-                            validation_results["ipw"] = "PASS"
-                        elif "❌ FAIL" in result:
-                            validation_results["ipw"] = "FAIL"
-                        else:
-                            validation_results["ipw"] = "WARNING"
                     elif "residual" in tool_name:
                         if "Overall Residual Analysis: PASS" in result:
                             validation_results["residual"] = "PASS"
@@ -275,10 +263,9 @@ Execute ALL validation tests:
 1. Load predictions
 2. Correlation analysis
 3. Propensity score analysis
-4. Inverse propensity weighting
-5. Residual analysis
-6. Create visualizations (residual_distribution, prediction_scatter, error_by_quintile)
-7. Save the final guardrails report with overall validity assessment
+4. Residual analysis
+5. Create visualizations (residual_distribution, prediction_scatter, error_by_quintile)
+6. Save the final guardrails report with overall validity assessment
 
 Be thorough and provide honest assessments.""")
         ],

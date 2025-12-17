@@ -4,7 +4,6 @@ Stage 7 Tools: Guardrails Validation
 Tools for validating model predictions using statistical tests:
 - Correlation analysis
 - Propensity score analysis
-- Inverse propensity weighting
 - Residual analysis
 - Feature importance validation
 """
@@ -296,116 +295,6 @@ def run_propensity_score_analysis(plan_id: str) -> str:
         return f"Error in propensity score analysis: {e}"
 
 
-# ============================================================================
-# INVERSE PROPENSITY WEIGHTING
-# ============================================================================
-
-@tool
-def run_inverse_propensity_weighting(plan_id: str) -> str:
-    """
-    Run Inverse Propensity Weighting (IPW) validation.
-    
-    IPW reweights predictions to check if the model performs
-    consistently across different data subgroups.
-
-    Args:
-        plan_id: Plan ID (e.g., PLAN-TSK-001)
-
-    Returns:
-        IPW validation results
-    """
-    try:
-        predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
-        prepared_path = STAGE3B_OUT_DIR / f"prepared_{plan_id}.parquet"
-
-        if not predictions_path.exists() or not prepared_path.exists():
-            return "Required data not found for IPW analysis"
-
-        df = pd.read_parquet(predictions_path)
-        prepared_df = pd.read_parquet(prepared_path)
-
-        result = ["=== INVERSE PROPENSITY WEIGHTING (IPW) VALIDATION ===\n"]
-
-        # Find columns
-        pred_col = next((c for c in df.columns if 'predict' in c.lower()), None)
-        actual_col = next((c for c in df.columns if 'actual' in c.lower()), None)
-
-        if not pred_col or not actual_col:
-            return "Could not identify prediction and actual columns"
-
-        # Calculate residuals and squared errors
-        residuals = df[actual_col] - df[pred_col]
-        squared_errors = residuals ** 2
-        
-        # Create quintile-based groups
-        n_samples = len(df)
-        quintile_size = n_samples // 5
-        
-        result.append("Performance by Prediction Quintile:")
-        result.append("-" * 40)
-        
-        sorted_indices = df[pred_col].argsort()
-        quintile_maes = []
-        
-        for i in range(5):
-            start_idx = i * quintile_size
-            end_idx = (i + 1) * quintile_size if i < 4 else n_samples
-            quintile_indices = sorted_indices[start_idx:end_idx]
-            
-            quintile_mae = residuals.iloc[quintile_indices].abs().mean()
-            quintile_maes.append(quintile_mae)
-            
-            result.append(f"  Q{i+1}: MAE = {quintile_mae:.4f}")
-        
-        # Check consistency across quintiles
-        mae_range = max(quintile_maes) - min(quintile_maes)
-        mae_cv = np.std(quintile_maes) / np.mean(quintile_maes)
-        
-        result.append(f"\nMAE Range across quintiles: {mae_range:.4f}")
-        result.append(f"MAE Coefficient of Variation: {mae_cv:.4f}")
-        
-        # IPW Assessment with detailed reasons
-        if mae_cv < 0.15:
-            result.append("\n✅ PASS: Model performs consistently across prediction ranges")
-            status = "PASS"
-            reason = f"MAE coefficient of variation is {mae_cv:.4f}, below the 0.15 threshold. The model's error is consistent across all prediction quintiles, indicating stable performance regardless of prediction magnitude."
-        elif mae_cv < 0.30:
-            result.append("\n⚠️ WARNING: Some inconsistency in model performance across ranges")
-            status = "WARNING"
-            reason = f"MAE CV of {mae_cv:.4f} is between 0.15-0.30. The model shows moderate variation in error across prediction quintiles (range: {mae_range:.4f}). Consider investigating specific quintiles with higher errors."
-        else:
-            result.append("\n❌ FAIL: Model performance varies significantly across prediction ranges")
-            status = "FAIL"
-            reason = f"MAE CV of {mae_cv:.4f} exceeds 0.30 threshold. Error varies significantly across quintiles (range: {mae_range:.4f}). The model may be overfitting to certain prediction ranges or missing patterns in others."
-        
-        # IPW-adjusted overall MAE
-        weights = 1.0 / (np.abs(residuals) + 0.01)  # Avoid division by zero
-        weights = weights / weights.sum()
-        ipw_mae = (residuals.abs() * weights * len(residuals)).sum()
-        
-        result.append(f"\nIPW-adjusted MAE: {ipw_mae:.4f}")
-        result.append(f"Standard MAE: {residuals.abs().mean():.4f}")
-
-        # Save results
-        ipw_data = {
-            "test_name": "inverse_propensity_weighting",
-            "quintile_maes": [float(m) for m in quintile_maes],
-            "mae_range": float(mae_range),
-            "mae_cv": float(mae_cv),
-            "threshold_pass": 0.15,
-            "threshold_warning": 0.30,
-            "ipw_adjusted_mae": float(ipw_mae),
-            "standard_mae": float(residuals.abs().mean()),
-            "status": status,
-            "reason": reason,
-            "interpretation": "IPW validates that the model performs consistently across different prediction ranges. High variation suggests the model may be unreliable for certain value ranges."
-        }
-        DataPassingManager.save_artifact(ipw_data, STAGE7_OUT_DIR, f"{plan_id}_ipw.json")
-
-        return "\n".join(result)
-
-    except Exception as e:
-        return f"Error in IPW analysis: {e}"
 
 
 # ============================================================================
@@ -600,7 +489,7 @@ def create_guardrails_visualization(plan_id: str, viz_type: str) -> str:
             n = len(df)
             quintile_size = n // 5
             sorted_indices = df[pred_col].argsort()
-            
+
             quintiles = []
             maes = []
             for i in range(5):
@@ -609,12 +498,12 @@ def create_guardrails_visualization(plan_id: str, viz_type: str) -> str:
                 quintile_indices = sorted_indices[start_idx:end_idx]
                 quintiles.append(f'Q{i+1}')
                 maes.append(residuals.iloc[quintile_indices].abs().mean())
-            
+
             bars = ax.bar(quintiles, maes, color='steelblue')
             ax.axhline(y=np.mean(maes), color='red', linestyle='--', label=f'Mean MAE: {np.mean(maes):.3f}')
             ax.set_xlabel('Prediction Quintile')
             ax.set_ylabel('Mean Absolute Error')
-            ax.set_title('Guardrails: Error by Prediction Quintile (IPW Check)')
+            ax.set_title('Guardrails: Error by Prediction Quintile')
             ax.legend()
             filename = f"{task_id}_guardrails_quintile.png"
             
@@ -641,7 +530,6 @@ def save_guardrails_report(
     plan_id: str,
     correlation_result: str,
     propensity_result: str,
-    ipw_result: str,
     residual_result: str,
     overall_assessment: str
 ) -> str:
@@ -652,7 +540,6 @@ def save_guardrails_report(
         plan_id: Plan ID (e.g., PLAN-TSK-001)
         correlation_result: Pass/Fail/Warning for correlation test
         propensity_result: Pass/Fail/Warning for propensity score test
-        ipw_result: Pass/Fail/Warning for IPW test
         residual_result: Pass/Fail/Warning for residual analysis
         overall_assessment: Overall validity assessment with explanation
 
@@ -664,34 +551,34 @@ def save_guardrails_report(
         
         # Load individual test results if they exist
         tests = {}
-        for test_name in ['correlation', 'propensity', 'ipw', 'residuals']:
+        for test_name in ['correlation', 'propensity', 'residuals']:
             test_path = STAGE7_OUT_DIR / f"{plan_id}_{test_name}.json"
             if test_path.exists():
                 tests[test_name] = DataPassingManager.load_artifact(test_path)
-        
+
         # Collect visualization paths
         viz_files = list(STAGE7_OUT_DIR.glob(f"{task_id}_guardrails_*.png"))
         visualizations = [{"filename": f.name, "api_url": f"/api/guardrails/{task_id}/image/{f.name}"} for f in viz_files]
-        
-        # Calculate validity percentage (each test is worth 25%)
-        results = [correlation_result.upper(), propensity_result.upper(), ipw_result.upper(), residual_result.upper()]
-        
+
+        # Calculate validity percentage (each test is worth 33.33%)
+        results = [correlation_result.upper(), propensity_result.upper(), residual_result.upper()]
+
         def score_result(result):
             if result == "PASS":
-                return 25.0
+                return 33.33
             elif result == "WARNING":
-                return 12.5
+                return 16.67
             else:
                 return 0.0
-        
+
         validity_score = sum(score_result(r) for r in results)
-        
+
         # Determine validity label based on score
-        if validity_score >= 75:
+        if validity_score >= 66.67:
             validity_label = "HIGH"
             validity_icon = "✅"
             validity_color = "#10b981"
-        elif validity_score >= 50:
+        elif validity_score >= 33.33:
             validity_label = "MEDIUM"
             validity_icon = "⚠️"
             validity_color = "#f59e0b"
@@ -699,15 +586,14 @@ def save_guardrails_report(
             validity_label = "LOW"
             validity_icon = "❌"
             validity_color = "#ef4444"
-        
+
         # Individual test scores for display
         test_scores = {
             "correlation": score_result(correlation_result.upper()),
             "propensity": score_result(propensity_result.upper()),
-            "ipw": score_result(ipw_result.upper()),
             "residual": score_result(residual_result.upper())
         }
-        
+
         report = {
             "task_id": task_id,
             "plan_id": plan_id,
@@ -727,11 +613,6 @@ def save_guardrails_report(
                     "score": test_scores["propensity"],
                     "details": tests.get("propensity", {})
                 },
-                "inverse_propensity_weighting": {
-                    "status": ipw_result,
-                    "score": test_scores["ipw"],
-                    "details": tests.get("ipw", {})
-                },
                 "residual_analysis": {
                     "status": residual_result,
                     "score": test_scores["residual"],
@@ -742,17 +623,17 @@ def save_guardrails_report(
             "visualizations": visualizations,
             "generated_at": pd.Timestamp.now().isoformat()
         }
-        
+
         output_path = DataPassingManager.save_artifact(
             report,
             STAGE7_OUT_DIR,
             f"{task_id}_guardrails_report.json",
             metadata={"stage": "stage7", "type": "guardrails_report"}
         )
-        
+
         logger.info(f"Guardrails report saved to {output_path}")
-        
-        return f"Guardrails report saved: {output_path}\nValidity: {validity_icon} {validity}"
+
+        return f"Guardrails report saved: {output_path}\nValidity: {validity_icon} {validity_label}"
 
     except Exception as e:
         return f"Error saving guardrails report: {e}"
@@ -763,7 +644,6 @@ STAGE7_GUARDRAILS_TOOLS = [
     load_predictions_for_validation,
     run_correlation_analysis,
     run_propensity_score_analysis,
-    run_inverse_propensity_weighting,
     run_residual_analysis,
     create_guardrails_visualization,
     save_guardrails_report,

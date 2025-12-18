@@ -1,0 +1,93 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T15:48:41.175077",
+    "checksum": "5170c23f75dfca42",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-003",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Logistic Regression",
+        "category": "baseline",
+        "description": "Simple linear classifier using all available features",
+        "implementation_code": "def predict_logistic_regression(train_df, test_df, target_col, **params):\n    from sklearn.linear_model import LogisticRegression\n    from sklearn.metrics import accuracy_score\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    model = LogisticRegression(max_iter=1000)\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.linear_model",
+          "sklearn.metrics"
+        ],
+        "hyperparameters": {
+          "C": 1.0,
+          "penalty": "l2"
+        },
+        "expected_strengths": [
+          "Simple and fast",
+          "Good baseline for classification"
+        ],
+        "expected_weaknesses": [
+          "Assumes linear relationships"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "Decision Tree Classifier",
+        "category": "statistical/traditional",
+        "description": "Tree-based classifier that handles categorical features naturally",
+        "implementation_code": "def predict_decision_tree(train_df, test_df, target_col, **params):\n    from sklearn.tree import DecisionTreeClassifier\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    model = DecisionTreeClassifier(max_depth=5)\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.tree"
+        ],
+        "hyperparameters": {
+          "max_depth": 5
+        },
+        "expected_strengths": [
+          "Handles non-linear relationships",
+          "Interpretable"
+        ],
+        "expected_weaknesses": [
+          "Can overfit"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "Random Forest Classifier",
+        "category": "ml",
+        "description": "Ensemble of decision trees for improved accuracy",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, **params):\n    from sklearn.ensemble import RandomForestClassifier\n\n    X_train = train_df.drop(columns=[target_col])\n    y_train = train_df[target_col]\n    X_test = test_df.drop(columns=[target_col])\n\n    model = RandomForestClassifier(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    return pd.DataFrame({'predicted': predictions}, index=test_df.index)",
+        "required_libraries": [
+          "sklearn.ensemble"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "max_depth": null
+        },
+        "expected_strengths": [
+          "Handles complex patterns",
+          "Robust to overfitting"
+        ],
+        "expected_weaknesses": [
+          "Less interpretable"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "stratified",
+      "date_column": null,
+      "target_column": "output",
+      "train_period": "70% of data",
+      "validation_period": "15% of data",
+      "test_period": "15% of data"
+    },
+    "evaluation_metrics": [
+      "accuracy",
+      "precision",
+      "recall",
+      "f1"
+    ],
+    "date_column": null,
+    "target_column": "output"
+  }
+}

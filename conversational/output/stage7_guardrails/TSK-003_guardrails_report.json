@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T16:16:12.753776",
+    "checksum": "0b769b259c946b9e",
+    "version": "1.0",
+    "stage": "stage7",
+    "type": "guardrails_report"
+  },
+  "data": {
+    "task_id": "TSK-003",
+    "plan_id": "PLAN-TSK-003",
+    "validity_score": 33.34,
+    "validity_label": "MEDIUM",
+    "validity_icon": "⚠️",
+    "validity_color": "#f59e0b",
+    "test_scores": {
+      "correlation": 16.67,
+      "propensity": 0.0,
+      "residual": 16.67
+    },
+    "tests": {
+      "correlation_analysis": {
+        "status": "WARNING",
+        "score": 16.67,
+        "details": {
+          "test_name": "correlation_analysis",
+          "prediction_actual_correlation": 0.547722557505166,
+          "threshold_pass": 0.8,
+          "threshold_warning": 0.5,
+          "status": "WARNING",
+          "reason": "Correlation of 0.5477 is between 0.5-0.8. The model captures some patterns but may miss important relationships. Consider feature engineering or alternative models.",
+          "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+        }
+      },
+      "propensity_score_analysis": {
+        "status": "FAIL",
+        "score": 0.0,
+        "details": {
+          "test_name": "propensity_score_analysis",
+          "propensity_mean": 0.08695073287703184,
+          "propensity_std": 0.06648587993149893,
+          "extreme_low_pct": 0.6521739130434783,
+          "extreme_high_pct": 0.0,
+          "extreme_total_pct": 0.6521739130434783,
+          "threshold_pass": 0.2,
+          "threshold_warning": 0.4,
+          "status": "FAIL",
+          "reason": "65.2% of samples have extreme propensity scores, exceeding the 40% threshold. The model shows significant selection bias - certain data subgroups are poorly handled. Consider rebalancing training data or stratified sampling.",
+          "interpretation": "Propensity scores measure the probability of belonging to high/low error groups. Extreme scores indicate certain feature combinations are over-represented in errors."
+        }
+      },
+      "residual_analysis": {
+        "status": "WARNING",
+        "score": 16.67,
+        "details": {
+          "test_name": "residual_analysis",
+          "mean": -0.044444444444444446,
+          "std": 0.4746077593682233,
+          "skewness": -0.15007645094646058,
+          "kurtosis": 1.7961424007823346,
+          "outlier_count": 0,
+          "outlier_pct": 0.0,
+          "bias_status": "WARNING",
+          "bias_reason": "Residual mean of -0.0444 is non-zero indicating systematic prediction bias",
+          "normality_status": "PASS",
+          "normality_reason": "Skewness=-0.15, Kurtosis=1.80. Within acceptable range (-1 to 1 skew, -3 to 3 kurtosis)",
+          "outlier_status": "PASS",
+          "outlier_reason": "0 outliers (0.0%). Acceptable (<1%)",
+          "status": "WARNING",
+          "reason": "Residual analysis has warnings: systematic bias detected (mean=-0.0444)",
+          "interpretation": "Residual analysis validates regression assumptions: zero-mean residuals (unbiased), normality (valid confidence intervals), and few outliers (data quality)."
+        }
+      }
+    },
+    "overall_assessment": "Model is INVALID due to significant covariate imbalance in propensity score analysis. Key issues: 1) Moderate prediction-actual correlation (0.548) 2) Systematic bias in residuals (mean -0.044) 3) Covariate imbalance indicates selection bias. Recommend: 1) Investigate feature engineering 2) Check training data representativeness 3) Consider causal modeling approaches.",
+    "visualizations": [
+      {
+        "filename": "TSK-003_guardrails_scatter.png",
+        "api_url": "/api/guardrails/TSK-003/image/TSK-003_guardrails_scatter.png"
+      },
+      {
+        "filename": "TSK-003_guardrails_quintile.png",
+        "api_url": "/api/guardrails/TSK-003/image/TSK-003_guardrails_quintile.png"
+      },
+      {
+        "filename": "TSK-003_guardrails_residual_dist.png",
+        "api_url": "/api/guardrails/TSK-003/image/TSK-003_guardrails_residual_dist.png"
+      }
+    ],
+    "generated_at": "2025-12-18T16:16:12.753716"
+  }
+}

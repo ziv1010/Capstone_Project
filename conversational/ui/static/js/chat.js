@@ -530,11 +530,8 @@ function createMessageElement(message) {
         content = content.replace(/<think>[\s\S]*?<\/think>/g, '');
     }
 
-    // Convert line breaks to <br> and escape HTML
-    content = escapeHtml(content).replace(/\n/g, '<br>');
-
-    // Basic markdown: **bold** -> <strong>
-    content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Parse markdown to HTML
+    content = parseMarkdown(content);
 
     // Build visualization gallery HTML if present
     let vizHtml = '';
@@ -600,6 +597,57 @@ function showError(message) {
             <p style="color: var(--error);">⚠️ ${escapeHtml(message)}</p>
         </div>
     `;
+}
+
+/**
+ * Parse markdown to HTML with enhanced formatting
+ */
+function parseMarkdown(text) {
+    // Escape HTML first
+    let html = escapeHtml(text);
+
+    // Code blocks (```language\ncode\n```)
+    html = html.replace(/```(\w+)?\n([\s\S]+?)```/g, (_match, lang, code) => {
+        return `<pre><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
+    });
+
+    // Inline code (`code`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold (**text** or __text__)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    // Italic (*text* or _text_)
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+    // Headers (# Header)
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Lists
+    html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // Wrap consecutive <li> in <ul>
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+    // Blockquotes (> text)
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Horizontal rules (--- or ***)
+    html = html.replace(/^(---|\*\*\*)$/gm, '<hr>');
+
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
 }
 
 // Initialize when page loads

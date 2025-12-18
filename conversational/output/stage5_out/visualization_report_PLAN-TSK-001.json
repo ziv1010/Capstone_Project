@@ -1,0 +1,47 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T13:05:12.978143",
+    "checksum": "fe9b98349a0d674d",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report",
+    "fallback": true
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "visualizations": [
+      {
+        "filename": "TSK-001_actual_vs_predicted.png",
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-001_actual_vs_predicted.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted",
+        "description": "Actual vs Predicted scatter plot",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ]
+      },
+      {
+        "filename": "TSK-001_residuals_histogram.png",
+        "filepath": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage5_out/TSK-001_residuals_histogram.png",
+        "plot_type": "histogram",
+        "title": "Residual Distribution",
+        "description": "Distribution of prediction errors",
+        "columns_used": [
+          "actual",
+          "predicted"
+        ]
+      }
+    ],
+    "html_report_path": null,
+    "insights": [
+      "Mean Absolute Error: 18.1479",
+      "Root Mean Squared Error: 34.2618",
+      "Prediction Bias: 17.7311",
+      "Model created visualizations showing actual vs predicted values and error distribution"
+    ],
+    "summary": "Created 2 visualizations (fallback mode)",
+    "task_answer": null,
+    "created_at": "2025-12-18 13:05:12.978053"
+  }
+}

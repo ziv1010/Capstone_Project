@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T13:17:05.382311",
+    "checksum": "cf9bb5b48d004265",
+    "version": "1.0"
+  },
+  "data": {
+    "test_name": "residual_analysis",
+    "mean": 17.73109234559827,
+    "std": 29.681039492727272,
+    "skewness": 2.4198934454938206,
+    "kurtosis": 5.796994493214923,
+    "outlier_count": 2,
+    "outlier_pct": 4.3478260869565215,
+    "bias_status": "WARNING",
+    "bias_reason": "Residual mean of 17.7311 is non-zero indicating systematic prediction bias",
+    "normality_status": "WARNING",
+    "normality_reason": "Skewness=2.42, Kurtosis=5.80. Outside normal range, residuals are not normally distributed",
+    "outlier_status": "WARNING",
+    "outlier_reason": "2 outliers (4.3%). Moderate (1-5%)",
+    "status": "WARNING",
+    "reason": "Residual analysis has warnings: systematic bias detected (mean=17.7311); non-normal distribution (skew=2.42, kurtosis=5.80); moderate outliers (4.3%)",
+    "interpretation": "Residual analysis validates regression assumptions: zero-mean residuals (unbiased), normality (valid confidence intervals), and few outliers (data quality)."
+  }
+}

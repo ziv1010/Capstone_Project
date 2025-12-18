@@ -45,6 +45,15 @@ PACKAGE_MAPPING = {
     'skimage': 'scikit-image',
 }
 
+# Reverse mapping: pip package name -> import name
+# Used when required_libraries uses pip names instead of import names
+PIP_TO_IMPORT_MAPPING = {
+    'scikit-learn': 'sklearn',
+    'opencv-python': 'cv2',
+    'pillow': 'PIL',
+    'scikit-image': 'skimage',
+}
+
 
 def install_package(package_name: str, timeout: int = 120) -> bool:
     """
@@ -197,9 +206,17 @@ def setup_ml_namespace(required_libraries: List[str] = None) -> Dict[str, Any]:
             # Try direct import for any other library
             else:
                 try:
-                    module = import_with_auto_install(lib)
+                    # Convert pip package name to import name if needed
+                    # e.g., 'scikit-learn' -> 'sklearn'
+                    import_name = PIP_TO_IMPORT_MAPPING.get(lib_lower, lib)
+                    pip_package = lib if lib in PIP_TO_IMPORT_MAPPING.values() else PACKAGE_MAPPING.get(import_name, lib)
+                    
+                    module = import_with_auto_install(import_name, pip_package)
                     if module:
-                        namespace[lib] = module
+                        namespace[import_name] = module
+                        # Also add with original name for compatibility
+                        if import_name != lib:
+                            namespace[lib.replace('-', '_')] = module
                 except Exception as e:
                     logger.warning(f"Could not import {lib}: {e}")
 

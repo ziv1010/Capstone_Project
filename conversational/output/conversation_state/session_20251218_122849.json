@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T12:28:59.775053",
+    "checksum": "0cf1c33a4db3d2e3",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251218_122849",
+    "messages": [
+      {
+        "role": "user",
+        "content": "can you tell me what tasks are available to do",
+        "timestamp": "2025-12-18 12:28:49.439974",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "<think>\nOkay, the user asked for available tasks, and I provided the list using get_task_proposals. Now they might want to run one of these tasks. Let me check if they need more info on any task or if they want to proceed. Since the response ends with instructions to use 'run task TSK-XXX', maybe I should ask if they want to execute any specific task. Alternatively, they might need help understanding the tasks better. I should offer assistance in choosing or running a task. Let me prompt them to select a task or ask for clarification.\n</think>\n\nHere are the available analytical tasks you can execute:\n\n1. **TSK-001** - Forecast Food Grain Production by Year  \n   *Predict annual production trends using historical data*\n\n2. **TSK-002** - Predict Mandi Prices from Production Data  \n   *Link crop production to wholesale price forecasting*\n\n3. **TSK-003** - Predict Heart Disease Risk  \n   *Classify patients based on medical indicators*\n\n4. **TSK-004** - Predict Production by Season  \n   *Analyze seasonal patterns in crop yields*\n\n5. **TSK-005** - Predict Yield by Crop Type  \n   *Crop-specific yield forecasting*\n\nWould you like to:\n- Run one of these tasks (e.g., \"run task TSK-001\")?\n- Get more details about any task?\n- Create a custom forecasting task?",
+        "timestamp": "2025-12-18 12:28:59.774794",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-18 12:28:49.439937",
+    "last_updated": "2025-12-18 12:28:59.774821"
+  }
+}

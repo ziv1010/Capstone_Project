@@ -1,56 +1,166 @@
 {
   "_meta": {
-    "timestamp": "2025-12-17T21:40:13.635716",
-    "checksum": "dcc777422a29a972",
-    "version": "1.0"
+    "timestamp": "2025-12-18T12:21:54.351820",
+    "checksum": "536cb0e2055f92b5",
+    "version": "1.0",
+    "stage": "stage2",
+    "type": "task_proposals"
   },
   "data": {
     "proposals": [
       {
-        "id": "TSK-1967",
+        "id": "TSK-001",
         "category": "forecasting",
-        "title": "Custom Forecasting: output",
-        "problem_statement": "write me a regression task proposal for the heart dataset",
+        "title": "Forecast Food Grain Production by Year",
+        "problem_statement": "Predict annual food grain production values using historical estimates and area data",
         "required_datasets": [
-          "heart.csv"
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
         ],
-        "target_column": "output",
-        "target_dataset": "heart.csv",
-        "feature_columns": [],
-        "validation_plan": {
-          "train_fraction": 0.7,
-          "validation_fraction": 0.15,
-          "test_fraction": 0.15,
-          "split_strategy": "random",
-          "date_column": null
-        },
-        "feasibility_score": 0.7,
-        "feasibility_notes": "Custom task created from user query: write me a regression task proposal for the heart dataset",
-        "forecast_horizon": 1,
+        "target_column": "Production",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Year",
+          "Area",
+          "Yield",
+          "Season",
+          "Crop"
+        ],
+        "join_plan": null,
+        "feasibility_score": 0.85,
+        "filters": {},
+        "forecast_horizon": 5,
         "forecast_granularity": "year",
-        "forecast_type": "single_step",
+        "forecast_type": "multi_step",
         "evaluation_metrics": [
           "mae",
           "rmse",
           "mape",
           "r2"
         ]
-      }
-    ],
-    "tasks": [
+      },
       {
-        "id": "TSK-1967-R1",
-        "task_id": "TSK-1967-R1",
-        "title": "[RERUN] Analyze guardrails results and apply remediations ...",
-        "description": "RERUN WITH IMPROVEMENTS:\n1. Added target decile balancing feature for propensity issues\n2. Trimmed 1% extreme outliers from target\n3. Applied log transformation to stabilize variance\n\nOriginal: Analyze guardrails results and apply remediations for plan: PLAN-TSK-1967",
+        "id": "TSK-002",
+        "category": "regression",
+        "title": "Predict Mandi Prices from Production Data",
+        "problem_statement": "Join crop production estimates with mandi price data to predict wholesale prices",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+          "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+        ],
+        "target_column": "January-2025",
+        "target_dataset": "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv",
+        "feature_columns": [
+          "Production",
+          "Area",
+          "Yield",
+          "Crop"
+        ],
+        "join_plan": {
+          "datasets": [
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv"
+          ],
+          "join_keys": {
+            "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv": "Crop",
+            "Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv": "crop"
+          },
+          "join_type": "inner"
+        },
+        "feasibility_score": 0.78,
+        "filters": {},
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-003",
+        "category": "classification",
+        "title": "Predict Heart Disease Risk",
+        "problem_statement": "Classify patients as high/low risk for heart disease based on medical features",
+        "required_datasets": [
+          "heart.csv"
+        ],
         "target_column": "target",
-        "complexity": "medium",
-        "is_rerun": true,
-        "original_plan_id": "PLAN-TSK-1967",
-        "improvements": "1. Added target decile balancing feature for propensity issues\n2. Trimmed 1% extreme outliers from target\n3. Applied log transformation to stabilize variance",
-        "status": "ready_to_run"
+        "target_dataset": "heart.csv",
+        "feature_columns": [
+          "age",
+          "sex",
+          "cp",
+          "trestbps",
+          "chol",
+          "fbs",
+          "restecg",
+          "thalach",
+          "exang",
+          "oldpeak",
+          "slope",
+          "ca",
+          "thal"
+        ],
+        "join_plan": null,
+        "feasibility_score": 0.92,
+        "filters": {},
+        "evaluation_metrics": [
+          "accuracy",
+          "precision",
+          "recall",
+          "f1"
+        ]
+      },
+      {
+        "id": "TSK-004",
+        "category": "regression",
+        "title": "Predict Production by Season",
+        "problem_statement": "Analyze seasonal patterns in food grain production using historical estimates",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Production",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Season",
+          "Year",
+          "Area",
+          "Yield",
+          "Crop"
+        ],
+        "join_plan": null,
+        "feasibility_score": 0.82,
+        "filters": {},
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-005",
+        "category": "regression",
+        "title": "Predict Yield by Crop Type",
+        "problem_statement": "Analyze crop-specific yield patterns using production and area data",
+        "required_datasets": [
+          "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv"
+        ],
+        "target_column": "Yield",
+        "target_dataset": "All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv",
+        "feature_columns": [
+          "Crop",
+          "Area",
+          "Production",
+          "Year",
+          "Season"
+        ],
+        "join_plan": null,
+        "feasibility_score": 0.84,
+        "filters": {},
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "r2"
+        ]
       }
-    ],
-    "timestamp": "2025-12-17T21:40:13.635614"
+    ]
   }
 }

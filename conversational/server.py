@@ -13,13 +13,14 @@ import os
 import sys
 import json
 import logging
+import asyncio
 import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -85,6 +86,33 @@ class PipelineTracker:
             }
 
 tracker = PipelineTracker()
+
+# WebSocket connection manager for real-time updates
+class ConnectionManager:
+    """Manages WebSocket connections for real-time updates."""
+    
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+    
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+    
+    async def broadcast(self, message: dict):
+        """Broadcast message to all connected clients."""
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"Error broadcasting to client: {e}")
+
+ws_manager = ConnectionManager()
 
 # ============================================================================
 # API MODELS
@@ -184,9 +212,53 @@ def infer_stage_status(stage: str, task_id: str = None) -> str:
     
     return "pending"
 
+def detect_active_task() -> Optional[str]:
+    """Detect the most recently active task from output files."""
+    import time
+    
+    # Check multiple stage directories for recent activity
+    stage_dirs = [
+        (STAGE3_OUT_DIR, "PLAN-*.json"),
+        (STAGE3B_OUT_DIR, "prepared_PLAN-*.parquet"),
+        (STAGE3_5A_OUT_DIR, "method_proposal_PLAN-*.json"),
+        (STAGE3_5B_OUT_DIR, "tester_PLAN-*.json"),
+        (STAGE4_OUT_DIR, "execution_result_PLAN-*.json"),
+        (STAGE5_OUT_DIR, "visualization_report_PLAN-*.json"),
+    ]
+    
+    recent_task = None
+    recent_time = 0
+    
+    for stage_dir, pattern in stage_dirs:
+        if stage_dir.exists():
+            for f in stage_dir.glob(pattern):
+                mtime = f.stat().st_mtime
+                # Only consider files modified in the last 10 minutes as "active"
+                if mtime > recent_time and (time.time() - mtime) < 600:
+                    recent_time = mtime
+                    # Extract task ID from filename
+                    name = f.stem
+                    if name.startswith("prepared_"):
+                        name = name.replace("prepared_", "")
+                    elif name.startswith("method_proposal_"):
+                        name = name.replace("method_proposal_", "")
+                    elif name.startswith("tester_"):
+                        name = name.replace("tester_", "")
+                    elif name.startswith("execution_result_"):
+                        name = name.replace("execution_result_", "")
+                    elif name.startswith("visualization_report_"):
+                        name = name.replace("visualization_report_", "")
+                    # Remove PLAN- prefix to get task ID
+                    if name.startswith("PLAN-"):
+                        recent_task = name.replace("PLAN-", "")
+                    else:
+                        recent_task = name
+    
+    return recent_task
+
 def get_all_stages_status(task_id: str = None) -> Dict[str, Dict[str, Any]]:
     """Get status for all stages."""
-    stages = ["stage1", "stage2", "stage3", "stage3b", "stage3_5a", "stage3_5b", "stage4", "stage5"]
+    stages = ["stage1", "stage2", "stage3", "stage3b", "stage3_5a", "stage3_5b", "stage4", "stage5", "stage6", "stage7"]
     result = {}
     
     for stage in stages:
@@ -198,6 +270,7 @@ def get_all_stages_status(task_id: str = None) -> Dict[str, Dict[str, Any]]:
         }
     
     return result
+
 
 # ============================================================================
 # PIPELINE EXECUTION
@@ -227,12 +300,163 @@ def run_pipeline_background(task_id: str):
         tracker.finish_pipeline(success=False)
 
 # ============================================================================
+# STARTUP PREREQUISITES
+# ============================================================================
+
+async def ensure_startup_prerequisites():
+    """
+    Ensure all prerequisites are met before the server accepts requests:
+    1. All datasets have summaries (Stage 1)
+    2. 3-5 task proposals exist (Stage 2)
+    """
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
+    logger.info("=" * 60)
+    logger.info("Checking startup prerequisites...")
+    logger.info("=" * 60)
+    
+    # Run blocking operations in thread pool
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        # Check and generate summaries
+        await loop.run_in_executor(executor, ensure_all_summaries_sync)
+        
+        # Check and generate task proposals (3-5, labeled 001-005)
+        await loop.run_in_executor(executor, ensure_task_proposals_sync)
+    
+    logger.info("=" * 60)
+    logger.info("Startup prerequisites check complete.")
+    logger.info("=" * 60)
+
+
+def ensure_all_summaries_sync():
+    """
+    Ensure all datasets in DATA_DIR have corresponding summaries.
+    Runs Stage 1 profiling for any missing summaries.
+    """
+    from code.utils import list_data_files, list_summary_files, profile_csv
+    from code.config import DataPassingManager
+    
+    logger.info("Checking dataset summaries (Stage 1)...")
+    
+    # Get all data files
+    all_files = list_data_files(DATA_DIR)
+    logger.info(f"Found {len(all_files)} data files in {DATA_DIR}")
+    
+    # Get existing summaries
+    SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+    summary_files = list_summary_files(SUMMARIES_DIR)
+    summarized_stems = {
+        Path(sf).stem.replace('.summary', '') 
+        for sf in summary_files
+    }
+    
+    # Find files that need summarizing
+    missing = []
+    for f in all_files:
+        stem = Path(f).stem
+        if stem not in summarized_stems:
+            missing.append(f)
+    
+    if not missing:
+        logger.info(f"✅ All {len(all_files)} datasets have summaries")
+        return
+    
+    logger.info(f"⚠️ Found {len(missing)} datasets without summaries. Generating...")
+    
+    for filename in missing:
+        try:
+            dataset_path = DATA_DIR / filename
+            logger.info(f"  Summarizing: {filename}")
+            
+            # Profile the dataset
+            summary = profile_csv(dataset_path)
+            
+            # Save the summary
+            summary_dict = summary.model_dump()
+            output_name = f"{dataset_path.stem}.summary.json"
+            
+            DataPassingManager.save_artifact(
+                data=summary_dict,
+                output_dir=SUMMARIES_DIR,
+                filename=output_name,
+                metadata={"stage": "stage1", "type": "dataset_summary", "source": "startup_check"}
+            )
+            
+            logger.info(f"    ✅ Saved summary: {output_name}")
+            
+        except Exception as e:
+            logger.error(f"    ❌ Failed to summarize {filename}: {e}")
+    
+    logger.info("Stage 1 summary check complete.")
+
+
+def ensure_task_proposals_sync():
+    """
+    Ensure 3-5 task proposals exist with IDs TSK-001 through TSK-005.
+    If fewer than 3 proposals exist, runs Stage 2 to generate them.
+    """
+    from code.config import DataPassingManager
+    from code.stage2_agent import run_stage2
+    
+    logger.info("Checking task proposals (Stage 2)...")
+    
+    STAGE2_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    proposals_path = STAGE2_OUT_DIR / "task_proposals.json"
+    
+    # Check existing proposals
+    existing_count = 0
+    if proposals_path.exists():
+        try:
+            data = DataPassingManager.load_artifact(proposals_path)
+            proposals = data.get('proposals', [])
+            existing_count = len(proposals)
+            
+            # Check if proposals have proper IDs (TSK-001 through TSK-005)
+            proposal_ids = [p.get('id', '') for p in proposals]
+            expected_ids = {f"TSK-{str(i).zfill(3)}" for i in range(1, 6)}
+            has_proper_ids = any(pid in expected_ids for pid in proposal_ids)
+            
+            if existing_count >= 3 and has_proper_ids:
+                logger.info(f"✅ Found {existing_count} task proposals: {proposal_ids}")
+                return
+            elif existing_count > 0:
+                logger.info(f"⚠️ Found {existing_count} proposals but need proper IDs (TSK-001 to TSK-005)")
+        except Exception as e:
+            logger.warning(f"Could not read existing proposals: {e}")
+    
+    logger.info(f"⚠️ Need to generate task proposals (found {existing_count}, need 3-5 with IDs TSK-001 to TSK-005)")
+    
+    try:
+        # Run Stage 2 to generate proposals
+        logger.info("Running Stage 2 to generate task proposals...")
+        result = run_stage2()
+        
+        if result and result.proposals:
+            logger.info(f"✅ Generated {len(result.proposals)} task proposals")
+            for p in result.proposals:
+                logger.info(f"    - {p.id}: {p.title}")
+        else:
+            logger.warning("Stage 2 did not generate any proposals")
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to generate task proposals: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
+    
+    logger.info("Stage 2 proposal check complete.")
+
+
+# ============================================================================
 # FASTAPI APP
 # ============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting UI Server...")
+    # Ensure prerequisites are met before accepting requests
+    await ensure_startup_prerequisites()
     yield
     logger.info("Shutting down UI Server...")
 
@@ -723,6 +947,48 @@ async def get_task_status(task_id: str):
         "task_id": task_id,
         "stages": stages
     }
+
+
+# ============================================================================
+# WEBSOCKET ENDPOINTS
+# ============================================================================
+
+@app.websocket("/ws/task-progress")
+async def websocket_task_progress(websocket: WebSocket):
+    """WebSocket endpoint for real-time task progress updates."""
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            await asyncio.sleep(2)
+            # Send current status of all tasks
+            state = tracker.get_state()
+            
+            # Try to detect active task from file system if tracker doesn't have one
+            task_id = state.get("task_id")
+            if not task_id:
+                task_id = detect_active_task()
+            
+            stages = get_all_stages_status(task_id)
+            
+            # Build stages dict with just status strings for frontend compatibility
+            stages_status = {}
+            for stage_name, stage_info in stages.items():
+                stages_status[stage_name] = stage_info.get("status", "pending")
+            
+            await websocket.send_json({
+                "type": "task_update",
+                "task_id": task_id,
+                "is_running": state.get("is_running") or (task_id is not None),
+                "current_stage": state.get("current_stage"),
+                "stages": stages_status
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        ws_manager.disconnect(websocket)
+
+
 
 
 # ============================================================================

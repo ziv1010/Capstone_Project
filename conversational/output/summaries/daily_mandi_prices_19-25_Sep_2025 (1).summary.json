@@ -1,11 +1,11 @@
 {
   "_meta": {
-    "timestamp": "2025-12-17T17:14:45.252372",
-    "checksum": "54bdb5df60ed4ea4",
+    "timestamp": "2025-12-18T12:20:40.579110",
+    "checksum": "905d201cfa73326c",
     "version": "1.0",
     "stage": "stage1",
     "type": "dataset_summary",
-    "source": "eda_agent"
+    "source": "startup_check"
   },
   "data": {
     "filename": "daily_mandi_prices_19-25_Sep_2025 (1).csv",
@@ -128,7 +128,7 @@
       "Modal_Price_per_kg_INR"
     ],
     "file_size_mb": 0.0009174346923828125,
-    "created_at": "2025-12-17 17:14:45.252259",
+    "created_at": "2025-12-18 12:20:40.578976",
     "has_datetime_column": true,
     "has_target_candidates": [],
     "data_quality_score": 1.0

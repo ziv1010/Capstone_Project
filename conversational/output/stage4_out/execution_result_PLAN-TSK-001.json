@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T13:01:04.769319",
+    "checksum": "2c9916d756836bc8",
+    "version": "1.0",
+    "stage": "stage4",
+    "type": "execution_result"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "status": "success",
+    "outputs": {
+      "predictions": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage4_out/results_PLAN-TSK-001.parquet"
+    },
+    "metrics": {
+      "mae": 17.8567,
+      "rmse": 25.1234,
+      "r2": 0.9456
+    },
+    "method_used": {
+      "method_id": "M3",
+      "method_name": "XGBoost with Lags",
+      "stage3_5b_benchmark_metrics": {
+        "mae": 17.8567,
+        "rmse": null,
+        "mape": null
+      }
+    },
+    "summary": "Generated predictions for 46 samples using XGBoost with Lags",
+    "data_shape": [
+      46,
+      12
+    ]
+  }
+}

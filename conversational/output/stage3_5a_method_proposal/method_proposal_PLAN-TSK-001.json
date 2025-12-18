@@ -1,0 +1,93 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T12:38:49.603451",
+    "checksum": "db44513e046e5bf5",
+    "version": "1.0",
+    "stage": "stage3_5a",
+    "type": "method_proposal"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-001",
+    "methods_proposed": [
+      {
+        "method_id": "M1",
+        "name": "Naive Forecast",
+        "category": "baseline",
+        "description": "Use last observed Production value as forecast",
+        "implementation_code": "def predict_naive(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    last_value = train_df[target_col].iloc[-1]\n    return pd.DataFrame({'predicted': [last_value] * len(test_df)}, index=test_df.index)",
+        "required_libraries": [
+          "pandas"
+        ],
+        "hyperparameters": {},
+        "expected_strengths": [
+          "Simple baseline",
+          "No parameters to tune"
+        ],
+        "expected_weaknesses": [
+          "Ignores all patterns/trends"
+        ]
+      },
+      {
+        "method_id": "M2",
+        "name": "ARIMA",
+        "category": "statistical/traditional",
+        "description": "Autoregressive Integrated Moving Average model",
+        "implementation_code": "def predict_arima(train_df, test_df, target_col, date_col, **params):\n    from statsmodels.tsa.arima.model import ARIMA\n    import pandas as pd\n    model = ARIMA(train_df[target_col], order=(1,1,0))\n    results = model.fit()\n    forecast = results.forecast(steps=len(test_df))\n    return pd.DataFrame({'predicted': forecast}, index=test_df.index)",
+        "required_libraries": [
+          "statsmodels",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "order": "(1,1,0)"
+        },
+        "expected_strengths": [
+          "Captures temporal patterns",
+          "Well-established method"
+        ],
+        "expected_weaknesses": [
+          "Assumes stationarity",
+          "Less flexible for complex patterns"
+        ]
+      },
+      {
+        "method_id": "M3",
+        "name": "XGBoost with Lags",
+        "category": "ml",
+        "description": "Tree-based ensemble using lag features",
+        "implementation_code": "def predict_xgboost(train_df, test_df, target_col, date_col, **params):\n    from xgboost import XGBRegressor\n    import pandas as pd\n    features = ['Area', 'Yield', 'Area_lag1', 'Yield_lag1', 'Production_lag1']\n    X_train = train_df[features]\n    y_train = train_df[target_col]\n    X_test = test_df[features]\n    model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)\n    model.fit(X_train, y_train)\n    return pd.DataFrame({'predicted': model.predict(X_test)}, index=test_df.index)",
+        "required_libraries": [
+          "xgboost",
+          "pandas"
+        ],
+        "hyperparameters": {
+          "n_estimators": 100,
+          "learning_rate": 0.1
+        },
+        "expected_strengths": [
+          "Handles non-linear patterns",
+          "Uses engineered lag features"
+        ],
+        "expected_weaknesses": [
+          "Requires feature engineering",
+          "Less interpretable"
+        ]
+      }
+    ],
+    "data_split_strategy": {
+      "strategy_type": "temporal_row",
+      "date_column": "year",
+      "target_column": "Production",
+      "train_period": "Years 2021-2023",
+      "validation_period": "Year 2024",
+      "test_period": "Year 2025"
+    },
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "date_column": "year",
+    "target_column": "Production"
+  }
+}

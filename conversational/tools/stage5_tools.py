@@ -305,16 +305,16 @@ def load_execution_results(plan_id: str = None) -> str:
 @tool
 def analyze_data_columns(plan_id: str) -> str:
     """
-    Analyze columns in the results data for visualization planning.
+    Deeply analyze columns in the results data for visualization planning.
 
-    Categorizes columns as: GIVEN (input), PREDICTED (output), ENGINEERED (features),
-    DATETIME, CATEGORICAL.
+    Provides insights about data structure, dimensions, and categories
+    to help you create meaningful, data-driven visualizations.
 
     Args:
         plan_id: Plan ID
 
     Returns:
-        Column categorization for visualization
+        Detailed column analysis including categories, unique values, and visualization ideas
     """
     try:
         predictions_path = STAGE4_OUT_DIR / f"results_{plan_id}.parquet"
@@ -330,16 +330,21 @@ def analyze_data_columns(plan_id: str) -> str:
         target_col = plan.get('target_column', '')
         date_col = plan.get('date_column', '')
 
-        result = ["=== Column Analysis for Visualization ===\n"]
+        result = ["=== DATA STRUCTURE ANALYSIS ===\n"]
+        result.append(f"Total rows: {len(df)}")
+        result.append(f"Total columns: {len(df.columns)}")
+        result.append("")
 
         categories = {
             'DATETIME': [],
             'TARGET_ACTUAL': [],
             'PREDICTED': [],
-            'FEATURES': [],
             'CATEGORICAL': [],
+            'FEATURES': [],
             'OTHER': []
         }
+        
+        categorical_details = {}  # Store unique values for categorical columns
 
         for col in df.columns:
             col_lower = col.lower()
@@ -353,9 +358,15 @@ def analyze_data_columns(plan_id: str) -> str:
             # Check actual/target
             elif col == target_col or 'actual' in col_lower or 'target' in col_lower:
                 categories['TARGET_ACTUAL'].append(col)
-            # Check categorical
-            elif df[col].dtype == 'object' or df[col].nunique() < 20:
+            # Check categorical - object type or low cardinality
+            elif df[col].dtype == 'object' or (pd.api.types.is_numeric_dtype(df[col]) and df[col].nunique() < 15):
                 categories['CATEGORICAL'].append(col)
+                # Store unique values
+                unique_vals = df[col].unique()
+                if len(unique_vals) <= 10:
+                    categorical_details[col] = list(unique_vals)
+                else:
+                    categorical_details[col] = f"{len(unique_vals)} unique values"
             # Features and other numeric
             elif pd.api.types.is_numeric_dtype(df[col]):
                 if 'lag' in col_lower or 'rolling' in col_lower or 'feature' in col_lower:
@@ -365,29 +376,51 @@ def analyze_data_columns(plan_id: str) -> str:
             else:
                 categories['OTHER'].append(col)
 
+        # Output column categories with details
         for cat, cols in categories.items():
             if cols:
-                result.append(f"{cat}:")
+                result.append(f"=== {cat} COLUMNS ===")
                 for c in cols:
-                    result.append(f"  - {c}")
+                    n_unique = df[c].nunique()
+                    if c in categorical_details:
+                        if isinstance(categorical_details[c], list):
+                            result.append(f"  {c}: {categorical_details[c]}")
+                        else:
+                            result.append(f"  {c}: {categorical_details[c]}")
+                    else:
+                        result.append(f"  {c} ({n_unique} unique)")
                 result.append("")
 
-        # Visualization recommendations
-        result.append("--- Recommended Visualizations ---")
-
-        if categories['PREDICTED'] and categories['TARGET_ACTUAL']:
-            result.append("1. Actual vs Predicted scatter plot")
-            result.append("2. Residual analysis (histogram and time series)")
-
-        if categories['DATETIME'] and (categories['PREDICTED'] or categories['TARGET_ACTUAL']):
-            result.append("3. Time series plot with predictions")
+        # Data-driven visualization ideas (suggestive, not prescriptive)
+        result.append("=== DATA-DRIVEN VISUALIZATION IDEAS ===")
+        result.append("(Think about how to leverage the data structure)")
+        result.append("")
 
         if categories['CATEGORICAL']:
-            result.append("4. Predictions by category (box plots)")
+            cat_names = ", ".join(categories['CATEGORICAL'][:3])
+            result.append(f"📊 CATEGORICAL DIMENSIONS: {cat_names}")
+            result.append("   → Consider using these for color-coding, grouping, or faceting")
+            result.append("   → Ask: Which category has highest/lowest values? Which has most errors?")
+            result.append("")
 
-        if categories['FEATURES']:
-            result.append("5. Feature importance or correlation heatmap")
+        if categories['PREDICTED'] and categories['TARGET_ACTUAL']:
+            result.append("📈 PREDICTIONS vs ACTUALS available")
+            result.append("   → Consider showing WHERE errors occur, not just WHAT errors are")
+            result.append("   → Ask: Are errors uniform or do they cluster by category/time?")
+            result.append("")
 
+        if categories['DATETIME']:
+            result.append("📅 TIME DIMENSION available")
+            result.append("   → Consider showing patterns, trends, or cycles over time")
+            result.append("")
+
+        if len(df) < 100:
+            result.append("📋 SMALL DATASET - individual points are visible")
+            result.append("   → Consider labeling or annotating individual data points")
+            result.append("")
+
+        result.append("Remember: The best visualizations tell a STORY that answers the original question!")
+        
         return "\n".join(result)
 
     except Exception as e:
@@ -444,14 +477,18 @@ def create_plot(
     """
     Create and save a visualization.
 
+    IMPORTANT: Your plot_code MUST include a legend! Use ax.legend() or plt.legend().
+
     Args:
         plan_id: Plan ID for loading data
-        plot_code: Python code that creates the plot using matplotlib
-        filename: Output filename (e.g., 'actual_vs_predicted.png')
+        plot_code: Python code that creates the plot using matplotlib.
+                   MUST include ax.legend() or plt.legend() for the legend!
+        filename: Output filename (e.g., 'actual_vs_predicted.png').
+                  The task ID will be auto-prefixed (e.g., TSK-001_actual_vs_predicted.png)
         description: Description of what the plot shows
 
     Returns:
-        Confirmation with saved path
+        Confirmation with saved path including the full filename with task ID prefix
     """
     import sys
     from io import StringIO
@@ -495,19 +532,25 @@ def create_plot(
         # Extract task ID from plan_id (e.g., PLAN-TSK-001 -> TSK-001)
         task_id = plan_id.replace("PLAN-", "") if plan_id.startswith("PLAN-") else plan_id
 
-        # Append task ID to filename if not already present
+        # Normalize filename: ensure lowercase with underscores
         file_path = Path(filename)
-        if task_id not in file_path.stem:
-            new_filename = f"{task_id}_{file_path.name}"
+        normalized_stem = file_path.stem.lower().replace(' ', '_').replace('-', '_')
+        normalized_filename = f"{normalized_stem}{file_path.suffix}"
+        
+        # Always prefix with task ID for consistent naming pattern
+        if task_id.lower() not in normalized_stem.lower():
+            final_filename = f"{task_id}_{normalized_filename}"
         else:
-            new_filename = filename
+            final_filename = normalized_filename
 
         # Save figure
-        output_path = STAGE5_OUT_DIR / new_filename
+        output_path = STAGE5_OUT_DIR / final_filename
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         plt.close()
+        
+        logger.info(f"Plot saved: {final_filename}")
 
-        return f"Plot saved: {output_path}\nDescription: {description}"
+        return f"Plot saved: {output_path}\nFilename: {final_filename}\nDescription: {description}"
 
     except Exception as e:
         import traceback
@@ -827,6 +870,8 @@ def save_visualization_report(report_json: str) -> str:
 
 
 # Export tools list
+# NOTE: create_standard_plots is intentionally NOT exported to give the model
+# full creative freedom to design visualizations using create_plot
 STAGE5_TOOLS = [
     # ReAct framework tools
     record_thought_stage5,
@@ -838,7 +883,7 @@ STAGE5_TOOLS = [
     analyze_data_columns,
     plan_visualization,
     create_plot,
-    create_standard_plots,
+    # Insights and reporting
     generate_insights,
     save_visualization_report,
 ]

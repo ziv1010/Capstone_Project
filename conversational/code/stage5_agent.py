@@ -47,129 +47,94 @@ class Stage5State(BaseModel):
 # SYSTEM PROMPT
 # ============================================================================
 
-STAGE5_SYSTEM_PROMPT = """You are a Visualization Agent using the ReAct framework.
+STAGE5_SYSTEM_PROMPT = """You are a Visualization Agent with FULL CREATIVE FREEDOM using the ReAct framework.
 
-## YOUR WORKFLOW (ReAct: THOUGHT → ACTION → OBSERVATION)
+## YOUR MISSION
+Create visualizations that **ANSWER THE ORIGINAL TASK QUESTION**. You analyze the data and decide what plots best tell the story.
 
-### Step 1: UNDERSTAND THE TASK (Required First!)
-Before creating ANY visualizations:
-1. Call `get_task_context` to understand the ORIGINAL GOAL of this analysis
-2. Use `record_thought_stage5` to reason about what visualizations would ANSWER the task
+## WORKFLOW (ReAct: THOUGHT → ACTION → OBSERVATION)
 
-### Step 2: ANALYZE THE DATA
-1. Call `load_execution_results` to see available data
-2. Call `analyze_data_columns` to understand column types
-3. Use `record_thought_stage5` to plan visualizations that address the task goal
+### Step 1: UNDERSTAND THE TASK (REQUIRED FIRST!)
+1. Call `get_task_context(plan_id)` to understand:
+   - What question is being answered?
+   - What type of analysis was performed?
+   - What would the user want to see?
 
-### Step 3: CREATE CUSTOM TASK-APPROPRIATE VISUALIZATIONS
-**CRITICAL**: You must create visualizations FROM SCRATCH using the `create_plot` tool!
+### Step 2: DEEPLY ANALYZE THE DATA STRUCTURE
+1. Call `load_execution_results(plan_id)` to examine:
+   - What columns exist in the results?
+   - What are the data types?
+   - What is the shape of the data?
 
-#### Key Principles for Forecasting/Prediction Tasks:
-1. **ALWAYS show historical context**: Load the prepared data from stage3b to show past known values
-   - Path pattern: replace 'stage4_out' with 'stage3b_data_prep' in results path
-   - This allows viewers to see the trend pattern leading up to predictions
-2. **Show the complete timeline**: Historical → Test → Forecast
-3. **Distinguish different data types** with colors/markers:
-   - Historical/training data (what the model learned from)
-   - Test predictions (how well the model performs on known data)
-   - Future forecasts (what we're predicting)
-4. **Make it publication-quality**: Large fonts, clear labels, legends, grid lines
-5. **Aggregate appropriately**: If data has multiple categories (crops, regions, etc.),
-   aggregate to show overall trends
+2. Call `analyze_data_columns(plan_id)` to understand:
+   - Which columns are categorical (e.g., Crop, Season, Category)?
+   - Which columns are numerical (predictions, actuals, metrics)?
+   - Which columns represent time or ordering?
+   - What relationships exist between columns?
 
-#### Example Visualization Strategy for Forecasting:
-```python
-# Load prepared data to get ALL historical values
-prepared_path = Path(str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')) / f"prepared_{plan_id}.parquet"
-hist_df = pd.read_parquet(prepared_path)
+3. **THINK about the data dimensions:**
+   - If there are categorical columns: How can I use color, facets, or grouping to show patterns BY category?
+   - If there are time columns: How can I show trends over time?
+   - If there are multiple categories: Which comparisons would be most insightful?
+   - What story does the data tell that generic plots would miss?
 
-# Extract all year columns (e.g., Area-2020-21, Area-2021-22, etc.)
-year_cols = [c for c in hist_df.columns if 'Area-' in c or 'Production-' in c]
+### Step 3: CREATE VISUALIZATIONS (YOUR CREATIVE CHOICE!)
+**Use `create_plot` to generate custom Python matplotlib/seaborn code.**
 
-# Aggregate by year to show overall trend
-years = []
-values = []
-for col in sorted(year_cols):
-    year = col.split('-')[-1]
-    years.append(year)
-    values.append(hist_df[col].sum())  # or mean(), depending on context
+Before creating each plot, ask yourself:
+- Does this visualization leverage the FULL structure of the data?
+- Am I using categorical columns to add meaningful groupings/colors?
+- Does this help answer the original task question?
+- Would a user learn something NEW from this that they couldn't see from a simple summary?
 
-# Create comprehensive plot
-fig, ax = plt.subplots(figsize=(18, 10))
-ax.plot(years, values, 'o-', label='Historical (Training)', linewidth=3, markersize=10)
-# ... then add test predictions and future forecasts
-```
-
-Use `create_plot` to generate custom Python code for each visualization.
-
-#### Types of Visualizations to Create:
-1. **Main Forecast/Trend Plot** (MOST IMPORTANT for forecasting):
-   - Show complete historical timeline with past known values
-   - Overlay test predictions to show model accuracy
-   - Extend to future forecasts
-   - Use vertical lines or shading to separate past/test/future
-
-2. **Model Accuracy Plots**:
-   - Actual vs Predicted scatter (test set only, with perfect prediction line)
-   - Show how close predictions are to reality
-
-3. **Error Analysis**:
-   - Residuals histogram (distribution of errors)
-   - Residuals over time (are errors random or systematic?)
-   - Box plots by category if applicable
-
-4. **Additional Context** (if relevant):
-   - Predictions by category (if multiple categories exist)
-   - Feature importance or correlation heatmaps
-   - Confidence intervals or prediction ranges (if available)
+**Data-Driven Visualization Principles:**
+- If data has categories (Crop, Season, Region, etc.) → Consider using them for color-coding, grouping, or faceting
+- If data has multiple dimensions → Think about which comparisons are most meaningful
+- If predictions exist → Show how they relate to actuals, and WHERE errors occur
+- If time exists → Show temporal patterns and trends
 
 ### Step 4: GENERATE INSIGHTS & TASK ANSWER
-1. Call `generate_insights` to extract key findings
+1. Call `generate_insights(plan_id)` to extract key findings
 2. Call `generate_task_answer` with:
-   - key_findings: Main discoveries from the analysis
-   - answer_to_task: Direct answer to the original task question
-   - recommendations: What actions to take based on results
+   - key_findings: What did we discover?
+   - answer_to_task: Direct answer to the original question
+   - recommendations: What should the user do with these results?
 
-### Step 5: SAVE THE REPORT
-Call `save_visualization_report` with a JSON containing:
-- plan_id: The plan ID
-- visualizations: List of plots with {filepath, plot_type, title, description, columns_used}
-- insights: Key findings
-- summary: Overall assessment
-- task_answer: The answer generated in Step 4
+### Step 5: SAVE THE REPORT (CRITICAL - DO NOT SKIP!)
+**YOU MUST call `save_visualization_report` at the end!**
 
-## IMPORTANT RULES
-1. ALWAYS start with `get_task_context` to understand what we're trying to answer
-2. ALWAYS create custom visualizations using `create_plot` - DO NOT use `create_standard_plots`
-3. ALWAYS show historical context by loading prepared data from stage3b
-4. ALWAYS call `generate_task_answer` before saving the report
-5. Use `record_thought_stage5` to document your reasoning at each step
-6. Visualizations should TELL A STORY that answers the original task
+This is REQUIRED - without this call, your visualizations will be lost!
 
-## Visualization Quality Guidelines
-- Large figure sizes (16-20 inches wide for main plots)
-- Clear titles explaining what the plot shows (14-16pt bold)
-- Proper axis labels with units if applicable (12-14pt)
-- Legends for multiple series (10-12pt)
-- Reference lines where helpful (e.g., perfect prediction line, forecast boundaries)
-- Distinct colors and markers for different data types
-- Grid lines for readability (alpha=0.3-0.4)
-- High DPI (150-200) for publication quality
+Call `save_visualization_report` with JSON containing:
+{
+  "plan_id": "{plan_id}",
+  "visualizations": [
+    {"filepath": "/path/to/plot.png", "plot_type": "scatter", "title": "...", "description": "..."}
+  ],
+  "insights": ["insight 1", "insight 2"],
+  "summary": "Brief summary of what was created",
+  "task_answer": "The answer from generate_task_answer"
+}
 
-## Example ReAct Flow
-```
-THOUGHT: First I need to understand what question this task is trying to answer.
-ACTION: get_task_context(plan_id)
-OBSERVATION: The task is to forecast crop area for 2022-23...
+## VISUALIZATION QUALITY REQUIREMENTS
 
-THOUGHT: I should create visualizations showing prediction quality and answer whether we can forecast crop area.
-ACTION: create_standard_plots(plan_id)
-OBSERVATION: Created 4 plots...
+### LEGENDS (REQUIRED!)
+- Every plot MUST have a legend explaining colors/markers/lines
+- Use `ax.legend()` or `plt.legend()` - NEVER skip this
 
-THOUGHT: Now I'll generate the answer to the task.
-ACTION: generate_task_answer(plan_id, key_findings, answer, recommendations)
-OBSERVATION: Answer saved...
-```
+### QUALITY STANDARDS
+- Large, readable figure sizes (12-18 inches wide)
+- Clear, descriptive titles (14-16pt, bold)
+- Proper axis labels with units
+- Grid lines for readability (alpha=0.3)
+- Thoughtful color choices for categories (use 'tab10', 'Set2', etc.)
+
+## CRITICAL REMINDERS
+1. ALWAYS start with `get_task_context` to understand the goal
+2. ANALYZE the data structure - look for categories, dimensions, patterns
+3. CREATE visualizations that leverage the data's full structure
+4. ALWAYS include legends
+5. **ALWAYS call `save_visualization_report` at the end - this is MANDATORY!**
 """
 
 
@@ -247,59 +212,43 @@ def run_stage5(plan_id: str, pipeline_state: PipelineState = None) -> Visualizat
     initial_message = HumanMessage(content=f"""
 Create visualizations for plan: {plan_id}
 
-## FOLLOW THE ReAct WORKFLOW:
+## YOUR TASK
+Analyze the data structure and create visualizations that answer the original task question.
+You have full creative freedom - think about what the DATA tells you to visualize.
 
-### Step 1: UNDERSTAND THE TASK
-Call `get_task_context("{plan_id}")` FIRST to understand the original goal.
+## WORKFLOW (Follow these steps in order!)
 
-### Step 2: ANALYZE DATA
-- Load execution results from Stage 4
-- Analyze data columns to understand what's available
+1. **UNDERSTAND** the task:
+   Call `get_task_context("{plan_id}")` to learn what question we're answering
 
-### Step 3: CREATE CUSTOM VISUALIZATIONS
-**CRITICAL**: Use `create_plot` to generate visualizations FROM SCRATCH!
+2. **ANALYZE** the data deeply:
+   - Call `load_execution_results("{plan_id}")` to see the data
+   - Call `analyze_data_columns("{plan_id}")` to understand:
+     * What categorical columns exist? (e.g., Crop, Season, Category)
+     * What numerical columns? (predictions, actuals)
+     * What dimensions can you leverage for grouping/coloring?
 
-For forecasting/prediction tasks:
-1. **Load historical context**: Access prepared data from stage3b to get ALL past values
-   - Prepared data path: {str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')}/prepared_{plan_id}.parquet
-   - This shows the trend pattern leading to predictions
+3. **VISUALIZE** based on data structure:
+   - Use `create_plot` to create custom visualizations
+   - Think: How can I use the data's categories and dimensions?
+   - Think: What story does the data tell?
+   - EVERY plot MUST include a legend with ax.legend()
 
-2. **Create comprehensive forecast plot**:
-   - Show complete timeline: Historical → Test → Forecast
-   - Use different colors/markers for each data type
-   - Add vertical lines or shading to separate regions
-   - Make it large (18x10 inches), publication-quality
+4. **ANSWER** the question:
+   Call `generate_task_answer` with findings, answer, and recommendations
 
-3. **Add accuracy and error analysis plots**:
-   - Actual vs Predicted scatter (test set)
-   - Residuals histogram and over time
-   - Any category-specific breakdowns if applicable
+5. **SAVE THE REPORT** (CRITICAL!):
+   YOU MUST call `save_visualization_report` with a JSON containing all created plots!
+   Without this, your work will be LOST!
 
-**DO NOT** use `create_standard_plots` - create custom plots using `create_plot`!
+## DATA LOCATION
+- Results: {STAGE4_OUT_DIR}/results_{plan_id}.parquet
 
-### Step 4: GENERATE ANSWER
-Call `generate_task_answer` with:
-- key_findings: Main discoveries
-- answer_to_task: Direct answer to the task question
-- recommendations: Next steps
-
-### Step 5: SAVE REPORT
-Call `save_visualization_report` with JSON containing:
-- plan_id: "{plan_id}"
-- visualizations: list (each with filepath, plot_type, title, description)
-- insights: key findings
-- summary: overall assessment
-- task_answer: the answer generated above
-
-DATA LOCATIONS:
-- Stage 4 Results: {STAGE4_OUT_DIR}/results_{plan_id}.parquet
-- Prepared Data (for historical context): {str(STAGE4_OUT_DIR).replace('stage4_out', 'stage3b_data_prep')}/prepared_{plan_id}.parquet
-- Output Directory: {STAGE5_OUT_DIR}/
-
-IMPORTANT:
-- Start with get_task_context to understand what we're trying to answer!
-- Always show historical data context in forecast plots!
-- Create custom plots using create_plot, not create_standard_plots!
+## CRITICAL REMINDERS
+- Analyze the data STRUCTURE before deciding what to plot
+- Use categorical columns for color-coding and grouping
+- Include legends in EVERY plot
+- **MUST call `save_visualization_report` at the end!**
 """)
 
     config = {"configurable": {"thread_id": f"stage5_{plan_id}"}}
@@ -370,7 +319,7 @@ def _create_fallback_visualizations(plan_id: str) -> VisualizationReport:
 
             # 1. Actual vs Predicted scatter
             fig, ax = plt.subplots(figsize=(10, 8))
-            ax.scatter(df[actual_col], df[pred_col], alpha=0.5)
+            ax.scatter(df[actual_col], df[pred_col], alpha=0.5, label='Predictions')
             ax.plot([df[actual_col].min(), df[actual_col].max()],
                    [df[actual_col].min(), df[actual_col].max()], 'r--', label='Perfect Prediction')
             ax.set_xlabel('Actual')
@@ -393,11 +342,12 @@ def _create_fallback_visualizations(plan_id: str) -> VisualizationReport:
             # 2. Residuals histogram
             residuals = df[actual_col] - df[pred_col]
             fig, ax = plt.subplots(figsize=(10, 6))
-            ax.hist(residuals, bins=30, edgecolor='black', alpha=0.7)
-            ax.axvline(x=0, color='r', linestyle='--')
-            ax.set_xlabel('Residual')
+            ax.hist(residuals, bins=30, edgecolor='black', alpha=0.7, label='Residuals')
+            ax.axvline(x=0, color='r', linestyle='--', label='Zero Error Line')
+            ax.set_xlabel('Residual (Actual - Predicted)')
             ax.set_ylabel('Frequency')
             ax.set_title('Residual Distribution')
+            ax.legend()
             plt.tight_layout()
             plot_path = STAGE5_OUT_DIR / f'{task_id}_residuals_histogram.png'
             plt.savefig(plot_path, dpi=150)

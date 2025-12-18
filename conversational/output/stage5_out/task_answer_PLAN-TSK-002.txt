@@ -1,0 +1,27 @@
+
+═══════════════════════════════════════════════════════════════
+TASK: Predict Mandi prices using crop production estimates
+═══════════════════════════════════════════════════════════════
+
+📊 KEY FINDINGS:
+- Model achieved 99.9% R-squared but has 1.03 MAE
+- Predicted prices closely follow actual values (scatter plot)
+- Largest discrepancies observed in [insert specific crops from visualization]
+- Residuals show slight negative bias (-0.24 mean)
+- Error distribution is roughly normal with no extreme outliers
+
+✅ ANSWER TO TASK:
+The Linear Regression model successfully predicts Mandi prices with high accuracy (R²=0.9988), but shows minor overprediction bias. The model's predictions align closely with actual values across most crops, though specific crops show larger discrepancies that warrant further investigation.
+
+📈 MODEL PERFORMANCE:
+  • MAE: 1.0315
+  • RMSE: 1.3055
+  • R2: 0.9988
+
+💡 RECOMMENDATIONS:
+1. Investigate crops with largest prediction errors in visualization
+2. Consider feature engineering for time-based patterns
+3. Validate model performance on recent years' data
+4. Explore ensemble methods to reduce residual bias
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-18T15:41:51.043490",
+    "checksum": "41db34f18aaa19f0",
+    "version": "1.0",
+    "stage": "stage7",
+    "type": "guardrails_report"
+  },
+  "data": {
+    "task_id": "TSK-002",
+    "plan_id": "PLAN-TSK-002",
+    "validity_score": 83.33,
+    "validity_label": "HIGH",
+    "validity_icon": "✅",
+    "validity_color": "#10b981",
+    "test_scores": {
+      "correlation": 33.33,
+      "propensity": 33.33,
+      "residual": 16.67
+    },
+    "tests": {
+      "correlation_analysis": {
+        "status": "PASS",
+        "score": 33.33,
+        "details": {
+          "test_name": "correlation_analysis",
+          "prediction_actual_correlation": 0.999476912600851,
+          "threshold_pass": 0.8,
+          "threshold_warning": 0.5,
+          "status": "PASS",
+          "reason": "Correlation of 0.9995 is >= 0.8 threshold, indicating strong linear relationship between predictions and actual values.",
+          "interpretation": "Measures linear relationship between predictions and actuals. Higher correlation indicates better model fit."
+        }
+      },
+      "propensity_score_analysis": {
+        "status": "PASS",
+        "score": 33.33,
+        "details": {
+          "test_name": "propensity_score_analysis",
+          "propensity_mean": 0.19047996244751678,
+          "propensity_std": 0.09525232878720037,
+          "extreme_low_pct": 0.19047619047619047,
+          "extreme_high_pct": 0.0,
+          "extreme_total_pct": 0.19047619047619047,
+          "threshold_pass": 0.2,
+          "threshold_warning": 0.4,
+          "status": "PASS",
+          "reason": "Only 19.0% of samples have extreme propensity scores (< 0.1 or > 0.9), which is below the 20% threshold. This indicates good covariate balance and no significant selection bias.",
+          "interpretation": "Propensity scores measure the probability of belonging to high/low error groups. Extreme scores indicate certain feature combinations are over-represented in errors."
+        }
+      },
+      "residual_analysis": {
+        "status": "WARNING",
+        "score": 16.67,
+        "details": {
+          "test_name": "residual_analysis",
+          "mean": -0.23757675763333927,
+          "std": 1.3615933033116945,
+          "skewness": -0.4271109399035452,
+          "kurtosis": -0.33720688782752717,
+          "outlier_count": 0,
+          "outlier_pct": 0.0,
+          "bias_status": "WARNING",
+          "bias_reason": "Residual mean of -0.2376 is non-zero indicating systematic prediction bias",
+          "normality_status": "PASS",
+          "normality_reason": "Skewness=-0.43, Kurtosis=-0.34. Within acceptable range (-1 to 1 skew, -3 to 3 kurtosis)",
+          "outlier_status": "PASS",
+          "outlier_reason": "0 outliers (0.0%). Acceptable (<1%)",
+          "status": "WARNING",
+          "reason": "Residual analysis has warnings: systematic bias detected (mean=-0.2376)",
+          "interpretation": "Residual analysis validates regression assumptions: zero-mean residuals (unbiased), normality (valid confidence intervals), and few outliers (data quality)."
+        }
+      }
+    },
+    "overall_assessment": "Model shows strong correlation and covariate balance but has non-zero residual mean (-0.2376) indicating systematic bias. Needs review before deployment.",
+    "visualizations": [
+      {
+        "filename": "TSK-002_guardrails_scatter.png",
+        "api_url": "/api/guardrails/TSK-002/image/TSK-002_guardrails_scatter.png"
+      },
+      {
+        "filename": "TSK-002_guardrails_residual_dist.png",
+        "api_url": "/api/guardrails/TSK-002/image/TSK-002_guardrails_residual_dist.png"
+      },
+      {
+        "filename": "TSK-002_guardrails_quintile.png",
+        "api_url": "/api/guardrails/TSK-002/image/TSK-002_guardrails_quintile.png"
+      }
+    ],
+    "generated_at": "2025-12-18T15:41:51.043432"
+  }
+}

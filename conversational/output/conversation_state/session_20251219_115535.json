@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T11:55:36.976877",
+    "checksum": "8f065f6050d62f4d",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_115535",
+    "messages": [
+      {
+        "role": "user",
+        "content": "what tasks do I have to",
+        "timestamp": "2025-12-19 11:55:35.881717",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the analysis tasks that have been generated for your data:\n\n| Task ID | Category | Target | Feasibility | Quick Description |\n|---------|----------|--------|-------------|-------------------|\n| **TSK‑001** | Forecasting | Production | 0.85 | Predict annual food‑grain production using historical estimates and area data. |\n| **TSK‑002** | Regression | January‑2025 | 0.78 | Join crop production with mandi price data to forecast wholesale prices. |\n| **TSK‑003** | Classification | target | 0.92 | Classify patients as high/low risk for heart disease. |\n| **TSK‑004** | Regression | Production | 0.82 | Model seasonal patterns in food‑grain production. |\n| **TSK‑005** | Regression | Yield | 0.84 | Predict yield by crop type using production & area data. |\n| **TSK‑4518** | Forecasting | output | 0.70 | Custom forecasting task (heart disease risk). |\n| **TSK‑7025** | Forecasting | Sales | 0.70 | Custom forecasting task using the advertising dataset. |\n| **TSK‑8826** | Forecasting | Sales | 0.70 | Another custom sales‑forecasting task. |\n\n### How to proceed\n- **Run a task**: Say “run task TSK‑001” (or any other ID) to start the pipeline for that task.  \n- **Explore data first**: If you’d like to understand the underlying data before choosing a task, use the EDA agent: e.g., “What columns are in the crop dataset?” or “Show me the correlation between area and production.”  \n- **Create a new custom task**: If none of the above fits your goal, give me a natural‑language query (e.g., “I want to forecast next‑year wheat yield”) and I’ll auto‑generate a task for you.\n\nLet me know which task you’d like to run or if you’d like to explore the data first!",
+        "timestamp": "2025-12-19 11:55:36.976711",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 11:55:35.881695",
+    "last_updated": "2025-12-19 11:55:36.976729"
+  }
+}

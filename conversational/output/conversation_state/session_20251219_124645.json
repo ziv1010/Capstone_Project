@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T12:46:48.627894",
+    "checksum": "8ff644156df9ee9a",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_124645",
+    "messages": [
+      {
+        "role": "user",
+        "content": "what datasets do i have",
+        "timestamp": "2025-12-19 12:46:45.745698",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "Here’s a quick snapshot of the datasets currently available in your workspace:\n\n| # | Dataset name | Size |\n|---|--------------|------|\n| 1 | **All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv** | 0.01 MB |\n| 2 | **All-India-profile_-Crop-wise-Area.csv** | 0.01 MB |\n| 3 | **Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv** | 0.00 MB |\n| 4 | **Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv** | 0.05 MB |\n| 5 | **advertising.csv** | 0.00 MB |\n| 6 | **daily_mandi_prices_19-25_Sep_2025 (1).csv** | 0.00 MB |\n| 7 | **heart.csv** | 0.01 MB |\n| 8 | **insurance[1].csv** | 0.05 MB |\n| 9 | **soil_data_final.xlsx - soil_data_final.csv** | 0.00 MB |\n\n**Next steps you might consider:**\n\n- **Explore a dataset** – e.g., “What columns are in the *All-India-Estimates-of-Area* file?” → `run_eda_analysis`.\n- **Get a quick summary** of all datasets → `get_summaries`.\n- **See what analytical tasks are ready** → `get_task_proposals`.\n- **Check pipeline status** → `check_pipeline_status`.\n- **Ask if a specific forecast is possible** → `evaluate_user_query`.\n\nLet me know what you’d like to do next!",
+        "timestamp": "2025-12-19 12:46:48.627741",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 12:46:45.745682",
+    "last_updated": "2025-12-19 12:46:48.627757"
+  }
+}

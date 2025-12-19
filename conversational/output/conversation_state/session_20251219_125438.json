@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T12:54:57.707299",
+    "checksum": "b3b6eb7ad7ba7d2b",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_125438",
+    "messages": [
+      {
+        "role": "user",
+        "content": "what tasks do i have",
+        "timestamp": "2025-12-19 12:54:38.722319",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "<think>\nOkay, the user asked \"what tasks do I have,\" and I used the get_task_proposals function to list the available tasks. Now, looking at the response, there are several tasks listed with their IDs, categories, targets, feasibility scores, and descriptions. The user might want to know which tasks are most feasible or need guidance on selecting one.\n\nFirst, I should summarize the tasks in a user-friendly way. Highlighting the feasibility scores could help them decide. TSK-003 has the highest feasibility at 0.92, which is a classification task for heart disease risk. The others range from 0.7 to 0.85. \n\nI should mention the different categories: forecasting, regression, classification. Maybe group them by category if that's helpful. Also, note the custom tasks at the end, which might be less refined. \n\nThe user might need suggestions on which task to choose. Since TSK-003 is the most feasible, I could recommend starting there. Alternatively, if they're interested in forecasting, TSK-001 or TSK-004. \n\nI should ask if they want to run any specific task or need more details. Keeping the response open-ended allows them to specify their next steps. Also, remind them to use the 'run task TSK-XXX' command once they decide.\n</think>\n\nHere are your available analysis tasks:\n\n**Top Recommended Tasks:**\n1. **TSK-003** (Feasibility: 0.92)  \n   *Predict Heart Disease Risk*  \n   Classification task using medical features\n\n2. **TSK-001** (Feasibility: 0.85)  \n   *Forecast Food Grain Production by Year*  \n   Time-series forecasting with historical crop data\n\n3. **TSK-005** (Feasibility: 0.84)  \n   *Predict Yield by Crop Type*  \n   Regression analysis of production/area relationships\n\n**Other Options:**\n- TSK-002: Predict Mandi Prices from Production Data\n- TSK-004: Predict Production by Season\n- TSK-4518/7025/8826: Custom forecasting tasks (lower feasibility)\n\nWould you like to:\n- Run one of these tasks?\n- Get more details about a specific task?\n- Create a custom task based on your own query?",
+        "timestamp": "2025-12-19 12:54:57.707006",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 12:54:38.722270",
+    "last_updated": "2025-12-19 12:54:57.707027"
+  }
+}

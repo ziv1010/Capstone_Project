@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T11:55:29.030738",
+    "checksum": "a8b3f68d2d3610af",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_115527",
+    "messages": [
+      {
+        "role": "user",
+        "content": "what datasets do I currently have",
+        "timestamp": "2025-12-19 11:55:27.926479",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "Here’s a quick list of the datasets currently available in your data directory:\n\n| # | Dataset Name | Size |\n|---|--------------|------|\n| 1 | **All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv** | 0.01 MB |\n| 2 | **All-India-profile_-Crop-wise-Area.csv** | 0.01 MB |\n| 3 | **Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv** | 0.00 MB |\n| 4 | **Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv** | 0.05 MB |\n| 5 | **advertising.csv** | 0.00 MB |\n| 6 | **daily_mandi_prices_19-25_Sep_2025 (1).csv** | 0.00 MB |\n| 7 | **heart.csv** | 0.01 MB |\n| 8 | **soil_data_final.xlsx - soil_data_final.csv** | 0.00 MB |\n\nLet me know if you’d like to explore any of these datasets further—e.g., get summaries, check for missing values, or start a forecasting task!",
+        "timestamp": "2025-12-19 11:55:29.030576",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 11:55:27.926456",
+    "last_updated": "2025-12-19 11:55:29.030594"
+  }
+}

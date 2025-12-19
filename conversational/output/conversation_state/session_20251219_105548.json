@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T10:55:49.060183",
+    "checksum": "09f591e3fd2f622f",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_105548",
+    "messages": [
+      {
+        "role": "user",
+        "content": "run tsk-005",
+        "timestamp": "2025-12-19 10:55:48.267793",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 10:55:48.267761",
+    "last_updated": "2025-12-19 10:55:48.267798"
+  }
+}

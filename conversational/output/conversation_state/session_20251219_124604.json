@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T12:46:06.738836",
+    "checksum": "474d8c0dba98142f",
+    "version": "1.0"
+  },
+  "data": {
+    "session_id": "session_20251219_124604",
+    "messages": [
+      {
+        "role": "user",
+        "content": "what dataset do i have",
+        "timestamp": "2025-12-19 12:46:04.971096",
+        "metadata": {}
+      },
+      {
+        "role": "assistant",
+        "content": "Here’s a quick snapshot of the datasets currently available in your data directory:\n\n| # | Dataset name | Size |\n|---|--------------|------|\n| 1 | **All-India-Estimates-of-Area,-Production-&-Yield-of-Food-Grains.csv** | 0.01 MB |\n| 2 | **All-India-profile_-Crop-wise-Area.csv** | 0.01 MB |\n| 3 | **Export-of-Rice-Varieties-to-Bangladesh,-2018-19-to-2024-25.csv** | 0.00 MB |\n| 4 | **Wholesale-Mandi_Price-from-2012-to-2025 in(RS_qntls) (1).csv** | 0.05 MB |\n| 5 | **advertising.csv** | 0.00 MB |\n| 6 | **daily_mandi_prices_19-25_Sep_2025 (1).csv** | 0.00 MB |\n| 7 | **heart.csv** | 0.01 MB |\n| 8 | **soil_data_final.xlsx – soil_data_final.csv** | 0.00 MB |\n\n**What you can do next**\n\n- **Explore a dataset** – e.g., `run_eda_analysis(query=\"What columns are in the soil_data_final.csv?\")`\n- **Get a summary of the data** – `get_summaries`\n- **See what analytical tasks are ready** – `get_task_proposals`\n- **Check pipeline status** – `check_pipeline_status`\n- **Create a forecasting task** – `create_custom_task_from_query(query=\"Predict rice export to Bangladesh for next 3 years\")`\n\nLet me know what you’d like to explore or analyze!",
+        "timestamp": "2025-12-19 12:46:06.738617",
+        "metadata": {}
+      }
+    ],
+    "current_intent": null,
+    "pipeline_state": null,
+    "available_summaries": [],
+    "available_proposals": [],
+    "current_task_id": null,
+    "preferred_task_category": null,
+    "custom_query": null,
+    "created_at": "2025-12-19 12:46:04.971044",
+    "last_updated": "2025-12-19 12:46:06.738635"
+  }
+}

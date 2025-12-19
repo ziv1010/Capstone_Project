@@ -875,7 +875,8 @@ async def get_stages():
         {"name": "stage4", "title": "Execution", "order": 7},
         {"name": "stage5", "title": "Visualization", "order": 8},
         {"name": "stage6", "title": "Final Report", "order": 9},
-        {"name": "eda", "title": "EDA Output", "order": 10},
+        {"name": "stage7", "title": "Guardrails", "order": 10},
+        {"name": "eda", "title": "EDA Output", "order": 11},
     ]
     
     # Add status for each stage
@@ -901,6 +902,7 @@ async def get_stage_outputs(stage_name: str):
         "stage4": OUTPUT_ROOT / "stage4_out",
         "stage5": OUTPUT_ROOT / "stage5_out",
         "stage6": OUTPUT_ROOT / "stage6_out",
+        "stage7": OUTPUT_ROOT / "stage7_guardrails",
         "eda": OUTPUT_ROOT / "eda_out",
     }
     

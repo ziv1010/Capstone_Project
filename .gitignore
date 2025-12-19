@@ -1,0 +1,72 @@
+# ============================================
+# Agentic AI Pipeline - Git Ignore
+# ============================================
+
+# -------------------- DUMP FOLDERS --------------------
+# Legacy and experimental code
+dump/
+conversational/dump/
+
+# -------------------- PYTHON --------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# -------------------- IDE --------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# -------------------- LOGS --------------------
+*.log
+logs/
+
+# -------------------- DATA OUTPUTS --------------------
+# Uncomment to ignore generated outputs (optional)
+# conversational/output/
+
+# Keep output structure but ignore large files
+*.pkl
+*.pt
+*.h5
+*.model
+
+# -------------------- OS --------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -------------------- JUPYTER --------------------
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# -------------------- SECRETS --------------------
+.env
+.env.local
+*.key
+*.pem
+secrets.json
+
+# -------------------- MISC --------------------
+*.bak
+*.tmp
+*.temp
+.cache/

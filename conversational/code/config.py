@@ -68,7 +68,7 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 PRIMARY_LLM_CONFIG = {
     "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
     "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
-    "model": "llama-3.3-70b-versatile" if USE_GROQ else "Qwen/Qwen2.5-32B-Instruct",
+    "model": "openai/gpt-oss-120b" if USE_GROQ else "Qwen/Qwen2.5-32B-Instruct",
     "temperature": 0.0,
     "max_tokens": 4096,
 }
@@ -77,7 +77,7 @@ PRIMARY_LLM_CONFIG = {
 SECONDARY_LLM_CONFIG = {
     "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
     "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
-    "model": "llama-3.3-70b-versatile" if USE_GROQ else "Qwen/Qwen3-32B",
+    "model": "openai/gpt-oss-120b" if USE_GROQ else "Qwen/Qwen3-32B",
     "temperature": 0.3,  # Lower temperature for better instruction following
     "max_tokens": 4096,  # Default for most stages
 }
@@ -97,7 +97,7 @@ STAGE_MAX_TOKENS = {
 CONVERSATION_LLM_CONFIG = {
     "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
     "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
-    "model": "llama-3.3-70b-versatile" if USE_GROQ else "Qwen/Qwen3-32B",
+    "model": "openai/gpt-oss-120b" if USE_GROQ else "Qwen/Qwen3-32B",
     "temperature": 0.2,  # Slightly higher for more natural conversation
     "max_tokens": 2048,
 }
@@ -106,7 +106,7 @@ CONVERSATION_LLM_CONFIG = {
 EDA_LLM_CONFIG = {
     "base_url": GROQ_BASE_URL if USE_GROQ else LLM_BASE_URL,
     "api_key": GROQ_API_KEY if USE_GROQ else LLM_API_KEY,
-    "model": "llama-3.3-70b-versatile" if USE_GROQ else "Qwen/Qwen3-32B",
+    "model": "openai/gpt-oss-120b" if USE_GROQ else "Qwen/Qwen3-32B",
     "temperature": 0.2,
     "max_tokens": 8192,  # Higher limit for code generation
 }
@@ -114,7 +114,7 @@ EDA_LLM_CONFIG = {
 # Log LLM backend selection
 if USE_GROQ:
     if GROQ_API_KEY:
-        print(f"[CONFIG] Using GROQ LLM (model: llama-3.3-70b-versatile)")
+        print(f"[CONFIG] Using GROQ LLM (model: openai/gpt-oss-120b)")
     else:
         print("[CONFIG] WARNING: USE_GROQ is enabled but GROQ_API_KEY is not set!")
 else:

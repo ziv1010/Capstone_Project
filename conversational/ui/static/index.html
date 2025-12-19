@@ -50,9 +50,16 @@
 
             <!-- EDA Quick Actions -->
             <div class="glass-card mb-3" id="edaActionsCard">
-                <div class="glass-card-header">
-                    <h3 class="glass-card-title">🔍 Quick EDA Actions</h3>
-                    <span class="badge badge-success">NEW</span>
+                <div class="glass-card-header"
+                    style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <h3 class="glass-card-title" style="margin: 0;">🔍 Quick EDA Actions</h3>
+                        <span class="badge badge-success">NEW</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshDatasets()" id="refreshDataBtn"
+                        style="margin-left: auto;">
+                        🔄 Refresh Data
+                    </button>
                 </div>
                 <div class="glass-card-body">
                     <div class="flex gap-2" style="flex-wrap: wrap;">
@@ -72,9 +79,6 @@
                         <button class="btn btn-secondary"
                             onclick="sendQuickQuery('Create a histogram of the target column')">
                             📉 Create Plot
-                        </button>
-                        <button class="btn btn-primary" onclick="refreshDatasets()" id="refreshDataBtn">
-                            🔄 Refresh Data
                         </button>
                     </div>
                 </div>

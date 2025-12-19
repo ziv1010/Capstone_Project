@@ -184,6 +184,21 @@ def load_stage_output(stage: str, task_id: str = None) -> Optional[Dict[str, Any
             return {"summaries": summaries, "count": len(summaries)}
         return None
     
+    # Handle stage3b parquet files specially
+    if stage == "stage3b" and isinstance(path, Path) and path.exists():
+        try:
+            import pandas as pd
+            df = pd.read_parquet(path)
+            return {
+                "columns": list(df.columns),
+                "shape": list(df.shape),
+                "preview": df.head(10).to_dict(orient="records"),
+                "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()}
+            }
+        except Exception as e:
+            logger.error(f"Failed to load parquet {path}: {e}")
+            return None
+    
     # Other stages have single JSON files
     if isinstance(path, Path) and path.exists():
         try:

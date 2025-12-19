@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-18T12:38:49.603451",
-    "checksum": "db44513e046e5bf5",
+    "timestamp": "2025-12-19T03:55:43.961549",
+    "checksum": "27d30bb8e6e97c69",
     "version": "1.0",
     "stage": "stage3_5a",
     "type": "method_proposal"
@@ -11,83 +11,84 @@
     "methods_proposed": [
       {
         "method_id": "M1",
-        "name": "Naive Forecast",
+        "name": "Simple Average Baseline",
         "category": "baseline",
-        "description": "Use last observed Production value as forecast",
-        "implementation_code": "def predict_naive(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    last_value = train_df[target_col].iloc[-1]\n    return pd.DataFrame({'predicted': [last_value] * len(test_df)}, index=test_df.index)",
+        "description": "Averages last two production values for forecasting",
+        "implementation_code": "def predict_simple_average(train_df, test_df, target_col, date_col, **params):\n    import pandas as pd\n    import numpy as np\n    last_two = train_df[target_col].tail(2)\n    prediction = last_two.mean()\n    return pd.DataFrame({\"predicted\": [prediction] * len(test_df)})",
         "required_libraries": [
-          "pandas"
+          "pandas",
+          "numpy"
         ],
         "hyperparameters": {},
         "expected_strengths": [
-          "Simple baseline",
-          "No parameters to tune"
+          "Simple and fast",
+          "Establishes baseline performance"
         ],
         "expected_weaknesses": [
-          "Ignores all patterns/trends"
+          "Ignores all features",
+          "No trend/seasonality handling"
         ]
       },
       {
         "method_id": "M2",
         "name": "ARIMA",
         "category": "statistical/traditional",
-        "description": "Autoregressive Integrated Moving Average model",
-        "implementation_code": "def predict_arima(train_df, test_df, target_col, date_col, **params):\n    from statsmodels.tsa.arima.model import ARIMA\n    import pandas as pd\n    model = ARIMA(train_df[target_col], order=(1,1,0))\n    results = model.fit()\n    forecast = results.forecast(steps=len(test_df))\n    return pd.DataFrame({'predicted': forecast}, index=test_df.index)",
+        "description": "Autoregressive Integrated Moving Average for time series forecasting",
+        "implementation_code": "def predict_arima(train_df, test_df, target_col, date_col, **params):\n    from statsmodels.tsa.arima.model import ARIMA\n    import pandas as pd\n    model = ARIMA(train_df[target_col], order=(1,1,1))\n    results = model.fit()\n    forecast = results.forecast(steps=len(test_df))\n    return pd.DataFrame({\"predicted\": forecast})",
         "required_libraries": [
           "statsmodels",
           "pandas"
         ],
         "hyperparameters": {
-          "order": "(1,1,0)"
+          "order": "(1,1,1)"
         },
         "expected_strengths": [
-          "Captures temporal patterns",
-          "Well-established method"
+          "Handles temporal patterns",
+          "Interpretable parameters"
         ],
         "expected_weaknesses": [
-          "Assumes stationarity",
-          "Less flexible for complex patterns"
+          "Requires stationarity",
+          "Manual order selection"
         ]
       },
       {
         "method_id": "M3",
-        "name": "XGBoost with Lags",
+        "name": "Random Forest Regressor",
         "category": "ml",
-        "description": "Tree-based ensemble using lag features",
-        "implementation_code": "def predict_xgboost(train_df, test_df, target_col, date_col, **params):\n    from xgboost import XGBRegressor\n    import pandas as pd\n    features = ['Area', 'Yield', 'Area_lag1', 'Yield_lag1', 'Production_lag1']\n    X_train = train_df[features]\n    y_train = train_df[target_col]\n    X_test = test_df[features]\n    model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)\n    model.fit(X_train, y_train)\n    return pd.DataFrame({'predicted': model.predict(X_test)}, index=test_df.index)",
+        "description": "Tree-based ensemble using engineered features for forecasting",
+        "implementation_code": "def predict_random_forest(train_df, test_df, target_col, date_col, **params):\n    from sklearn.ensemble import RandomForestRegressor\n    import pandas as pd\n    features = [\"Area\", \"Yield\", \"lag_1\", \"lag_2\", \"rolling_mean_3\"]\n    X_train = train_df[features]\n    y_train = train_df[target_col]\n    X_test = test_df[features]\n    model = RandomForestRegressor(n_estimators=100, random_state=42)\n    model.fit(X_train, y_train)\n    preds = model.predict(X_test)\n    return pd.DataFrame({\"predicted\": preds})",
         "required_libraries": [
-          "xgboost",
+          "sklearn",
           "pandas"
         ],
         "hyperparameters": {
           "n_estimators": 100,
-          "learning_rate": 0.1
+          "random_state": 42
         },
         "expected_strengths": [
-          "Handles non-linear patterns",
-          "Uses engineered lag features"
+          "Captures non-linear patterns",
+          "Handles feature interactions"
         ],
         "expected_weaknesses": [
-          "Requires feature engineering",
-          "Less interpretable"
+          "Less interpretable",
+          "Requires feature engineering"
         ]
       }
     ],
     "data_split_strategy": {
       "strategy_type": "temporal_row",
-      "date_column": "year",
+      "date_column": "Year",
       "target_column": "Production",
-      "train_period": "Years 2021-2023",
-      "validation_period": "Year 2024",
-      "test_period": "Year 2025"
+      "train_period": "Years 2020-2022",
+      "validation_period": "Year 2023",
+      "test_period": "Year 2024"
     },
     "evaluation_metrics": [
       "mae",
       "rmse",
-      "mape",
       "r2"
     ],
-    "date_column": "year",
+    "date_column": "Year",
     "target_column": "Production"
   }
 }

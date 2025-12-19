@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-18T12:37:01.373942",
-    "checksum": "de796f3fc2c14bf1",
+    "timestamp": "2025-12-19T03:52:09.505275",
+    "checksum": "87a23f0d05d92776",
     "version": "1.0",
     "stage": "stage3b",
     "type": "prepared_data_metadata"
@@ -9,8 +9,8 @@
   "data": {
     "plan_id": "PLAN-TSK-001",
     "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-001.parquet",
-    "original_row_count": 142,
-    "final_row_count": 142,
+    "original_row_count": 183,
+    "final_row_count": 183,
     "columns_created": [
       "Crop",
       "Season",
@@ -18,22 +18,25 @@
       "Area",
       "Production",
       "Yield",
-      "Area_lag1",
-      "Yield_lag1",
-      "Production_lag1"
+      "Year",
+      "lag_1",
+      "lag_2",
+      "rolling_mean_3"
     ],
     "transformations_applied": [
-      "reshape_to_long",
-      "create_lag_features"
+      "wide-to-long-reshape",
+      "lag-features",
+      "rolling-mean",
+      "fillna-zero"
     ],
     "data_quality_report": {
-      "total_rows": 142,
-      "total_columns": 9,
+      "total_rows": 183,
+      "total_columns": 10,
       "null_counts": {},
       "duplicate_rows": 0
     },
     "has_no_nulls": true,
     "ready_for_modeling": true,
-    "quality_notes": "Zero nulls after dropna(), final shape (142,9)"
+    "quality_notes": "All nulls handled with fillna(0) in lag features. Final null count: 0"
   }
 }

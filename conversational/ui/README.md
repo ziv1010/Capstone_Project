@@ -1,15 +1,12 @@
-<div align="center">
+# Web UI & API Server
 
-# 🌐 Web UI & API Server
-### *FastAPI Backend & Interactive Frontend*
-
-</div>
+**FastAPI Backend & Interactive Frontend**
 
 The interface layer providing a modern chat experience, real-time monitoring, and artifact browsing.
 
 ---
 
-## 🚀 Running the Server
+## Running the Server
 
 ### Option 1: Main Server (Recommended)
 This launches the full application stack.
@@ -28,7 +25,7 @@ python ui/api.py
 
 ---
 
-## 📁 Structure
+## Structure
 
 | Path | Purpose |
 |---|---|
@@ -41,18 +38,18 @@ python ui/api.py
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
-### 🖥️ Pages
+### Pages
 
 | Route | Description |
 |---|---|
-| `/` | 💬 Chat Interface |
-| `/logs` | 📜 Pipeline Logs |
-| `/outputs` | 📂 Output Browser |
-| `/status` | ⚡ Task Status |
+| `/` | Chat Interface |
+| `/logs` | Pipeline Logs |
+| `/outputs` | Artifact Browser |
+| `/status` | Task Status |
 
-### ⚡ REST API
+### REST API
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -61,7 +58,7 @@ python ui/api.py
 | `/api/stages` | `GET` | List pipeline stages |
 | `/api/stages/{name}/outputs` | `GET` | Get stage artifacts |
 
-### 🔄 WebSocket
+### WebSocket
 
 | Endpoint | Description |
 |---|---|
@@ -70,19 +67,19 @@ python ui/api.py
 
 ---
 
-## 💡 Key Features
+## Features
 
-- **⚡ Real-time Sidebar**: Shows pipeline stage status (Planning → Running → Done).
-- **📝 Markdown Chat**: Full syntax highlighting for code blocks and tables.
-- **🔔 Toast Notifications**: Context-aware alerts for success/error.
-- **💾 Auto-Persistence**: Chat history is saved automatically.
-- **📱 Responsive**: Works on Desktop, Tablet, and Mobile.
+- **Real-time Sidebar**: Shows pipeline stage status (Planning → Running → Done).
+- **Markdown Chat**: Full syntax highlighting for code blocks and tables.
+- **Toast Notifications**: Context-aware alerts for success/error.
+- **Auto-Persistence**: Chat history is saved automatically.
+- **Responsive**: Works on Desktop, Tablet, and Mobile.
 
 ---
 
-## 🎨 Customization
+## Customization
 
-Want to change the theme? Edit `static/css/main.css`:
+To change the theme, edit `static/css/main.css`:
 
 ```css
 :root {

@@ -1,33 +1,30 @@
-<div align="center">
+# Agent Implementations
 
-# 🧠 Agent Implementations
-### *ReAct Agents Powered by LangGraph*
-
-</div>
+**ReAct Agents Powered by LangGraph**
 
 This directory contains the core intelligence of the system. Each agent is designed to handle a specific stage of the data science workflow using the **ReAct (Reason + Act)** pattern.
 
 ---
 
-## 📁 Files Overview
+## Files Overview
 
 | File | Role | Description |
 |---|---|---|
-| `master_orchestrator.py` | 👑 **Orchestrator** | Coordinates all agents, manages pipeline state, and ensures data passing. |
-| `conversation_agent.py` | 🗣️ **Interface** | Handles user interactions, intent classification, and routing. |
-| `eda_agent.py` | 🔍 **Explorer** | Exploratory data analysis with autonomous code generation. |
-| `stage1_agent.py` | 📊 **Analyst** | Dataset analysis and summary generation. |
-| `stage2_agent.py` | 💡 **Strategist** | Task proposal generation based on user intent. |
-| `stage3_agent.py` | 🗺️ **Planner** | Execution plan creation with feature engineering. |
-| `stage3_5b_agent.py` | 🧪 **Scientist** | Benchmarking multiple ML methods (Cross-Validation). |
-| `stage4_agent.py` | ⚡ **Executor** | Final model execution and prediction generation. |
-| `stage5_agent.py` | 🎨 **Artist** | Publication-quality visualization generation. |
-| `stage6_agent.py` | ✍️ **Author** | Comprehensive markdown report generation. |
-| `config.py` | ⚙️ **Config** | Centralized configuration for LLMs and paths. |
+| `master_orchestrator.py` | **Orchestration** | Coordinates all agents, manages pipeline state, and ensures data passing. |
+| `conversation_agent.py` | **Interface** | Handles user interactions, intent classification, and routing. |
+| `eda_agent.py` | **Analysis** | Exploratory data analysis with autonomous code generation. |
+| `stage1_agent.py` | **Profiling** | Dataset analysis and summary generation. |
+| `stage2_agent.py` | **Strategy** | Task proposal generation based on user intent. |
+| `stage3_agent.py` | **Planning** | Execution plan creation with feature engineering. |
+| `stage3_5b_agent.py` | **Benchmarking** | Benchmarking multiple ML methods (Cross-Validation). |
+| `stage4_agent.py` | **Execution** | Final model execution and prediction generation. |
+| `stage5_agent.py` | **Visualization** | Publication-quality visualization generation. |
+| `stage6_agent.py` | **Reporting** | Comprehensive markdown report generation. |
+| `config.py` | **Configuration** | Centralized configuration for LLMs and paths. |
 
 ---
 
-## 🔄 Agent Architecture
+## Agent Architecture
 
 All agents follow a standardized **ReAct** pattern:
 
@@ -51,9 +48,9 @@ while not done:
 
 ---
 
-## 🎯 Master Orchestrator
+## Master Orchestrator
 
-The `ConversationalOrchestrator` is the central nervous system.
+The `ConversationalOrchestrator` is the central component of the system.
 
 1.  **Session Management**: Tracks total conversation state.
 2.  **Intent Routing**: Decides if user wants to *Plan*, *Execute*, or *Talk*.
@@ -61,9 +58,9 @@ The `ConversationalOrchestrator` is the central nervous system.
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-Key settings in `config.py` you might want to tune:
+Key settings in `config.py` available for tuning:
 
 ```python
 # LLM Configuration
@@ -85,11 +82,11 @@ STAGE_MAX_ROUNDS = {
 
 ---
 
-## 📝 Extending the System
+## Extending the System
 
-Want to add a new agent?
+To add a new agent to the pipeline:
 
-1.  Create `stage_new_agent.py`
+1.  Create `stage_new_agent.py`.
 2.  Define a **System Prompt** describing its role.
 3.  Create corresponding tools in `tools/stage_new_tools.py`.
 4.  Register it in `master_orchestrator.py`.

@@ -1,15 +1,12 @@
-<div align="center">
+# Tool Implementations
 
-# 🔧 Tool Implementations
-### *Capabilities for AI Agents*
-
-</div>
+**Capabilities for AI Agents**
 
 This directory defines the **Actions** that agents can take. Each function is exposed as a tool to the LLM.
 
 ---
 
-## 📁 Tool Suite Overview
+## Tool Suite Overview
 
 | File | Capabilities Provided |
 |---|---|
@@ -24,7 +21,7 @@ This directory defines the **Actions** that agents can take. Each function is ex
 
 ---
 
-## 🛠️ Tool Structure
+## Tool Structure
 
 We use LangChain's `@tool` decorator to expose Python functions to the LLM.
 
@@ -54,24 +51,22 @@ def save_visualization(
 
 ---
 
-## 🔑 Critical Tools
+## Key Tools
 
-### 🧪 Benchmarking (Stage 3.5B)
+### Benchmarking (Stage 3.5B)
 ```python
 run_benchmark_code(code: str, plan_id: str, method_id: str) -> str
 ```
 > Executes dynamically generated Python code to benchmark a specific ML method (e.g., XGBoost) via Cross-Validation. Saves the model if successful.
 
-### ⚡ Execution (Stage 4)
+### Execution (Stage 4)
 ```python
 execute_winning_method(plan_id: str, method_id: str) -> str
 ```
 > Loads the best-performing model checkpoint from Stage 3.5B and runs it on the full dataset to generate final predictions.
 
-### 🎨 Visualization (Stage 5)
+### Visualization (Stage 5)
 ```python
 create_visualization(viz_type: str, data_path: str, output_path: str) -> str
 ```
 > Generates publication-ready plots (Residuals, Feature Importance, Actual vs Predicted) using Matplotlib/Seaborn.
-
----

@@ -1,52 +1,47 @@
 
-<div align="center">
+# Agentic AI Data Science Pipeline
 
-# 🤖 Agentic AI Data Science Pipeline
-### *Automated End-to-End Data Science with Multi-Agent Orchestration*
+**Automated End-to-End Data Science with Multi-Agent Orchestration**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-orange.svg)](https://www.langchain.com/langgraph)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Server-green.svg)](https://fastapi.tiangolo.com/)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](unavailable)
 
-<br/>
-
-**A production-ready system that automates workflows from data ingestion to report generation using ReAct agents and Large Language Models.**
+A production-ready system that automates workflows from data ingestion to report generation using ReAct agents and Large Language Models.
 
 ![Architecture](docs/architecture_diagram.png)
 
-</div>
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Pipeline Architecture](#pipeline-architecture)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Technical Stack](#technical-stack)
+- [Usage Guide](#usage-guide)
+- [Configuration](#configuration-reference)
+- [API Endpoints](#api-endpoints)
 
 ---
 
-## 📖 Table of Contents
-
-- [Key Features](#-key-features)
-- [Pipeline Architecture](#-pipeline-architecture)
-- [Quick Start](#-quick-start)
-- [Project Structure](#-project-structure)
-- [Tech Stack](#-tech-stack)
-- [Chat Interface Guide](#-using-the-chat-interface)
-- [Configuration](#-configuration-reference)
-- [API Endpoints](#-api-endpoints)
-
----
-
-## ✨ Key Features
+## Features
 
 | Feature | Description |
-|:---:|---|
-| **🎯 Multi-Agent Orchestration** | **9 specialized agents** coordinate via a master orchestrator to solve complex tasks. |
-| **🧠 ReAct Framework** | Agents use **Reason + Act** loops to iteratively solve problems using 15+ custom tools. |
-| **💬 Conversational Interface** | Natural language task specification ("Predict sales next month") with follow-up capabilities. |
-| **📊 End-to-End Automation** | Handles everything: **EDA → Planning → Feature Eng → Benchmark → Execution → Reporting**. |
-| **🔄 Dynamic Method Selection** | Automatically benchmarks multiple ML methods (XGBoost, LightGBM, etc.) and picks the winner. |
-| **🛡️ Guardrails Validation** | Optional safety layer for model validation and fairness analysis. |
-| **🌐 Web UI** | Real-time **status tracking**, markdown chat, logs viewer, and artifact browser. |
+|:---|---|
+| **Multi-Agent Orchestration** | **9 specialized agents** coordinate via a master orchestrator to solve complex tasks. |
+| **ReAct Framework** | Agents use **Reason + Act** loops to iteratively solve problems using 15+ custom tools. |
+| **Conversational Interface** | Natural language task specification ("Predict sales next month") with follow-up capabilities. |
+| **End-to-End Automation** | Handles everything: **EDA → Planning → Feature Engineering → Benchmark → Execution → Reporting**. |
+| **Dynamic Method Selection** | Automatically benchmarks multiple ML methods (XGBoost, LightGBM, etc.) and selects the optimal one. |
+| **Guardrails Validation** | Optional safety layer for model validation and fairness analysis. |
+| **Web UI** | Real-time **status tracking**, markdown chat, logs viewer, and artifact browser. |
 
 ---
 
-## 🏗️ Pipeline Architecture
+## Pipeline Architecture
 
 The system uses a sequential yet flexible pipeline of agents.
 
@@ -68,7 +63,7 @@ graph LR
 ```
 
 <details>
-<summary><b>🔍 Click to view detailed stage descriptions</b></summary>
+<summary><b>Click to view detailed stage descriptions</b></summary>
 
 | Stage | Description |
 |-------|-------------|
@@ -77,7 +72,7 @@ graph LR
 | **Stage 3** | Creates detailed execution plans with feature engineering strategies |
 | **Stage 3B** | Prepares and transforms data according to the plan |
 | **Stage 3.5A** | Proposes multiple ML methods suitable for the task |
-| **Stage 3.5B** | Benchmarks methods with cross-validation, selects winner |
+| **Stage 3.5B** | Benchmarks methods with cross-validation, selects the best performing model |
 | **Stage 4** | Executes the winning method, generates predictions |
 | **Stage 5** | Creates visualizations (actual vs predicted, residuals, etc.) |
 | **Stage 6** | Generates comprehensive markdown reports |
@@ -87,10 +82,10 @@ graph LR
 
 ---
 
-## 🚀 Quick Start
+## Getting Started
 
 > [!IMPORTANT]
-> Make sure you have **Python 3.10+** installed and an LLM backend ready (Local or Groq).
+> Ensure you have **Python 3.10+** installed and an LLM backend ready (Local or Groq).
 
 ### 1. Installation
 
@@ -142,61 +137,57 @@ python ui/api.py
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 final_code/
-├── README.md                     # 📌 You are here
+├── README.md                     # Main documentation
 ├── docs/                         # Documentation assets
-├── conversational/               # 🧠 Main Intelligence Core
+├── conversational/               # Main Intelligence Core
 │   ├── code/                     # Agent logic & Orchestrator
 │   ├── tools/                    # 15+ specialized tools
 │   ├── ui/                       # Web Interface
 │   ├── server.py                 # Main Entry Point
 │   ├── data/                     # Dataset storage
-│   └── output/                   # 📄 Generated Reports & Models
+│   └── output/                   # Generated Reports & Models
 └── dump/                         # Experimental / Legacy code
 ```
 
 ---
 
-## 🛠️ Tech Stack
-
-<div align="center">
+## Technical Stack
 
 | Category | Technologies |
 |----------|--------------|
-| **🧠 AI Core** | LangChain, LangGraph, OpenAI API |
-| **🤖 LLMs** | Qwen, GPT-4, Llama-3 (Groq), vLLM |
-| **🔬 Data Science** | Pandas, NumPy, Scikit-learn, XGBoost, LightGBM |
-| **📈 Viz** | Matplotlib, Seaborn, Plotly |
-| **⚡ Backend** | FastAPI, Uvicorn, WebSockets |
-| **💾 Data** | Parquet, JSON, CSV |
-
-</div>
+| **AI Core** | LangChain, LangGraph, OpenAI API |
+| **LLMs** | Qwen, GPT-4, Llama-3 (Groq), vLLM |
+| **Data Science** | Pandas, NumPy, Scikit-learn, XGBoost, LightGBM |
+| **Visualization** | Matplotlib, Seaborn, Plotly |
+| **Backend** | FastAPI, Uvicorn, WebSockets |
+| **Data Storage** | Parquet, JSON, CSV |
 
 ---
 
-## 💬 Using the Chat Interface
+## Usage Guide
 
-The system is designed to be conversational. Here's a typical workflow:
+The system is designed to be conversational. Here is a typical workflow:
 
-1.  **Start a Task** 🟢
+1.  **Start a Task**
     > "Predict insurance charges based on the available features."
 
-2.  **Follow Progress** 🔵
+2.  **Follow Progress**
     > Watch the real-time sidebar updates as agents plan, execute, and verify.
 
-3.  **Deep Dive** 🟣
+3.  **Deep Dive**
     > "What is the R² score of the best model?"
     > "Show me the top 5 most important features."
 
-4.  **EDA & Analysis** 🟠
+4.  **Analysis**
     > "Show distribution of age in the heart dataset."
 
 ---
 
-## 🔧 Configuration Reference
+## Configuration Reference
 
 Edit `conversational/code/config.py` to customize the pipeline.
 
@@ -210,7 +201,7 @@ Edit `conversational/code/config.py` to customize the pipeline.
 
 ---
 
-## 📊 API Endpoints
+## API Endpoints
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -223,6 +214,4 @@ Edit `conversational/code/config.py` to customize the pipeline.
 
 ---
 
-<p align="center">
-  <i>Built with ❤️ using LangGraph 🦜⛓️ and FastAPI ⚡</i>
-</p>
+_Built with LangGraph and FastAPI_

@@ -1,27 +1,24 @@
-<div align="center">
+# Conversational AI Pipeline
 
-# 🤖 Conversational AI Pipeline
-### *The Intelligent Core of the System*
-
-</div>
+**The Intelligent Core of the System**
 
 The **Conversational Module** is the brain of the operation, containing all agent logic, tool definitions, and data processing capabilities.
 
 ---
 
-## 📁 Directory Structure
+## Directory Structure
 
 | Directory | Purpose |
 |---|---|
-| **`code/`** | 🧠 **Brain**: Agent implementations and orchestration logic |
-| **`tools/`** | 🛠️ **Hands**: Tool definitions for each stage |
-| **`ui/`** | 💻 **Face**: Web interface and API server |
-| **`data/`** | 💾 **Memory**: Sample datasets and storage |
-| **`output/`** | 📄 **Output**: Generated artifacts and reports |
+| **`code/`** | **Core Logic**: Agent implementations and orchestration logic |
+| **`tools/`** | **Capabilities**: Tool definitions for each stage |
+| **`ui/`** | **Interface**: Web interface and API server |
+| **`data/`** | **Storage**: Sample datasets and storage |
+| **`output/`** | **Artifacts**: Generated reports and models |
 
 ---
 
-## 🚀 Quick Start
+## Getting Started
 
 > [!TIP]
 > This is the recommended way to start the entire system.
@@ -40,7 +37,7 @@ python ui/api.py
 
 ---
 
-## 📊 Data Flow
+## Data Flow
 
 The data flows sequentially through the pipeline, coordinated by the **Master Orchestrator**.
 
@@ -70,7 +67,7 @@ graph TD
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 All settings are centralized in `code/config.py`.
 

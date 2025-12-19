@@ -1,15 +1,12 @@
-<div align="center">
+# Sample Datasets
 
-# 📊 Sample Datasets
-### *Ready-to-Use Data for Testing*
-
-</div>
+**Ready-to-Use Data for Testing**
 
 This directory contains pre-validated datasets to test the pipeline's capabilities.
 
 ---
 
-## 📁 Available Datasets
+## Available Datasets
 
 | File | Description | Shape | Type |
 |---|---|---|---|
@@ -20,9 +17,7 @@ This directory contains pre-validated datasets to test the pipeline's capabiliti
 
 ---
 
-## 🎯 Usage
-
-Simply drop your files here! 
+## Usage
 
 1.  **Place File**: Add your `.csv` or `.xlsx` file to this folder.
 2.  **Auto-Detect**: The system detects new files on startup/refresh.
@@ -32,11 +27,11 @@ Simply drop your files here!
 > **Best Practices for Custom Data:**
 > - Clean header names (no special chars like `$` or `#`).
 > - Consistent types in columns.
-> - Handle missing values (empty or `NaN`) if possible (though the pipeline handles imputation).
+> - Handle missing values (empty or `NaN`) if possible.
 
 ---
 
-## 🔄 How to Refresh
+## How to Refresh
 
 Adding data while the server is running?
 

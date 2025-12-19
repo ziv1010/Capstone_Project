@@ -1,0 +1,59 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T08:59:41.116648",
+    "checksum": "2d56318affc6988a",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-005",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-005.parquet",
+    "original_row_count": 285,
+    "final_row_count": 285,
+    "columns_created": [
+      "year",
+      "Area",
+      "Production",
+      "Yield",
+      "Area_was_missing",
+      "Production_was_missing",
+      "Yield_was_missing",
+      "Crop_Barley",
+      "Crop_Cereals",
+      "Crop_Gram",
+      "Crop_Jowar",
+      "Crop_Lentil",
+      "Crop_Maize",
+      "Crop_Moong",
+      "Crop_Nutri/Coarse Cereals",
+      "Crop_Other Pulses",
+      "Crop_Ragi",
+      "Crop_Rice",
+      "Crop_Shree Anna /Nutri Cereals",
+      "Crop_Small Millets",
+      "Crop_Total Food Grains",
+      "Crop_Total Pulses",
+      "Crop_Tur",
+      "Crop_Urad",
+      "Crop_Wheat",
+      "Season_Rabi",
+      "Season_Summer"
+    ],
+    "transformations_applied": [
+      "reshape_to_long",
+      "grouped_median_imputation",
+      "global_median_fallback",
+      "categorical_encoding"
+    ],
+    "data_quality_report": {
+      "total_rows": 285,
+      "total_columns": 27,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "Zero nulls achieved (285 rows, 27 columns). Missing indicators added for Area/Production/Yield. Categorical features encoded with get_dummies."
+  }
+}

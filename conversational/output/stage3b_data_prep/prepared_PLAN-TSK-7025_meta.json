@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:36:08.295999",
+    "checksum": "1432087cbdac0dfe",
+    "version": "1.0",
+    "stage": "stage3b",
+    "type": "prepared_data_metadata"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-7025",
+    "prepared_file_path": "/scratch/ziv_baretto/llmserve/final_code/conversational/output/stage3b_data_prep/prepared_PLAN-TSK-7025.parquet",
+    "original_row_count": 200,
+    "final_row_count": 200,
+    "columns_created": [
+      "TV",
+      "Radio",
+      "Newspaper",
+      "Sales"
+    ],
+    "transformations_applied": [
+      "None"
+    ],
+    "data_quality_report": {
+      "total_rows": 200,
+      "total_columns": 4,
+      "null_counts": {},
+      "duplicate_rows": 0
+    },
+    "has_no_nulls": true,
+    "ready_for_modeling": true,
+    "quality_notes": "No missing values in original data"
+  }
+}

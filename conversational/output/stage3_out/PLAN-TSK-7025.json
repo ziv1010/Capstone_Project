@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:35:15.286526",
+    "checksum": "ae716b6eaf48a4a9",
+    "version": "1.0",
+    "stage": "stage3",
+    "type": "execution_plan"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-7025",
+    "selected_task_id": "TSK-7025",
+    "goal": "Forecast Sales using advertising spend data",
+    "task_category": "forecasting",
+    "file_instructions": [
+      {
+        "filename": "advertising.csv",
+        "filepath": "DATA_DIR/advertising.csv",
+        "columns_to_use": [
+          "TV",
+          "Radio",
+          "Newspaper",
+          "Sales"
+        ],
+        "filters": [],
+        "date_column": null,
+        "parse_dates": []
+      }
+    ],
+    "join_steps": [],
+    "feature_engineering": [],
+    "target_column": "Sales",
+    "date_column": null,
+    "validation_strategy": "random",
+    "train_end_date": null,
+    "validation_end_date": null,
+    "forecast_horizon": 1,
+    "forecast_granularity": "year",
+    "forecast_type": "single_step",
+    "expected_model_types": [
+      "LinearRegression",
+      "RandomForestRegressor",
+      "XGBRegressor"
+    ],
+    "evaluation_metrics": [
+      "mae",
+      "rmse",
+      "mape",
+      "r2"
+    ],
+    "output_columns": [],
+    "artifacts_to_save": [],
+    "created_at": "2025-12-19T09:35:15.286337"
+  }
+}

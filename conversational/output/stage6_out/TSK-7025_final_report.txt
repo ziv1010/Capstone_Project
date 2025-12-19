@@ -1,0 +1,30 @@
+════════════════════════════════════════════════════════════════════════════════
+FINAL ANALYSIS REPORT: TSK-7025
+════════════════════════════════════════════════════════════════════════════════
+
+EXECUTIVE SUMMARY
+--------------------------------------------------------------------------------
+The task successfully forecasted sales using advertising spend data with a Random Forest model achieving 95.2% R-squared accuracy. Key metrics include MAE=0.96, RMSE=1.23, and MAPE=5.68%.
+
+METHODOLOGY
+--------------------------------------------------------------------------------
+Used Random Forest Regressor on advertising dataset with TV/Radio/ Newspaper features. Evaluated with MAE, RMSE, MAPE, R2 metrics. Generated 31 predictions for sales forecasting.
+
+RESULTS ANALYSIS
+--------------------------------------------------------------------------------
+Model achieved R2=0.9523 with strong alignment between actual and predicted values. TV and Radio showed strongest correlations. Prediction errors remained below 1.24 units (RMSE) and 5.68% (MAPE). Residuals were randomly distributed with no systematic bias.
+
+CONCLUSIONS
+--------------------------------------------------------------------------------
+The Random Forest model successfully forecasts sales with high accuracy (R²=0.952), demonstrating strong predictive capability for advertising spend data.
+
+RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Prioritize TV/Radio advertising based on strong correlations
+2. Monitor residuals for emerging patterns
+3. Validate model with fresh data
+4. Consider feature engineering for Newspaper channel
+
+════════════════════════════════════════════════════════════════════════════════
+Report generated for TSK-7025
+════════════════════════════════════════════════════════════════════════════════

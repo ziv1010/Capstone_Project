@@ -93,7 +93,7 @@ You MUST run each method {BENCHMARK_ITERATIONS} times to check consistency:
 - load_checkpoint: Resume from previous run if exists
 - save_checkpoint: Save progress after each method
 - record_thought_3_5b: Document reasoning
-- run_benchmark_code: Execute method and get metrics
+- run_benchmark_code: Execute method and get metrics. **ALWAYS pass plan_id parameter** (e.g., plan_id="PLAN-TSK-001") for proper model checkpoint naming
 - calculate_metrics: Compute MAE, RMSE, MAPE
 - validate_consistency: Check if results are consistent
 - select_best_method: Select winner based on results

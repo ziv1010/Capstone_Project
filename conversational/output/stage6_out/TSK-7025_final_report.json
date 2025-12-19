@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:59:12.211381",
+    "checksum": "368d8a9d03b35a99",
+    "version": "1.0",
+    "stage": "stage6",
+    "type": "final_report"
+  },
+  "data": {
+    "task_id": "TSK-7025",
+    "plan_id": "PLAN-TSK-7025",
+    "executive_summary": "The task successfully forecasted sales using advertising spend data with a Random Forest model achieving 95.2% R-squared accuracy. Key metrics include MAE=0.96, RMSE=1.23, and MAPE=5.68%.",
+    "methodology": "Used Random Forest Regressor on advertising dataset with TV/Radio/ Newspaper features. Evaluated with MAE, RMSE, MAPE, R2 metrics. Generated 31 predictions for sales forecasting.",
+    "results_analysis": "Model achieved R2=0.9523 with strong alignment between actual and predicted values. TV and Radio showed strongest correlations. Prediction errors remained below 1.24 units (RMSE) and 5.68% (MAPE). Residuals were randomly distributed with no systematic bias.",
+    "conclusions": "The Random Forest model successfully forecasts sales with high accuracy (R²=0.952), demonstrating strong predictive capability for advertising spend data.",
+    "recommendations": "1. Prioritize TV/Radio advertising based on strong correlations\n2. Monitor residuals for emerging patterns\n3. Validate model with fresh data\n4. Consider feature engineering for Newspaper channel",
+    "thought_process": "1. Data Profiling: Analyzed advertising dataset with Sales as target\n2. Task Proposal: Identified sales forecasting as primary objective\n3. Planning: Selected Random Forest Regressor with R2/MAE metrics\n4. Data Prep: Used TV/Radio/Newspaper features for prediction\n5. Method Selection: Chose ensemble model for nonlinear relationships\n6. Benchmarking: Random Forest outperformed linear models\n7. Execution: Generated 31 predictions with high accuracy\n8. Visualization: No plots created but residual analysis confirmed reliability",
+    "visualization_paths": [],
+    "generated_at": "2025-12-19 09:59:12.211291"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "timestamp": "2025-12-18T16:11:58.341043",
-    "checksum": "a308a1fbc72795e0",
+    "timestamp": "2025-12-19T10:03:46.806302",
+    "checksum": "9425a19ab014270f",
     "version": "1.0"
   },
   "data": {
@@ -179,6 +179,66 @@
         },
         "feasibility_score": 0.7,
         "feasibility_notes": "Custom task created from user query: Predict heart disease risk based on medical features",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-7025",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Sales",
+        "problem_statement": "create a task using the advertising dataset",
+        "required_datasets": [
+          "advertising.csv"
+        ],
+        "target_column": "Sales",
+        "target_dataset": "advertising.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: create a task using the advertising dataset",
+        "forecast_horizon": 1,
+        "forecast_granularity": "year",
+        "forecast_type": "single_step",
+        "evaluation_metrics": [
+          "mae",
+          "rmse",
+          "mape",
+          "r2"
+        ]
+      },
+      {
+        "id": "TSK-8826",
+        "category": "forecasting",
+        "title": "Custom Forecasting: Sales",
+        "problem_statement": "Forecast sales using the advertising dataset",
+        "required_datasets": [
+          "advertising.csv"
+        ],
+        "target_column": "Sales",
+        "target_dataset": "advertising.csv",
+        "feature_columns": [],
+        "validation_plan": {
+          "train_fraction": 0.7,
+          "validation_fraction": 0.15,
+          "test_fraction": 0.15,
+          "split_strategy": "random",
+          "date_column": null
+        },
+        "feasibility_score": 0.7,
+        "feasibility_notes": "Custom task created from user query: Forecast sales using the advertising dataset",
         "forecast_horizon": 1,
         "forecast_granularity": "year",
         "forecast_type": "single_step",

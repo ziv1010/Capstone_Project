@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:11:26.098444",
+    "checksum": "b7e1e5830d7f56c3",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report"
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-005",
+    "visualizations": [
+      {
+        "filepath": "TSK-005_actual_vs_predicted_by_crop.png",
+        "plot_type": "scatter",
+        "title": "Actual vs Predicted Yield by Crop Type",
+        "description": "Scatter plot showing actual vs predicted yields with crop types colored differently. Includes perfect prediction line and error band.",
+        "filename": "TSK-005_actual_vs_predicted_by_crop.png"
+      }
+    ],
+    "insights": [
+      "Model shows consistent underprediction bias (mean residual +50.16)",
+      "3.4% of predictions have extreme errors (>3σ)",
+      "Highest errors observed in Nutri/Coarse Cereals, Small Millets, and Shree Anna/Nutri Cereals"
+    ],
+    "summary": "Created visualization showing prediction errors across 21 crop types. Identified three high-error categories with systematic underprediction patterns.",
+    "task_answer": "The highest yield prediction errors occur in Nutri/Coarse Cereals, Small Millets, and Shree Anna/Nutri Cereals. These crops likely have unique growth patterns or limited training data causing prediction challenges. The model systematically underpredicts yields by ~50 units on average."
+  }
+}

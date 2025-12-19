@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:57:41.899373",
+    "checksum": "c25949c58bfff115",
+    "version": "1.0",
+    "stage": "stage5",
+    "type": "visualization_report",
+    "fallback": true
+  },
+  "data": {
+    "plan_id": "PLAN-TSK-7025",
+    "visualizations": [],
+    "html_report_path": null,
+    "insights": [],
+    "summary": "Created 0 visualizations (fallback mode)",
+    "task_answer": null,
+    "created_at": "2025-12-19 09:57:41.899277"
+  }
+}

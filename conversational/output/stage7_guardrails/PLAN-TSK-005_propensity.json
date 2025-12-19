@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:31:09.884774",
+    "checksum": "f71426200b8e220a",
+    "version": "1.0"
+  },
+  "data": {
+    "test_name": "propensity_score_analysis",
+    "propensity_mean": 0.4828360398904285,
+    "propensity_std": 0.16664636475543157,
+    "extreme_low_pct": 0.0,
+    "extreme_high_pct": 0.0,
+    "extreme_total_pct": 0.0,
+    "threshold_pass": 0.2,
+    "threshold_warning": 0.4,
+    "status": "PASS",
+    "reason": "Only 0.0% of samples have extreme propensity scores (< 0.1 or > 0.9), which is below the 20% threshold. This indicates good covariate balance and no significant selection bias.",
+    "interpretation": "Propensity scores measure the probability of belonging to high/low error groups. Extreme scores indicate certain feature combinations are over-represented in errors."
+  }
+}

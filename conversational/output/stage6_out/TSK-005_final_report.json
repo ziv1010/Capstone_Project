@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "timestamp": "2025-12-19T09:13:16.561649",
+    "checksum": "7b34440739374373",
+    "version": "1.0",
+    "stage": "stage6",
+    "type": "final_report"
+  },
+  "data": {
+    "task_id": "TSK-005",
+    "plan_id": "PLAN-TSK-005",
+    "executive_summary": "This report analyzes crop yield predictions using area and production data across seasons. The model achieved an R² score of 0.9882 but shows consistent underprediction bias (mean residual +50.16) in three crop categories: Nutri/Coarse Cereals, Small Millets, and Shree Anna/Nutri Cereals.",
+    "methodology": "Used Random Forest Regressor with features including crop type dummies (21 categories), seasonal indicators, and area/production metrics. Evaluated using MAE (66.37), RMSE (114.64), and R² (0.9882).",
+    "results_analysis": "Model predictions (n=58) show mean yield of 1,773.64 with range 507.89-4,632.77. Visualizations reveal systematic underprediction patterns in three crop categories with 3.4% of predictions exceeding 3σ error thresholds. Key metrics: MAE=66.37, RMSE=114.64, R²=0.9882.",
+    "conclusions": "The model successfully predicts crop yields with high accuracy (R²=0.9882) but exhibits consistent underprediction in three specialized cereal categories. This suggests either unique growth patterns or insufficient training data for these specific crop types.",
+    "recommendations": "1. Collect additional data for underrepresented crop categories\n2. Consider specialized models for high-error crop types\n3. Monitor prediction residuals for these categories in production\n4. Investigate feature engineering for crop-specific variables",
+    "thought_process": "1. **Stage 1**: Analyzed production data with 21 crop types and seasonal patterns\n2. **Stage 2**: Identified yield prediction task with high feasibility (0.84)\n3. **Stage 3**: Planned regression approach with Random Forest and Linear Regression\n4. **Stage 3B**: Prepared data with crop type dummies and seasonal indicators\n5. **Stage 3.5A**: Selected Random Forest as primary method\n6. **Stage 3.5B**: Validated with MAE/RMSE/R² metrics\n7. **Stage 4**: Generated predictions showing strong performance\n8. **Stage 5**: Created visualization highlighting three high-error crop categories",
+    "visualization_paths": [
+      {
+        "filename": "TSK-005_actual_vs_predicted_by_crop.png",
+        "title": "Actual vs Predicted Yield by Crop Type",
+        "description": "Scatter plot showing actual vs predicted yields with crop types colored differently. Includes perfect prediction line and error band.",
+        "plot_type": "scatter",
+        "api_url": "/api/stage5/image/TSK-005_actual_vs_predicted_by_crop.png"
+      }
+    ],
+    "generated_at": "2025-12-19 09:13:16.561554"
+  }
+}

@@ -410,7 +410,7 @@ def record_thought_3_5b(thought: str, next_action: str) -> str:
 
 
 @tool
-def run_benchmark_code(code: str, method_name: str, required_libraries: str = None) -> str:
+def run_benchmark_code(code: str, method_name: str, required_libraries: str = None, plan_id: str = None) -> str:
     """
     Execute benchmarking code for a method with automatic dependency installation.
     Also saves trained model checkpoints for Stage 4 to load.
@@ -426,6 +426,8 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
         code: Python code to execute
         method_name: Name of the method being tested
         required_libraries: Comma-separated list of required libraries (optional)
+        plan_id: Plan ID (e.g., PLAN-TSK-001) for model checkpoint naming. 
+                 If not provided, attempts to extract from code string.
 
     Returns:
         Execution output with metrics
@@ -493,12 +495,16 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
         # Save model checkpoint if found
         if trained_model is not None:
             try:
-                # Extract plan_id from code or method_name (including -R1 suffix for reruns)
-                plan_match = re.search(r'PLAN-TSK-\d+(?:-R\d+)?', code)
-                if plan_match:
-                    plan_id = plan_match.group()
-                else:
-                    plan_id = "UNKNOWN"
+                # Use the plan_id parameter if provided, otherwise extract from code
+                checkpoint_plan_id = plan_id
+                if checkpoint_plan_id is None:
+                    # Extract plan_id from code (including -R1 suffix for reruns)
+                    plan_match = re.search(r'PLAN-TSK-\d+(?:-R\d+)?', code)
+                    if plan_match:
+                        checkpoint_plan_id = plan_match.group()
+                    else:
+                        checkpoint_plan_id = "UNKNOWN"
+                        logger.warning("Could not determine plan_id for model checkpoint - using 'UNKNOWN'")
                 
                 # Extract method_id (M1, M2, M3) from method_name
                 method_match = re.search(r'M(\d+)', method_name)
@@ -507,7 +513,7 @@ def run_benchmark_code(code: str, method_name: str, required_libraries: str = No
                 else:
                     method_id = method_name.replace(' ', '_')[:10]
                 
-                model_filename = f"model_{plan_id}_{method_id}.pkl"
+                model_filename = f"model_{checkpoint_plan_id}_{method_id}.pkl"
                 model_path = STAGE3_5B_OUT_DIR / model_filename
                 joblib.dump(trained_model, model_path)
                 saved_model_path = str(model_path)
